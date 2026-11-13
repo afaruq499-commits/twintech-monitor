@@ -1,0 +1,368 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --v14-canvas: #f4f5f7;
+  --v14-surface: #ffffff;
+  --v14-surface-alt: #f8f9fb;
+  --v14-border: rgba(15, 23, 42, 0.07);
+  --v14-shadow: 0 2px 16px rgba(15, 23, 42, 0.035);
+  --v14-shadow-hover: 0 12px 28px rgba(15, 23, 42, 0.07);
+  --v14-accent-start: #f45b38;
+  --v14-accent-end: #da381b;
+}
+
+html.dark {
+  color-scheme: dark;
+  --v14-canvas: #0d0e12;
+  --v14-surface: #16181f;
+  --v14-surface-alt: #1e212a;
+  --v14-border: rgba(255, 255, 255, 0.08);
+  --v14-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --v14-shadow-hover: 0 14px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* Skala teks diperbesar secara default agar nyaman dibaca di layar laptop & lapangan */
+html {
+  font-size: 17px;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+html[data-font-scale="normal"] {
+  font-size: 15.5px;
+}
+@media (min-width: 1024px) {
+  html[data-font-scale="normal"] {
+    font-size: 16px;
+  }
+}
+
+html[data-font-scale="large"] {
+  font-size: 17px;
+}
+@media (min-width: 1024px) {
+  html[data-font-scale="large"] {
+    font-size: 18px;
+  }
+}
+
+html[data-font-scale="xlarge"] {
+  font-size: 18.5px;
+}
+@media (min-width: 1024px) {
+  html[data-font-scale="xlarge"] {
+    font-size: 19.5px;
+  }
+}
+
+body {
+  background-color: var(--v14-canvas);
+  color: #0f172a;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.55;
+  overflow-x: hidden;
+  max-width: 100vw;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark body {
+  background-color: var(--v14-canvas);
+  color: #f1f5f9;
+}
+
+/* Dashboard V14 Reusable Surface, Gradient & Motion Primitives */
+.v14-card {
+  background-color: var(--v14-surface);
+  border: 1px solid var(--v14-border);
+  box-shadow: var(--v14-shadow);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease,
+    background-color 0.3s ease;
+}
+
+.v14-card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--v14-shadow-hover);
+}
+
+.v14-subcard {
+  background-color: var(--v14-surface-alt);
+  border: 1px solid var(--v14-border);
+  transition: transform 0.2s ease, background-color 0.3s ease, border-color 0.2s ease;
+}
+
+.v14-coral-card {
+  background: linear-gradient(135deg, var(--v14-accent-start) 0%, var(--v14-accent-end) 100%);
+  box-shadow: 0 12px 28px -6px rgba(235, 68, 38, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.v14-coral-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 36px -6px rgba(235, 68, 38, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+@keyframes v14FadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-v14-in {
+  animation: v14FadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.v14-delay-1 { animation-delay: 40ms; }
+.v14-delay-2 { animation-delay: 90ms; }
+.v14-delay-3 { animation-delay: 140ms; }
+.v14-delay-4 { animation-delay: 190ms; }
+.v14-delay-5 { animation-delay: 240ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-v14-in {
+    animation: none;
+  }
+  .v14-card-interactive:hover,
+  .v14-coral-card:hover {
+    transform: none;
+  }
+}
+
+/* Global Dark Mode Adaptation for Legacy Sub-Pages (zero specificity so Tailwind dark:* always wins) */
+:where(html.dark .bg-white:not([data-keep-light])) {
+  background-color: #16181f;
+}
+
+:where(html.dark .bg-slate-50:not([data-keep-light])),
+:where(html.dark .bg-slate-50\/80:not([data-keep-light])),
+:where(html.dark .bg-slate-50\/70:not([data-keep-light])) {
+  background-color: #1d2029;
+}
+
+:where(html.dark .bg-slate-100:not([data-keep-light])) {
+  background-color: #232631;
+}
+
+:where(html.dark .hover\:bg-slate-50:hover:not([data-keep-light])),
+:where(html.dark .hover\:bg-slate-100:hover:not([data-keep-light])) {
+  background-color: #262a36;
+}
+
+:where(html.dark .text-slate-900:not([data-keep-light])),
+:where(html.dark .text-slate-800:not([data-keep-light])) {
+  color: #f1f5f9;
+}
+
+:where(html.dark .text-slate-700:not([data-keep-light])) {
+  color: #cbd5e1;
+}
+
+:where(html.dark .text-slate-600:not([data-keep-light])),
+:where(html.dark .text-slate-500:not([data-keep-light])) {
+  color: #94a3b8;
+}
+
+:where(html.dark .border-slate-200:not([data-keep-light])),
+:where(html.dark .border-slate-300:not([data-keep-light])),
+:where(html.dark .border-slate-100:not([data-keep-light])) {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:where(html.dark .divide-slate-100 > :not(:last-child)),
+:where(html.dark .divide-slate-200 > :not(:last-child)) {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:where(html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([data-keep-light])),
+:where(html.dark select:not([data-keep-light])),
+:where(html.dark textarea:not([data-keep-light])) {
+  background-color: #12141a;
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:where(html.dark input::placeholder),
+:where(html.dark textarea::placeholder) {
+  color: #64748b;
+}
+
+/* Hilangkan visual scrollbar tetapi fungsionalitas scroll tetap berjalan */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar elegan untuk tabel jadwal & top-scrollbar */
+.schedule-scrollbar::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.schedule-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 6px;
+}
+.schedule-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid transparent;
+}
+html.dark .schedule-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f4454;
+}
+.schedule-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.schedule-scrollbar {
+  scrollbar-color: #94a3b8 transparent;
+  scrollbar-width: thin;
+}
+
+/* FullCalendar clean styling dengan penanda tanggal merah / hari ini */
+.fc {
+  --fc-border-color: #e2e8f0;
+  --fc-button-bg-color: #141518;
+  --fc-button-border-color: #141518;
+  --fc-button-hover-bg-color: #27272a;
+  --fc-button-hover-border-color: #27272a;
+  --fc-button-active-bg-color: #f05232;
+  --fc-button-active-border-color: #f05232;
+  --fc-today-bg-color: #fff5f2;
+  font-size: 0.95rem;
+}
+
+html.dark .fc {
+  --fc-border-color: rgba(255, 255, 255, 0.1);
+  --fc-page-bg-color: #16181f;
+  --fc-neutral-bg-color: #1e212a;
+  --fc-button-bg-color: #272a36;
+  --fc-button-border-color: #323644;
+  --fc-button-hover-bg-color: #363a49;
+  --fc-today-bg-color: rgba(240, 82, 50, 0.12);
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+html.dark .fc .fc-toolbar-title,
+html.dark .fc .fc-col-header-cell-cushion,
+html.dark .fc .fc-daygrid-day-number {
+  color: #f1f5f9;
+}
+
+.fc .fc-button {
+  padding: 0.45rem 0.95rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  text-transform: capitalize;
+}
+
+.fc .fc-daygrid-event {
+  border-radius: 0.5rem;
+  padding: 3px 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: grab;
+}
+
+/* Header Kolom Sabtu & Minggu: TANGGAL MERAH */
+.fc th.fc-col-header-cell.fc-day-sat,
+.fc th.fc-col-header-cell.fc-day-sun,
+.fc th.cal-header-weekend {
+  background-color: #ffe4e6 !important;
+  color: #be123c !important;
+  border-bottom: 3px solid #f43f5e !important;
+}
+
+html.dark .fc th.fc-col-header-cell.fc-day-sat,
+html.dark .fc th.fc-col-header-cell.fc-day-sun,
+html.dark .fc th.cal-header-weekend {
+  background-color: rgba(244, 63, 94, 0.18) !important;
+  color: #fda4af !important;
+}
+
+/* Header Kolom HARI INI */
+.fc th.fc-col-header-cell.fc-day-today,
+.fc th.cal-header-today {
+  background-color: #ffedd5 !important;
+  color: #c2410c !important;
+  border-bottom: 3px solid #f05232 !important;
+}
+
+html.dark .fc th.fc-col-header-cell.fc-day-today,
+html.dark .fc th.cal-header-today {
+  background-color: rgba(240, 82, 50, 0.22) !important;
+  color: #fdba74 !important;
+}
+
+/* Sel Grid Tanggal Merah (Sabtu, Minggu & Libur Nasional) */
+.fc .fc-day-sat,
+.fc .fc-day-sun,
+.fc td.cal-tanggal-merah {
+  background-color: rgba(255, 241, 242, 0.6) !important;
+}
+
+html.dark .fc .fc-day-sat,
+html.dark .fc .fc-day-sun,
+html.dark .fc td.cal-tanggal-merah {
+  background-color: rgba(244, 63, 94, 0.06) !important;
+}
+
+.fc .fc-day-sat .fc-daygrid-day-number,
+.fc .fc-day-sun .fc-daygrid-day-number,
+.fc td.cal-tanggal-merah .fc-daygrid-day-number {
+  color: #e11d48 !important;
+  font-weight: 800 !important;
+}
+
+html.dark .fc .fc-day-sat .fc-daygrid-day-number,
+html.dark .fc .fc-day-sun .fc-daygrid-day-number,
+html.dark .fc td.cal-tanggal-merah .fc-daygrid-day-number {
+  color: #fb7185 !important;
+}
+
+/* Sel Grid HARI INI */
+.fc .fc-day-today,
+.fc td.cal-hari-ini {
+  background-color: #fff5f2 !important;
+  box-shadow: inset 0 0 0 2px #f05232 !important;
+  z-index: 2 !important;
+}
+
+html.dark .fc .fc-day-today,
+html.dark .fc td.cal-hari-ini {
+  background-color: rgba(240, 82, 50, 0.12) !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number,
+.fc td.cal-hari-ini .fc-daygrid-day-number {
+  color: #dc2626 !important;
+  font-weight: 900 !important;
+}
+
+html.dark .fc .fc-day-today .fc-daygrid-day-number,
+html.dark .fc td.cal-hari-ini .fc-daygrid-day-number {
+  color: #fb923c !important;
+}

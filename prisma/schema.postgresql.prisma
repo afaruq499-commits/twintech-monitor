@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id           String    @id @default(cuid())
+  kode         String?   @db.VarChar(100)
+  nama         String    @db.VarChar(300)
+  client       String    @db.VarChar(300)
+  komponenInti String?   @map("komponen_inti") @db.Text
+  deskripsi    String?   @db.Text
+  tanggalMulai DateTime? @map("tanggal_mulai") @db.Date
+  deadline     DateTime? @db.Date
+  prioritas    String    @default("SEDANG") @db.VarChar(30) // TINGGI | SEDANG | RENDAH
+  tipeProyek   String    @default("AUTOMATION_KECIL") @map("tipe_proyek") @db.VarChar(50) // IOT | AUTOMATION_KECIL | AUTOMATION_BESAR | AFTER_SALES
+  status       String    @default("PLANNING") @db.VarChar(50) // PLANNING | MENUNGGU_KOMPONEN | WIRING | PROGRAMMING | COMMISSIONING | SELESAI
+  prStatus     String    @default("DRAFT") @map("pr_status") @db.VarChar(30) // DRAFT | PREPARED | CHECKED | PURCHASING | APPROVED
+  catatan      String?   @db.Text
+  warna        String    @default("#2563eb") @db.VarChar(20)
+  pic          String?   @db.VarChar(200)
+  bolehParalel Boolean   @default(false) @map("boleh_paralel")
+  urutanManual Int?      @map("urutan_manual")
+  plcAddressesJson String? @map("plc_addresses_json") @db.Text
+  gambarUrl    String?   @map("gambar_url") @db.Text
+  flowSequenceJson String? @map("flow_sequence_json") @db.Text
+  wiringDiagramPdfUrl String? @map("wiring_diagram_pdf_url") @db.Text
+  wiringDiagramPdfName String? @map("wiring_diagram_pdf_name") @db.VarChar(300)
+  plcProgramFileUrl String? @map("plc_program_file_url") @db.Text
+  plcProgramFileName String? @map("plc_program_file_name") @db.VarChar(300)
+  plcProgramFileSize Int? @map("plc_program_file_size")
+  panelLayoutJson String? @map("panel_layout_json") @db.Text
+  fileChecklistJson String? @map("file_checklist_json") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  components Component[]
+  lanes      Lane[]
+  prImports  PrImport[]
+
+  @@map("projects")
+}
+
+model PrImport {
+  id            String    @id @default(cuid())
+  projectId     String    @map("project_id")
+  namaFile      String    @map("nama_file") @db.VarChar(400)
+  tanggalRevisi DateTime? @map("tanggal_revisi") @db.Date
+  mode          String    @default("INITIAL") @db.VarChar(30) // INITIAL | MERGE
+  headerJson    String?   @map("header_json") @db.Text
+  ringkasanJson String?   @map("ringkasan_json") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("pr_imports")
+}
+
+model Component {
+  id              String    @id @default(cuid())
+  projectId       String    @map("project_id")
+  urutan          Int       @default(0)
+  kelompok        String    @default("Kelompok 1") @db.VarChar(200)
+  noPr            String?   @map("no_pr") @db.VarChar(50)
+  partType        String    @map("part_type") @db.VarChar(400)
+  partName        String    @map("part_name") @db.VarChar(300)
+  supplier        String?   @db.VarChar(300)
+  qty             Float     @default(1)
+  unit            String?   @db.VarChar(50)
+  catatanPr       String?   @map("catatan_pr") @db.Text
+  tanggalPakai    DateTime? @map("tanggal_pakai") @db.Date
+  hargaSatuan     Float?    @map("harga_satuan")
+  hargaRaw        String?   @map("harga_raw") @db.VarChar(200)
+  total           Float?
+  statusPembelian String    @default("BELUM_PR") @map("status_pembelian") @db.VarChar(40) // BELUM_PR | PR_DIAJUKAN | SUDAH_DIPESAN | SUDAH_DATANG | TERPASANG
+  estimasiTiba    DateTime? @map("estimasi_tiba") @db.Date
+  perluDicek      Boolean   @default(false) @map("perlu_dicek")
+  alasanDicek     String?   @map("alasan_dicek") @db.Text
+  statusImport    String    @default("NORMAL") @map("status_import") @db.VarChar(40) // NORMAL | BARU | HILANG_DI_REVISI
+  catatan         String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workItems WorkItemComponent[]
+
+  @@index([projectId])
+  @@map("components")
+}
+
+model Lane {
+  id           String   @id @default(cuid())
+  projectId    String   @map("project_id")
+  urutan       Int      @default(0)
+  nama         String   @db.VarChar(200)
+  subjudul     String    @default("(Timeline Onsite & Commissioning)") @db.VarChar(300)
+  tanggalMulai DateTime  @map("tanggal_mulai") @db.Date
+  jumlahHari   Int       @default(6) @map("jumlah_hari")
+  deadline     DateTime? @db.Date
+  pic          String?   @db.VarChar(200)
+  customDatesJson String? @map("custom_dates_json") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workItems WorkItem[]
+
+  @@index([projectId])
+  @@map("lanes")
+}
+
+model WorkItem {
+  id           String   @id @default(cuid())
+  laneId       String   @map("lane_id")
+  urutan       Int      @default(1)
+  jenis        String    @default("COMMISSIONING") @db.VarChar(40) // WIRING | PROGRAMMING | TESTING_FAT | INSTALASI_SITE | COMMISSIONING | MEETING | LAINNYA
+  judul        String    @db.VarChar(400)
+  bolehParalel Boolean   @default(false) @map("boleh_paralel")
+  pic          String?   @db.VarChar(200)
+  deadline     DateTime? @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  lane          Lane                @relation(fields: [laneId], references: [id], onDelete: Cascade)
+  subScopes     SubScope[]
+  scheduleCells ScheduleCell[]
+  components    WorkItemComponent[]
+
+  @@index([laneId])
+  @@map("work_items")
+}
+
+model SubScope {
+  id            String         @id @default(cuid())
+  workItemId    String         @map("work_item_id")
+  urutan        Int            @default(1)
+  judul         String         @db.VarChar(400)
+  workItem      WorkItem       @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  details       TaskDetail[]
+  scheduleCells ScheduleCell[]
+
+  @@index([workItemId])
+  @@map("sub_scopes")
+}
+
+model TaskDetail {
+  id         String   @id @default(cuid())
+  subScopeId String   @map("sub_scope_id")
+  urutan     Int      @default(1)
+  teks       String   @db.Text
+  subScope   SubScope @relation(fields: [subScopeId], references: [id], onDelete: Cascade)
+  scheduleCells ScheduleCell[]
+
+  @@index([subScopeId])
+  @@map("task_details")
+}
+
+model ScheduleCell {
+  id                 String    @id @default(cuid())
+  workItemId         String    @map("work_item_id")
+  subScopeId         String?   @map("sub_scope_id")
+  taskDetailId       String?   @map("task_detail_id")
+  tanggal            DateTime  @db.Date
+  status             String    @default("TARGET") @db.VarChar(30) // TARGET | ON_PROGRESS | DONE | DELAY
+  warnaCustom        String?   @map("warna_custom") @db.VarChar(20)
+  catatan            String?   @db.Text
+  delayDikonfirmasi  Boolean   @default(false) @map("delay_dikonfirmasi")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  workItem   WorkItem    @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  subScope   SubScope?   @relation(fields: [subScopeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  taskDetail TaskDetail? @relation(fields: [taskDetailId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([workItemId, tanggal])
+  @@index([subScopeId, tanggal])
+  @@index([taskDetailId, tanggal])
+  @@index([tanggal])
+  @@map("schedule_cells")
+}
+
+model WorkItemComponent {
+  id          String    @id @default(cuid())
+  workItemId  String    @map("work_item_id")
+  componentId String    @map("component_id")
+  workItem    WorkItem  @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  component   Component @relation(fields: [componentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([workItemId, componentId])
+  @@map("work_item_components")
+}
+
+model WorkTemplate {
+  id           String             @id @default(cuid())
+  nama         String             @db.VarChar(300)
+  jenis        String             @default("WIRING") @db.VarChar(40)
+  bolehParalel Boolean            @default(false) @map("boleh_paralel")
+  deskripsi    String?            @db.Text
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  subScopes    TemplateSubScope[]
+
+  @@map("work_templates")
+}
+
+model TemplateSubScope {
+  id         String           @id @default(cuid())
+  templateId String           @map("template_id")
+  urutan     Int              @default(1)
+  judul      String           @db.VarChar(400)
+  template   WorkTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  details    TemplateDetail[]
+
+  @@map("template_sub_scopes")
+}
+
+model TemplateDetail {
+  id         String           @id @default(cuid())
+  subScopeId String           @map("sub_scope_id")
+  urutan     Int              @default(1)
+  teks       String           @db.Text
+  subScope   TemplateSubScope @relation(fields: [subScopeId], references: [id], onDelete: Cascade)
+
+  @@map("template_details")
+}
+
+model Setting {
+  id                 String   @id @default("default") @db.VarChar(50)
+  kapasitasPerHari   Int      @default(1) @map("kapasitas_per_hari")
+  jenisDikecualikan  String   @default("[\"MEETING\"]") @map("jenis_dikecualikan") @db.VarChar(500)
+  namaPerusahaan     String   @default("PT. Twintech Precision") @map("nama_perusahaan") @db.VarChar(300)
+  alamatPerusahaan   String   @default("Multiguna 1, Jl. Mahoni 1 No. 9 Lippo Cikarang 17550, Indonesia") @map("alamat_perusahaan") @db.VarChar(500)
+  telpPerusahaan     String   @default("+62 (21) 89902228") @map("telp_perusahaan") @db.VarChar(100)
+  faxPerusahaan      String   @default("+62 (21) 89902229") @map("fax_perusahaan") @db.VarChar(100)
+  logoBase64         String?  @map("logo_base64") @db.Text
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model AlertDismissal {
+  id        String   @id @default(cuid())
+  alertKey  String   @unique @map("alert_key") @db.VarChar(300)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("alert_dismissals")
+}
+
+model CatalogComponent {
+  id            String   @id @default(cuid())
+  noUrut        Int      @default(0) @map("no_urut")
+  kategori      String   @db.VarChar(150)
+  nama          String   @db.VarChar(300)
+  merek         String   @db.VarChar(150)
+  tipeModel     String   @map("tipe_model") @db.VarChar(300)
+  spesifikasi   String?  @db.VarChar(500)
+  estimasiHarga Float?   @map("estimasi_harga")
+  defaultUnit   String   @default("pcs") @map("default_unit") @db.VarChar(40)
+  fungsi        String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([kategori])
+  @@map("catalog_components")
+}

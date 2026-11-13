@@ -1,0 +1,507 @@
+/**
+ * panel-magnetic-guide.ts
+ *
+ * Smart Magnetic Alignment & Center Snapping System untuk Editor Layout Panel & HMI Twintech.
+ *
+ * Fitur:
+ * 1. Snap ke Garis Tengah Plat (Center X: width/2, Center Y: height/2) dengan visual garis magnet.
+ * 2. Snap ke Garis Tengah HMI (Center X Layar HMI) agar tombol simetris tepat di bawah HMI.
+ * 3. Snap ke Garis Tengah Komponen Lain (Center Y sebaris / Center X sekolom) untuk meluruskan deretan tombol.
+ * 4. Snap Jarak Spasi Antar Tombol (Equal Gap / Pitch Spacing) agar jarak antar tombol identik.
+ * 5. Fungsi Utility Distribusi & Alignment Simetris 1-Klik:
+ *    - centerItemOnPlate (Horizontal / Vertikal)
+ *    - centerItemUnderHmi
+ *    - distributeSelectedItemsHorizontally
+ */
+
+import type { PanelEnclosure, PanelLayoutItem } from "./panel-layout-template";
+
+export interface SpacingIndicator {
+  x1: number;
+  x2: number;
+  y: number;
+  gapMm: number;
+}
+
+export interface MagneticGuide {
+  id: string;
+  type: "VERTICAL" | "HORIZONTAL";
+  positionMm: number; // Garis X untuk VERTICAL, Garis Y untuk HORIZONTAL
+  startMm: number;    // Batas awal (Y untuk vertikal, X untuk horizontal)
+  endMm: number;      // Batas akhir (Y untuk vertikal, X untuk horizontal)
+  label: string;
+  color: string;      // Warna garis magnet (Magenta: smart component, Cyan: center plat, Biru: center HMI)
+  isPlateCenter?: boolean;
+  isComponentCenter?: boolean;
+  isHmiCenter?: boolean;
+  spacingIndicator?: SpacingIndicator;
+}
+
+export interface SmartSnapResult {
+  snappedX: number;
+  snappedY: number;
+  guides: MagneticGuide[];
+  snappedAxisX: boolean;
+  snappedAxisY: boolean;
+}
+
+export const DEFAULT_SNAP_THRESHOLD_MM = 6;
+
+/**
+ * Menghitung posisi snap magnetik dan menghasilkan garis bantu visual (magnetic smart guides).
+ */
+export function calculateSmartMagneticSnap(params: {
+  rawX: number;
+  rawY: number;
+  draggedItem: PanelLayoutItem;
+  allItems: PanelLayoutItem[];
+  dragIds: string[];
+  enclosure: PanelEnclosure;
+  thresholdMm?: number;
+  enabled?: boolean;
+}): SmartSnapResult {
+  const {
+    rawX,
+    rawY,
+    draggedItem,
+    allItems,
+    dragIds,
+    enclosure,
+    thresholdMm = DEFAULT_SNAP_THRESHOLD_MM,
+    enabled = true,
+  } = params;
+
+  if (!enabled) {
+    return {
+      snappedX: rawX,
+      snappedY: rawY,
+      guides: [],
+      snappedAxisX: false,
+      snappedAxisY: false,
+    };
+  }
+
+  const w = draggedItem.widthMm;
+  const h = draggedItem.heightMm;
+
+  let nextX = rawX;
+  let nextY = rawY;
+  const guides: MagneticGuide[] = [];
+
+  const otherItems = allItems.filter((i) => !dragIds.includes(i.id));
+
+  // =========================================================================
+  // 1. SNAP SUMBU Y (ROW ALIGNMENT & PLAT CENTER Y)
+  // =========================================================================
+  let bestYDiff = Infinity;
+  let bestSnappedY: number | null = null;
+  let bestYGuide: MagneticGuide | null = null;
+
+  const candCenterY = rawY + h / 2;
+  const candTopY = rawY;
+  const candBottomY = rawY + h;
+
+  // A. Cek Pusat Plat Y
+  const plateCenterY = enclosure.heightMm / 2;
+  const diffPlateY = Math.abs(candCenterY - plateCenterY);
+  if (diffPlateY <= thresholdMm && diffPlateY < bestYDiff) {
+    bestYDiff = diffPlateY;
+    bestSnappedY = Math.round(plateCenterY - h / 2);
+    bestYGuide = {
+      id: "guide-plate-cy",
+      type: "HORIZONTAL",
+      positionMm: plateCenterY,
+      startMm: 0,
+      endMm: enclosure.widthMm,
+      label: `Tengah Plat (Y: ${Math.round(plateCenterY)} mm)`,
+      color: "#06b6d4", // Cyan
+      isPlateCenter: true,
+      isComponentCenter: true,
+    };
+  }
+
+  // B. Cek Sejajar Pusat Y Komponen Lain (Prioritas Utama Deretan Tombol)
+  for (const other of otherItems) {
+    const otherCenterY = other.yMm + other.heightMm / 2;
+    const diffCenterY = Math.abs(candCenterY - otherCenterY);
+
+    if (diffCenterY <= thresholdMm && diffCenterY < bestYDiff) {
+      bestYDiff = diffCenterY;
+      bestSnappedY = Math.round(otherCenterY - h / 2);
+      const minX = Math.min(rawX, other.xMm) - 20;
+      const maxX = Math.max(rawX + w, other.xMm + other.widthMm) + 20;
+
+      bestYGuide = {
+        id: `guide-cy-${other.id}`,
+        type: "HORIZONTAL",
+        positionMm: otherCenterY,
+        startMm: Math.max(0, minX),
+        endMm: Math.min(enclosure.widthMm, maxX),
+        label: `Sejajar Pusat Tombol (Y: ${Math.round(otherCenterY)} mm)`,
+        color: "#ec4899", // Magenta Smart Guide
+        isComponentCenter: true,
+      };
+    }
+  }
+
+  // C. Cek Rata Atas Y (Top Edge) jika belum snap ke center
+  if (!bestSnappedY) {
+    for (const other of otherItems) {
+      const diffTopY = Math.abs(candTopY - other.yMm);
+      if (diffTopY <= thresholdMm && diffTopY < bestYDiff) {
+        bestYDiff = diffTopY;
+        bestSnappedY = other.yMm;
+        const minX = Math.min(rawX, other.xMm) - 15;
+        const maxX = Math.max(rawX + w, other.xMm + other.widthMm) + 15;
+        bestYGuide = {
+          id: `guide-top-${other.id}`,
+          type: "HORIZONTAL",
+          positionMm: other.yMm,
+          startMm: Math.max(0, minX),
+          endMm: Math.min(enclosure.widthMm, maxX),
+          label: `Rata Atas (Y: ${other.yMm} mm)`,
+          color: "#a855f7", // Purple
+        };
+      }
+    }
+  }
+
+  // D. Cek Rata Bawah Y (Bottom Edge)
+  if (!bestSnappedY) {
+    for (const other of otherItems) {
+      const otherBottom = other.yMm + other.heightMm;
+      const diffBottomY = Math.abs(candBottomY - otherBottom);
+      if (diffBottomY <= thresholdMm && diffBottomY < bestYDiff) {
+        bestYDiff = diffBottomY;
+        bestSnappedY = otherBottom - h;
+        const minX = Math.min(rawX, other.xMm) - 15;
+        const maxX = Math.max(rawX + w, other.xMm + other.widthMm) + 15;
+        bestYGuide = {
+          id: `guide-bottom-${other.id}`,
+          type: "HORIZONTAL",
+          positionMm: otherBottom,
+          startMm: Math.max(0, minX),
+          endMm: Math.min(enclosure.widthMm, maxX),
+          label: `Rata Bawah (Y: ${otherBottom} mm)`,
+          color: "#a855f7",
+        };
+      }
+    }
+  }
+
+  let snappedAxisY = false;
+  if (bestSnappedY !== null) {
+    nextY = bestSnappedY;
+    snappedAxisY = true;
+    if (bestYGuide) guides.push(bestYGuide);
+  }
+
+  // =========================================================================
+  // 2. SNAP SUMBU X (COLUMN ALIGNMENT, CENTER PLAT & CENTER HMI)
+  // =========================================================================
+  let bestXDiff = Infinity;
+  let bestSnappedX: number | null = null;
+  let bestXGuide: MagneticGuide | null = null;
+
+  const candCenterX = rawX + w / 2;
+  const candLeftX = rawX;
+  const candRightX = rawX + w;
+
+  // A. Cek Pusat Layar HMI (Prioritas Khusus: tombol simetris tepat di bawah HMI)
+  const hmiItem = otherItems.find((i) => i.category === "HMI");
+  if (hmiItem) {
+    const hmiCenterX = hmiItem.xMm + hmiItem.widthMm / 2;
+    const diffHmiX = Math.abs(candCenterX - hmiCenterX);
+    if (diffHmiX <= thresholdMm && diffHmiX < bestXDiff) {
+      bestXDiff = diffHmiX;
+      bestSnappedX = Math.round(hmiCenterX - w / 2);
+      const minY = Math.min(rawY, hmiItem.yMm) - 10;
+      const maxY = Math.max(rawY + h, hmiItem.yMm + hmiItem.heightMm) + 15;
+      bestXGuide = {
+        id: "guide-center-hmi",
+        type: "VERTICAL",
+        positionMm: hmiCenterX,
+        startMm: Math.max(0, minY),
+        endMm: Math.min(enclosure.heightMm, maxY),
+        label: `Tengah Layar HMI (X: ${Math.round(hmiCenterX)} mm)`,
+        color: "#3b82f6", // Electric Blue
+        isHmiCenter: true,
+        isComponentCenter: true,
+      };
+    }
+  }
+
+  // B. Cek Pusat Plat X
+  const plateCenterX = enclosure.widthMm / 2;
+  const diffPlateX = Math.abs(candCenterX - plateCenterX);
+  if (diffPlateX <= thresholdMm && diffPlateX < bestXDiff) {
+    bestXDiff = diffPlateX;
+    bestSnappedX = Math.round(plateCenterX - w / 2);
+    bestXGuide = {
+      id: "guide-plate-cx",
+      type: "VERTICAL",
+      positionMm: plateCenterX,
+      startMm: 0,
+      endMm: enclosure.heightMm,
+      label: `Tengah Plat (X: ${Math.round(plateCenterX)} mm)`,
+      color: "#06b6d4", // Cyan
+      isPlateCenter: true,
+      isComponentCenter: true,
+    };
+  }
+
+  // C. Cek Sejajar Pusat X Komponen Lain (Kolom Vertikal)
+  for (const other of otherItems) {
+    if (other.id === hmiItem?.id) continue;
+    const otherCenterX = other.xMm + other.widthMm / 2;
+    const diffCenterX = Math.abs(candCenterX - otherCenterX);
+    if (diffCenterX <= thresholdMm && diffCenterX < bestXDiff) {
+      bestXDiff = diffCenterX;
+      bestSnappedX = Math.round(otherCenterX - w / 2);
+      const minY = Math.min(rawY, other.yMm) - 15;
+      const maxY = Math.max(rawY + h, other.yMm + other.heightMm) + 15;
+      bestXGuide = {
+        id: `guide-cx-${other.id}`,
+        type: "VERTICAL",
+        positionMm: otherCenterX,
+        startMm: Math.max(0, minY),
+        endMm: Math.min(enclosure.heightMm, maxY),
+        label: `Sejajar Pusat X (${Math.round(otherCenterX)} mm)`,
+        color: "#ec4899", // Magenta
+        isComponentCenter: true,
+      };
+    }
+  }
+
+  // D. Cek Jarak Spasi Antar Tombol yang Sama (Equal Spacing Pitch)
+  // Menemukan tombol lain yang berada di baris horizontal yang sama
+  const effectiveY = bestSnappedY !== null ? bestSnappedY : rawY;
+  const sameRowItems = otherItems
+    .filter((it) => Math.abs(it.yMm + it.heightMm / 2 - (effectiveY + h / 2)) < 15)
+    .sort((a, b) => a.xMm - b.xMm);
+
+  if (sameRowItems.length >= 2) {
+    for (let i = 0; i < sameRowItems.length - 1; i++) {
+      const a = sameRowItems[i];
+      const b = sameRowItems[i + 1];
+      const standardGap = b.xMm - (a.xMm + a.widthMm);
+
+      if (standardGap > 5 && standardGap < 150) {
+        // Cek jika candidate ditempatkan di sebelah kanan item terakhir
+        const lastItem = sameRowItems[sameRowItems.length - 1];
+        const targetXRight = lastItem.xMm + lastItem.widthMm + standardGap;
+        const diffSpacingRight = Math.abs(rawX - targetXRight);
+
+        if (diffSpacingRight <= thresholdMm && diffSpacingRight < bestXDiff) {
+          bestXDiff = diffSpacingRight;
+          bestSnappedX = Math.round(targetXRight);
+          bestXGuide = {
+            id: `guide-spacing-r-${lastItem.id}`,
+            type: "VERTICAL",
+            positionMm: bestSnappedX,
+            startMm: effectiveY - 10,
+            endMm: effectiveY + h + 10,
+            label: `Spasi Simetris (${Math.round(standardGap)} mm)`,
+            color: "#10b981", // Emerald Green
+            spacingIndicator: {
+              x1: lastItem.xMm + lastItem.widthMm,
+              x2: bestSnappedX,
+              y: effectiveY + h / 2,
+              gapMm: Math.round(standardGap),
+            },
+          };
+          break;
+        }
+
+        // Cek jika candidate ditempatkan di sebelah kiri item pertama
+        const firstItem = sameRowItems[0];
+        const targetXLeft = firstItem.xMm - w - standardGap;
+        const diffSpacingLeft = Math.abs(rawX - targetXLeft);
+
+        if (diffSpacingLeft <= thresholdMm && diffSpacingLeft < bestXDiff) {
+          bestXDiff = diffSpacingLeft;
+          bestSnappedX = Math.round(targetXLeft);
+          bestXGuide = {
+            id: `guide-spacing-l-${firstItem.id}`,
+            type: "VERTICAL",
+            positionMm: bestSnappedX + w,
+            startMm: effectiveY - 10,
+            endMm: effectiveY + h + 10,
+            label: `Spasi Simetris (${Math.round(standardGap)} mm)`,
+            color: "#10b981",
+            spacingIndicator: {
+              x1: bestSnappedX + w,
+              x2: firstItem.xMm,
+              y: effectiveY + h / 2,
+              gapMm: Math.round(standardGap),
+            },
+          };
+          break;
+        }
+      }
+    }
+  }
+
+  // E. Cek Rata Kiri X jika belum snap
+  if (!bestSnappedX) {
+    for (const other of otherItems) {
+      const diffLeftX = Math.abs(candLeftX - other.xMm);
+      if (diffLeftX <= thresholdMm && diffLeftX < bestXDiff) {
+        bestXDiff = diffLeftX;
+        bestSnappedX = other.xMm;
+        const minY = Math.min(rawY, other.yMm) - 15;
+        const maxY = Math.max(rawY + h, other.yMm + other.heightMm) + 15;
+        bestXGuide = {
+          id: `guide-left-${other.id}`,
+          type: "VERTICAL",
+          positionMm: other.xMm,
+          startMm: Math.max(0, minY),
+          endMm: Math.min(enclosure.heightMm, maxY),
+          label: `Rata Kiri (X: ${other.xMm} mm)`,
+          color: "#a855f7",
+        };
+      }
+    }
+  }
+
+  // F. Cek Rata Kanan X
+  if (!bestSnappedX) {
+    for (const other of otherItems) {
+      const otherRight = other.xMm + other.widthMm;
+      const diffRightX = Math.abs(candRightX - otherRight);
+      if (diffRightX <= thresholdMm && diffRightX < bestXDiff) {
+        bestXDiff = diffRightX;
+        bestSnappedX = otherRight - w;
+        const minY = Math.min(rawY, other.yMm) - 15;
+        const maxY = Math.max(rawY + h, other.yMm + other.heightMm) + 15;
+        bestXGuide = {
+          id: `guide-right-${other.id}`,
+          type: "VERTICAL",
+          positionMm: otherRight,
+          startMm: Math.max(0, minY),
+          endMm: Math.min(enclosure.heightMm, maxY),
+          label: `Rata Kanan (X: ${otherRight} mm)`,
+          color: "#a855f7",
+        };
+      }
+    }
+  }
+
+  let snappedAxisX = false;
+  if (bestSnappedX !== null) {
+    nextX = bestSnappedX;
+    snappedAxisX = true;
+    if (bestXGuide) guides.push(bestXGuide);
+  }
+
+  // Batasi agar komponen tidak keluar dari tepi plat panel
+  const clampedX = Math.max(5, Math.min(enclosure.widthMm - w - 5, nextX));
+  const clampedY = Math.max(5, Math.min(enclosure.heightMm - h - 5, nextY));
+
+  return {
+    snappedX: clampedX,
+    snappedY: clampedY,
+    guides,
+    snappedAxisX,
+    snappedAxisY,
+  };
+}
+
+/**
+ * 1-Klik memposisikan komponen tepat di tengah plat (Center X atau Center Y atau keduanya).
+ */
+export function centerItemOnPlate(
+  items: PanelLayoutItem[],
+  targetItemId: string,
+  axis: "X" | "Y" | "BOTH",
+  enclosure: PanelEnclosure
+): PanelLayoutItem[] {
+  return items.map((it) => {
+    if (it.id !== targetItemId) return it;
+    let x = it.xMm;
+    let y = it.yMm;
+    if (axis === "X" || axis === "BOTH") {
+      x = Math.round((enclosure.widthMm - it.widthMm) / 2);
+    }
+    if (axis === "Y" || axis === "BOTH") {
+      y = Math.round((enclosure.heightMm - it.heightMm) / 2);
+    }
+    return { ...it, xMm: x, yMm: y };
+  });
+}
+
+/**
+ * 1-Klik menyejajarkan komponen (tombol/saklar) tepat di tengah bawah layar HMI.
+ */
+export function centerItemUnderHmi(
+  items: PanelLayoutItem[],
+  targetItemId: string,
+  enclosure: PanelEnclosure
+): PanelLayoutItem[] {
+  const hmi = items.find((i) => i.category === "HMI");
+  if (!hmi) return items;
+  const hmiCenterX = hmi.xMm + hmi.widthMm / 2;
+
+  return items.map((it) => {
+    if (it.id !== targetItemId) return it;
+    const targetX = Math.round(hmiCenterX - it.widthMm / 2);
+    const clampedX = Math.max(5, Math.min(enclosure.widthMm - it.widthMm - 5, targetX));
+    return { ...it, xMm: clampedX };
+  });
+}
+
+/**
+ * 1-Klik membagi rata jarak spasi horizontal (Equal Horizontal Distribution)
+ * untuk grup tombol terpilih agar simetris sempurna di baris horizontal.
+ */
+export function distributeSelectedItemsHorizontally(
+  items: PanelLayoutItem[],
+  selectedIds: string[],
+  enclosure: PanelEnclosure,
+  alignCenterY = true
+): PanelLayoutItem[] {
+  const selectedSet = new Set(selectedIds);
+  const targets = items.filter((it) => selectedSet.has(it.id));
+  if (targets.length < 2) return items;
+
+  // Urutkan item dari kiri ke kanan
+  const sorted = [...targets].sort((a, b) => a.xMm - b.xMm);
+
+  const minX = sorted[0].xMm;
+  const last = sorted[sorted.length - 1];
+  const maxRight = last.xMm + last.widthMm;
+  const totalSpan = maxRight - minX;
+
+  const totalItemWidths = sorted.reduce((sum, it) => sum + it.widthMm, 0);
+  const totalGap = totalSpan - totalItemWidths;
+
+  const gap = sorted.length > 1 ? totalGap / (sorted.length - 1) : 0;
+
+  // Hitung rata-rata center Y jika alignCenterY aktif
+  const avgCenterY =
+    sorted.reduce((sum, it) => sum + (it.yMm + it.heightMm / 2), 0) / sorted.length;
+
+  const newPositions = new Map<string, { x: number; y: number }>();
+  let currentX = minX;
+
+  sorted.forEach((it) => {
+    const y = alignCenterY
+      ? Math.round(avgCenterY - it.heightMm / 2)
+      : it.yMm;
+    newPositions.set(it.id, {
+      x: Math.round(currentX),
+      y: Math.max(5, Math.min(enclosure.heightMm - it.heightMm - 5, y)),
+    });
+    currentX += it.widthMm + gap;
+  });
+
+  return items.map((it) => {
+    const pos = newPositions.get(it.id);
+    if (!pos) return it;
+    return {
+      ...it,
+      xMm: Math.max(5, Math.min(enclosure.widthMm - it.widthMm - 5, pos.x)),
+      yMm: pos.y,
+    };
+  });
+}

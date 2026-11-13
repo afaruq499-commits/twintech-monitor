@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kuis Singkat</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #0a0a0a;
+      color: #fafafa;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    /* Ambient Glow */
+    .glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+    }
+    .glow-1 { top: -150px; left: -150px; }
+    .glow-2 { bottom: -150px; right: -150px; }
+
+    /* Audio Toggle */
+    .sound-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 40;
+      background: rgba(23, 23, 23, 0.85);
+      border: 1px solid #262626;
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #a3a3a3;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .sound-btn:hover {
+      border-color: #404040;
+      color: #fafafa;
+    }
+
+    /* Card */
+    .card {
+      width: 100%;
+      max-width: 460px;
+      background: rgba(23, 23, 23, 0.85);
+      border: 1px solid #262626;
+      border-radius: 20px;
+      padding: 32px 28px;
+      position: relative;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #262626;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .category-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a3a3a3;
+    }
+
+    .step-label {
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #737373;
+    }
+
+    .question-title {
+      font-size: 1.18rem;
+      font-weight: 600;
+      line-height: 1.45;
+      color: #f5f5f5;
+      margin-bottom: 30px;
+    }
+
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 150px;
+      justify-content: center;
+      position: relative;
+    }
+
+    .btn-opt {
+      width: 100%;
+      padding: 15px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    /* Tombol Benar (LARI NON-STOP KETIKA DIKEJAR & KEMBALI KETIKA AMAN) */
+    .btn-run {
+      background: rgba(30, 30, 30, 0.9);
+      border: 1px solid #2e2e2e;
+      color: #d4d4d4;
+      position: relative;
+      z-index: 30;
+      cursor: default;
+      will-change: transform;
+      transition: transform 0.55s cubic-bezier(0.34, 1.45, 0.64, 1);
+    }
+    .btn-run.panicking {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: #171717;
+      color: #f5f5f5;
+      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.15);
+      transition: transform 0.16s ease-out !important;
+    }
+
+    /* Tombol Nyeleneh (BISA DIKLIK) */
+    .btn-silly {
+      background: #262626;
+      border: 1px solid #383838;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.15s ease;
+    }
+    .btn-silly:hover {
+      background: #333333;
+      border-color: #525252;
+    }
+    .btn-silly:active {
+      transform: scale(0.99);
+    }
+
+    .tag-hint {
+      font-size: 11px;
+      font-family: monospace;
+      color: #737373;
+    }
+    .btn-silly .tag-hint {
+      color: #a3a3a3;
+    }
+
+    .card-footer {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #1f1f1f;
+      text-align: center;
+      font-size: 11px;
+      color: #737373;
+    }
+
+    /* ================= JUMPSCARE ================= */
+    #jumpscare-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #000;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .jumpscare-shake {
+      animation: crazyShake 0.08s infinite;
+    }
+    @keyframes crazyShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      10% { transform: translate(-18px, -15px) rotate(-4deg); }
+      20% { transform: translate(18px, 15px) rotate(4deg); }
+      30% { transform: translate(-20px, 12px) rotate(-3deg); }
+      40% { transform: translate(20px, -18px) rotate(3deg); }
+      50% { transform: translate(-15px, -15px) rotate(-5deg); }
+      60% { transform: translate(18px, 18px) rotate(4deg); }
+      70% { transform: translate(-18px, 10px) rotate(-3deg); }
+      80% { transform: translate(15px, -12px) rotate(3deg); }
+      90% { transform: translate(-10px, -10px) rotate(-2deg); }
+    }
+
+    .screamer-face {
+      animation: screamerZoom 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+      filter: contrast(250%) drop-shadow(0 0 50px #ff0000);
+      transform: scale(1.4);
+    }
+    @keyframes screamerZoom {
+      0% { transform: scale(0.4); opacity: 0; }
+      20% { transform: scale(1.6); opacity: 1; }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1.5); }
+    }
+
+    .screamer-text {
+      color: #ff0000;
+      font-size: 2.2rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 25px #ff0000, 0 0 50px #ff0000;
+      margin-top: 25px;
+    }
+
+    .flash-strobe {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 0, 0, 0.35);
+      mix-blend-mode: color-dodge;
+      pointer-events: none;
+      animation: strobe 0.1s infinite;
+    }
+    @keyframes strobe {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
+    /* ================= ENDING ================= */
+    #ending-card {
+      display: none;
+      position: relative;
+      z-index: 20;
+      width: 100%;
+      max-width: 440px;
+      background: rgba(23, 23, 23, 0.95);
+      border: 1px solid #333333;
+      border-radius: 20px;
+      padding: 32px 26px;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .ending-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #262626;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin: 0 auto 16px auto;
+    }
+
+    .ending-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fafafa;
+      margin-bottom: 8px;
+    }
+
+    .ending-desc {
+      font-size: 13.5px;
+      color: #a3a3a3;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .note-box {
+      background: rgba(10, 10, 10, 0.6);
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+    .note-box span {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #737373;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .note-box p {
+      font-size: 13px;
+      color: #e5e5e5;
+      font-style: italic;
+    }
+
+    .btn-wa {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 13px;
+      background: #fafafa;
+      color: #0a0a0a;
+      text-decoration: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.2s;
+      margin-bottom: 10px;
+    }
+    .btn-wa:hover {
+      background: #e5e5e5;
+    }
+
+    .btn-replay {
+      width: 100%;
+      padding: 11px;
+      background: #171717;
+      border: 1px solid #262626;
+      color: #a3a3a3;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-replay:hover {
+      border-color: #404040;
+      color: #fafafa;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <!-- Audio Toggle -->
+  <button id="soundToggle" class="sound-btn" onclick="toggleAudio()">
+    <span id="soundLabel">Audio On</span>
+  </button>
+
+  <!-- ================= QUIZ CARD ================= -->
+  <div id="quiz-card" class="card">
+    <div class="card-header">
+      <span id="cat-label" class="category-label">Logika Dasar</span>
+      <span id="step-label" class="step-label">1 / 4</span>
+    </div>
+
+    <h1 id="question-text" class="question-title">
+      Kucing apa yang paling romantis dan setia seumur hidup?
+    </h1>
+
+    <div class="options-container">
+      <!-- Tombol Benar (LARI NON-STOP KETIKA DIKEJAR & BALIK LAGI SAAT AMAN) -->
+      <button
+        id="btn-run"
+        class="btn-opt btn-run"
+        ontouchstart="handleTouchChase(event)"
+      >
+        <span id="label-normal">A. Kucing Persia Asli</span>
+        <span id="tag-normal" class="tag-hint">Pilihan 1</span>
+      </button>
+
+      <!-- Tombol Nyeleneh (BISA DIKLIK) -->
+      <button
+        id="btn-silly"
+        class="btn-opt btn-silly"
+        onclick="chooseSillyAnswer()"
+      >
+        <span id="label-silly">B. Kucing-ta padamu selamanya</span>
+        <span class="tag-hint">Pilih</span>
+      </button>
+    </div>
+
+    <div class="card-footer">
+      Pilih jawaban yang menurutmu paling tepat untuk melanjutkan
+    </div>
+  </div>
+
+  <!-- ================= JUMPSCARE OVERLAY ================= -->
+  <div id="jumpscare-overlay" class="jumpscare-shake">
+    <div class="flash-strobe"></div>
+    <div class="screamer-face">
+      <svg width="320" height="360" viewBox="0 0 200 240">
+        <path d="M 30,110 C 20,40 180,40 170,110 C 165,160 145,210 100,210 C 55,210 35,160 30,110 Z" fill="#d8d5ce" stroke="#000" stroke-width="4" />
+        <ellipse cx="65" cy="95" rx="26" ry="32" fill="#000" />
+        <ellipse cx="135" cy="95" rx="26" ry="32" fill="#000" />
+        <circle cx="65" cy="95" r="9" fill="#ff0000" />
+        <circle cx="135" cy="95" r="9" fill="#ff0000" />
+        <circle cx="65" cy="95" r="4" fill="#ffffff" />
+        <circle cx="135" cy="95" r="4" fill="#ffffff" />
+        <polygon points="95,128 92,142 98,142" fill="#000" />
+        <polygon points="105,128 102,142 108,142" fill="#000" />
+        <path d="M 50,155 Q 100,138 150,155 Q 155,202 100,208 Q 45,202 50,155 Z" fill="#000" stroke="#600" stroke-width="2" />
+        <polygon points="56,155 64,172 72,155" fill="#fff" />
+        <polygon points="74,154 83,174 92,154" fill="#fff" />
+        <polygon points="94,153 100,175 106,153" fill="#fff" />
+        <polygon points="108,154 117,174 126,154" fill="#fff" />
+        <polygon points="128,155 136,172 144,155" fill="#fff" />
+        <polygon points="60,195 68,178 76,195" fill="#fff" />
+        <polygon points="78,198 87,176 96,198" fill="#fff" />
+        <polygon points="104,198 113,176 122,198" fill="#fff" />
+        <polygon points="124,195 132,178 140,195" fill="#fff" />
+      </svg>
+    </div>
+    <div class="screamer-text">KAGET KAN?! 💀</div>
+  </div>
+
+  <!-- ================= ENDING CARD ================= -->
+  <div id="ending-card">
+    <div class="ending-icon">✌️</div>
+    <h2 class="ending-title">Hehehe, kaget ya?</h2>
+    <p class="ending-desc">
+      Tombol jawaban normalnya emang dibuat kabur terus dan gamau disentuh biar kamu milih jawaban yang nyeleneh.
+      Jangan marah ya, cuma mau bikin senyum hari ini.
+    </p>
+
+    <div class="note-box">
+      <span>Catatan Khusus</span>
+      <p>&ldquo;Meskipun jumpscare-nya ngagetin, rasa sayangku tetap aman dan gak bakal bikin panik kok. Love you.&rdquo;</p>
+    </div>
+
+    <a
+      href="https://wa.me/?text=Jahil%20banget%20ya%20kirim%20tebak-tebakan%20jumpscare%20barusan%20wkwk%20bikin%20kaget!%20%F0%9F%A4%A3%E2%9D%A4%EF%B8%8F"
+      target="_blank"
+      class="btn-wa"
+    >
+      Balas ke WhatsApp
+    </a>
+
+    <button class="btn-replay" onclick="resetQuiz()">
+      Coba Lagi
+    </button>
+  </div>
+
+  <script>
+    const QUIZ = [
+      {
+        cat: "Logika Dasar",
+        q: "Kucing apa yang paling romantis dan setia seumur hidup?",
+        normal: "A. Kucing Persia Asli",
+        silly: "B. Kucing-ta padamu selamanya"
+      },
+      {
+        cat: "Observasi",
+        q: "Kenapa kopi hitam rasanya pahit tanpa gula?",
+        normal: "A. Kandungan senyawa kafein",
+        silly: "B. Karena manisnya ada di senyummu"
+      },
+      {
+        cat: "Masa Depan",
+        q: "Tempat tinggal mana yang paling aman dan bikin tenang?",
+        normal: "A. Apartemen penthouse pusat kota",
+        silly: "B. Rumah tangga kita berdua"
+      },
+      {
+        cat: "Pertanyaan Terakhir",
+        q: "Siapa sosok misterius yang diam-diam selalu memperhatikanmu?",
+        normal: "A. Agen rahasia intelijen",
+        silly: "B. Buka dan periksa fotonya sekarang"
+      }
+    ];
+
+    let currentStep = 0;
+    let audioEnabled = true;
+    let audioCtx = null;
+    let offsetX = 0;
+    let offsetY = 0;
+    let isPanicking = false;
+    let panicTimer = null;
+    let lastChaseTime = 0;
+    let isJumpscareActive = false;
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) audioCtx = new AudioCtx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('soundLabel').innerText = audioEnabled ? "Audio On" : "Muted";
+    }
+
+    function playWhoosh() {
+      if (!audioEnabled) return;
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(180, now + 0.12);
+
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch(e) {}
+    }
+
+    function playJumpscareSound() {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(3600, now);
+        filter.Q.setValueAtTime(3, now);
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.95, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(now);
+        noise.stop(now + 1.8);
+
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(1600, now);
+        osc.frequency.linearRampToValueAtTime(3200, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(350, now + 1.4);
+
+        oscGain.gain.setValueAtTime(0.85, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, now + 1.4);
+
+        osc.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 1.4);
+
+        const bass = ctx.createOscillator();
+        const bassGain = ctx.createGain();
+        bass.type = "square";
+        bass.frequency.setValueAtTime(140, now);
+        bass.frequency.exponentialRampToValueAtTime(30, now + 1.2);
+
+        bassGain.gain.setValueAtTime(0.9, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+
+        bass.connect(bassGain);
+        bassGain.connect(ctx.destination);
+        bass.start(now);
+        bass.stop(now + 1.2);
+
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 300, 100, 500]);
+        }
+      } catch(e) {}
+    }
+
+    // LOMPAT KE KOORDINAT RANDOM BARU
+    function jumpRandomly() {
+      const btn = document.getElementById("btn-run");
+      if (!btn) return;
+
+      const rect = btn.getBoundingClientRect();
+      const btnW = rect.width || 340;
+      const btnH = rect.height || 50;
+      const pad = 24;
+
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+
+      const targetX = Math.floor(Math.random() * (screenW - btnW - pad * 2)) + pad;
+      const targetY = Math.floor(Math.random() * (screenH - btnH - pad * 2)) + pad;
+
+      const originX = rect.left - offsetX;
+      const originY = rect.top - offsetY;
+
+      offsetX = targetX - originX;
+      offsetY = targetY - originY;
+
+      playWhoosh();
+      btn.classList.add("panicking");
+      btn.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+      document.getElementById("tag-normal").innerText = "Kabur! 💨";
+    }
+
+    // KEMBALI PULANG KE POSISI ASAL SAAT AMAN
+    function returnToOrigin() {
+      if (panicTimer) {
+        clearInterval(panicTimer);
+        panicTimer = null;
+      }
+      isPanicking = false;
+      const btn = document.getElementById("btn-run");
+      if (!btn) return;
+
+      offsetX = 0;
+      offsetY = 0;
+      btn.classList.remove("panicking");
+      btn.style.transform = `translate3d(0, 0, 0)`;
+      document.getElementById("tag-normal").innerText = "Pilihan 1";
+    }
+
+    // DETEKSI DIKEJAR ATAU TIDAK
+    function checkChase(pointerX, pointerY) {
+      if (isJumpscareActive) return;
+      const btn = document.getElementById("btn-run");
+      if (!btn) return;
+
+      const rect = btn.getBoundingClientRect();
+      const btnCenterX = rect.left + rect.width / 2;
+      const btnCenterY = rect.top + rect.height / 2;
+
+      const distance = Math.hypot(btnCenterX - pointerX, btnCenterY - pointerY);
+      const panicRadius = 150;
+
+      if (distance < panicRadius) {
+        lastChaseTime = Date.now();
+
+        if (!isPanicking) {
+          isPanicking = true;
+          jumpRandomly();
+
+          // Loop kabur terus berpindah-pindah random tanpa henti selama masih dikejar
+          if (!panicTimer) {
+            panicTimer = setInterval(() => {
+              const timeSinceLastChase = Date.now() - lastChaseTime;
+              if (timeSinceLastChase > 650) {
+                returnToOrigin();
+              } else {
+                jumpRandomly();
+              }
+            }, 240);
+          }
+        }
+      } else {
+        // Jika kursor sudah menjauh (>250px) dan tombol sedang lari
+        if (distance > 250 && isPanicking) {
+          const timeSinceLastChase = Date.now() - lastChaseTime;
+          if (timeSinceLastChase > 500) {
+            returnToOrigin();
+          }
+        }
+      }
+    }
+
+    window.addEventListener("mousemove", (e) => {
+      checkChase(e.clientX, e.clientY);
+    }, { passive: true });
+
+    function handleTouchChase(e) {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        checkChase(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }
+
+    function chooseSillyAnswer() {
+      returnToOrigin();
+
+      if (currentStep === QUIZ.length - 1) {
+        triggerJumpscare();
+      } else {
+        currentStep++;
+        updateUI();
+      }
+    }
+
+    function updateUI() {
+      const q = QUIZ[currentStep];
+      document.getElementById("cat-label").innerText = q.cat;
+      document.getElementById("step-label").innerText = `${currentStep + 1} / ${QUIZ.length}`;
+      document.getElementById("question-text").innerText = q.q;
+      document.getElementById("label-normal").innerText = q.normal;
+      document.getElementById("label-silly").innerText = q.silly;
+    }
+
+    function triggerJumpscare() {
+      isJumpscareActive = true;
+      const jumpscare = document.getElementById("jumpscare-overlay");
+      jumpscare.style.display = "flex";
+      playJumpscareSound();
+
+      setTimeout(() => {
+        jumpscare.style.display = "none";
+        document.getElementById("quiz-card").style.display = "none";
+        document.getElementById("ending-card").style.display = "block";
+      }, 2200);
+    }
+
+    function resetQuiz() {
+      isJumpscareActive = false;
+      document.getElementById("ending-card").style.display = "none";
+      document.getElementById("quiz-card").style.display = "block";
+      currentStep = 0;
+      returnToOrigin();
+      updateUI();
+    }
+  </script>
+</body>
+</html>
