@@ -41,10 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# uploads
-/public/uploads/*
-!/public/uploads/.gitkeep
-
 # local deploy and scratch
 deploy-siap-kirim/
 cookie.txt
