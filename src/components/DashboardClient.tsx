@@ -8,8 +8,11 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
+  Bell,
+  CalendarCheck,
   CalendarClock,
   CalendarPlus,
+  Check,
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
@@ -17,12 +20,18 @@ import {
   Download,
   FileSpreadsheet,
   FolderKanban,
+  Loader2,
   PackageCheck,
   PackageSearch,
+  Play,
   Search,
+  ShieldCheck,
   Sparkles,
   User,
+  Users,
 } from "lucide-react";
+import type { SessionUser } from "@/lib/auth";
+import { isTaskAssignedToUser } from "@/lib/users";
 import {
   SCHEDULE_CELL_LABELS,
   SCHEDULE_STATUS_RGB,
@@ -138,6 +147,7 @@ export function DashboardClient({
   alerts,
   topPriorities,
   projectChecklists,
+  currentUser,
 }: {
   todayIso: string;
   tomorrowIso: string;
@@ -155,6 +165,7 @@ export function DashboardClient({
   alerts: DashboardAlertItem[];
   topPriorities: TopPriorityItem[];
   projectChecklists?: ProjectChecklistSummaryItem[];
+  currentUser?: SessionUser | null;
 }) {
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -165,6 +176,14 @@ export function DashboardClient({
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
   const [checklistSearch, setChecklistSearch] = useState("");
   const [checklistFilter, setChecklistFilter] = useState<"ALL" | "INCOMPLETE" | "COMPLETE">("ALL");
+
+  const isMember = currentUser?.role === "MEMBER";
+  const isAdmin = currentUser?.role === "ADMIN" || !isMember;
+  const userNama = currentUser?.nama || (isAdmin ? "Faruq" : "Member");
+
+  const [picFilter, setPicFilter] = useState<string>(isMember ? "MY_TASKS" : "ALL");
+  const [optimisticStatusMap, setOptimisticStatusMap] = useState<Record<string, ScheduleCellStatus>>({});
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -185,6 +204,38 @@ export function DashboardClient({
     const m = Math.max(1, ...dailyScheduleStats.map((d) => d.totalCount));
     return m;
   }, [dailyScheduleStats]);
+
+  const myTodayTasks = useMemo(() => {
+    return todayTasks
+      .map((t) => ({
+        ...t,
+        status: optimisticStatusMap[t.id] || t.status,
+      }))
+      .filter((t) => isTaskAssignedToUser(t.workItemPic, userNama));
+  }, [todayTasks, optimisticStatusMap, userNama]);
+
+  const myTomorrowTasks = useMemo(() => {
+    return tomorrowTasks
+      .map((t) => ({
+        ...t,
+        status: optimisticStatusMap[t.id] || t.status,
+      }))
+      .filter((t) => isTaskAssignedToUser(t.workItemPic, userNama));
+  }, [tomorrowTasks, optimisticStatusMap, userNama]);
+
+  const myDoneCount = myTodayTasks.filter((t) => t.status === "DONE").length;
+
+  const faruqTodayTasks = useMemo(() => {
+    return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Faruq"));
+  }, [todayTasks]);
+
+  const apipTodayTasks = useMemo(() => {
+    return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Apip"));
+  }, [todayTasks]);
+
+  const rajipTodayTasks = useMemo(() => {
+    return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Rajip"));
+  }, [todayTasks]);
 
   async function handleDismissAlert(alertKey: string) {
     setBusyKey(alertKey);
@@ -218,10 +269,70 @@ export function DashboardClient({
     }
   }
 
+  async function handleQuickStatusChange(
+    task: TaskItem,
+    nextStatus: ScheduleCellStatus,
+    e?: React.MouseEvent
+  ) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setUpdatingTaskId(task.id);
+    setOptimisticStatusMap((prev) => ({ ...prev, [task.id]: nextStatus }));
+
+    try {
+      const res = await fetch("/api/schedule/task-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cellId: task.id,
+          workItemId: task.workItemId,
+          tanggal: task.tanggal,
+          subScopeId: task.subScopeId,
+          status: nextStatus,
+        }),
+      });
+      if (!res.ok) {
+        setOptimisticStatusMap((prev) => {
+          const next = { ...prev };
+          delete next[task.id];
+          return next;
+        });
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setOptimisticStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }
+
   function filterTasks(list: TaskItem[]) {
+    const mapped = list.map((t) => ({
+      ...t,
+      status: optimisticStatusMap[t.id] || t.status,
+    }));
+
+    let byPic = mapped;
+    if (picFilter === "MY_TASKS") {
+      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, userNama));
+    } else if (picFilter === "FARUQ") {
+      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Faruq"));
+    } else if (picFilter === "APIP") {
+      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Apip"));
+    } else if (picFilter === "RAJIP") {
+      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Rajip"));
+    }
+
     const q = agendaSearch.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((t) => {
+    if (!q) return byPic;
+    return byPic.filter((t) => {
       const hay = `${t.projectNama} ${t.projectClient} ${t.laneNama} ${t.workItemJudul} ${t.subScopeJudul ?? ""} ${t.workItemPic ?? ""} ${t.catatan ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
@@ -279,61 +390,109 @@ export function DashboardClient({
   }, [projectChecklists]);
 
   function renderTaskCard(task: TaskItem) {
-    const bgHex = task.warnaCustom || `#${SCHEDULE_STATUS_RGB[task.status]}`;
+    const currentStatus = optimisticStatusMap[task.id] || task.status;
+    const bgHex = task.warnaCustom || `#${SCHEDULE_STATUS_RGB[currentStatus]}`;
     const darkText = isLightHexColor(bgHex);
     const displayJudul = task.subScopeJudul || task.workItemJudul;
     const hasSubScope = Boolean(task.subScopeJudul);
+    const isUpdating = updatingTaskId === task.id;
 
     return (
-      <Link
+      <div
         key={task.id}
-        href={`/jadwal/lane/${task.laneId}`}
-        className="group block p-3.5 rounded-2xl v14-subcard hover:border-[#F05232]/50 hover:-translate-y-0.5 transition-all"
+        className="group block p-3.5 rounded-2xl v14-subcard hover:border-[#F05232]/50 transition-all"
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white dark:ring-[#16181f]"
-                style={{ backgroundColor: task.projectWarna }}
-              />
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
-                {task.projectClient} • {task.laneNama}
-              </span>
-            </div>
-            <div className="font-bold text-sm text-slate-900 dark:text-white leading-snug whitespace-pre-line group-hover:text-[#F05232] transition-colors">
-              {displayJudul}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-2">
-              <span>
-                {hasSubScope
-                  ? task.workItemJudul
-                  : `${task.projectNama} • ${WORK_TYPE_LABELS[task.jenis]}`}
-              </span>
-              {task.workItemPic && (
-                <span className="inline-flex items-center gap-1 font-bold text-slate-700 dark:text-slate-300">
-                  • <User className="w-3 h-3 text-[#F05232]" /> {task.workItemPic}
+            <Link href={`/jadwal/lane/${task.laneId}`} className="block">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white dark:ring-[#16181f]"
+                  style={{ backgroundColor: task.projectWarna }}
+                />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
+                  {task.projectClient} • {task.laneNama}
                 </span>
-              )}
-            </div>
+              </div>
+              <div className="font-bold text-sm text-slate-900 dark:text-white leading-snug whitespace-pre-line group-hover:text-[#F05232] transition-colors">
+                {displayJudul}
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-2">
+                <span>
+                  {hasSubScope
+                    ? task.workItemJudul
+                    : `${task.projectNama} • ${WORK_TYPE_LABELS[task.jenis]}`}
+                </span>
+                {task.workItemPic && (
+                  <span className="inline-flex items-center gap-1 font-bold text-slate-700 dark:text-slate-300">
+                    • <User className="w-3 h-3 text-[#F05232]" /> {task.workItemPic}
+                  </span>
+                )}
+              </div>
+            </Link>
+
             {task.catatan && (
               <div className="text-xs text-slate-700 dark:text-slate-300 mt-2 bg-white dark:bg-[#16181f] px-2.5 py-1.5 rounded-xl border border-black/[0.05] dark:border-white/[0.06]">
                 💬 {task.catatan}
               </div>
             )}
           </div>
-          <span
-            data-keep-light="true"
-            className="px-2.5 py-1 rounded-full text-[11px] font-extrabold shrink-0 shadow-2xs"
-            style={{
-              backgroundColor: bgHex,
-              color: darkText ? "#0f172a" : "#ffffff",
-            }}
-          >
-            {SCHEDULE_CELL_LABELS[task.status]}
-          </span>
+
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span
+              data-keep-light="true"
+              className="px-2.5 py-1 rounded-full text-[11px] font-extrabold shadow-2xs"
+              style={{
+                backgroundColor: bgHex,
+                color: darkText ? "#0f172a" : "#ffffff",
+              }}
+            >
+              {SCHEDULE_CELL_LABELS[currentStatus]}
+            </span>
+
+            {/* Quick 1-click status actions */}
+            {currentStatus === "TARGET" && (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={(e) => handleQuickStatusChange(task, "ON_PROGRESS", e)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold shadow-2xs transition cursor-pointer"
+                title="Mulai kerjakan pekerjaan ini"
+              >
+                {isUpdating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Play className="w-3 h-3 fill-current" />
+                )}
+                Mulai
+              </button>
+            )}
+
+            {currentStatus === "ON_PROGRESS" && (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={(e) => handleQuickStatusChange(task, "DONE", e)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold shadow-2xs transition cursor-pointer"
+                title="Tandai pekerjaan ini selesai"
+              >
+                {isUpdating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Check className="w-3 h-3" />
+                )}
+                Selesai
+              </button>
+            )}
+
+            {currentStatus === "DONE" && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3 h-3" /> Done
+              </span>
+            )}
+          </div>
         </div>
-      </Link>
+      </div>
     );
   }
 
@@ -342,11 +501,24 @@ export function DashboardClient({
       {/* ==================== HERO GREETING BAR (V14 STYLE) ==================== */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-v14-in">
         <div>
-          <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-            {greeting}, Tim Engineering
+          <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight flex items-center gap-2.5">
+            <span>
+              {greeting}, {userNama}
+            </span>
+            <span
+              className={`text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                isAdmin
+                  ? "bg-[#F05232] text-white"
+                  : "bg-sky-500 text-white"
+              }`}
+            >
+              {isAdmin ? "Admin" : "Member"}
+            </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Pantau kesiapan komponen PR, progres workshop, dan jadwal proyek —{" "}
+            {isAdmin
+              ? "Menentukan pekerjaan, tanggal pengerjaan, & delegasi PIC (Faruq, Apip, Rajip) — "
+              : "Pantau notifikasi tugas harian & pekerjaan yang diberikan oleh Admin Faruq — "}
             <span className="font-semibold text-slate-700 dark:text-slate-300">
               {formatTanggalId(todayIso)}
             </span>
@@ -354,29 +526,310 @@ export function DashboardClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Link
-            href="/jadwal/buat"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#141518] hover:bg-neutral-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-[#111216] text-xs font-bold shadow-sm transition hover:-translate-y-0.5"
-          >
-            <CalendarPlus className="w-3.5 h-3.5" />
-            Buat Schedule
-          </Link>
-          <Link
-            href="/buat-pr"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full v14-card hover:bg-slate-50 dark:hover:bg-[#1e212a] text-slate-800 dark:text-slate-100 text-xs font-bold transition hover:-translate-y-0.5"
-          >
-            <ClipboardList className="w-3.5 h-3.5 text-[#F05232]" />
-            Susun PR
-          </Link>
-          <a
-            href="/api/export/jadwal"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full v14-card hover:bg-slate-50 dark:hover:bg-[#1e212a] text-slate-800 dark:text-slate-100 text-xs font-bold transition hover:-translate-y-0.5"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            Export Jadwal
-          </a>
+          {isAdmin ? (
+            <>
+              <Link
+                href="/jadwal/buat"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#141518] hover:bg-neutral-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-[#111216] text-xs font-bold shadow-sm transition hover:-translate-y-0.5"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                Buat Schedule &amp; Delegasi
+              </Link>
+              <Link
+                href="/buat-pr"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full v14-card hover:bg-slate-50 dark:hover:bg-[#1e212a] text-slate-800 dark:text-slate-100 text-xs font-bold transition hover:-translate-y-0.5"
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-[#F05232]" />
+                Susun PR
+              </Link>
+              <a
+                href="/api/export/jadwal"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full v14-card hover:bg-slate-50 dark:hover:bg-[#1e212a] text-slate-800 dark:text-slate-100 text-xs font-bold transition hover:-translate-y-0.5"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Export Jadwal
+              </a>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/jadwal"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm transition hover:-translate-y-0.5"
+              >
+                <CalendarClock className="w-3.5 h-3.5" />
+                Buka Kalender Jadwal
+              </Link>
+              <Link
+                href="/proyek"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full v14-card hover:bg-slate-50 dark:hover:bg-[#1e212a] text-slate-800 dark:text-slate-100 text-xs font-bold transition hover:-translate-y-0.5"
+              >
+                <FolderKanban className="w-3.5 h-3.5 text-sky-500" />
+                Semua Proyek
+              </Link>
+            </>
+          )}
         </div>
       </div>
+
+      {/* ==================== NOTIFIKASI TUGAS HARIAN MEMBER ==================== */}
+      {isMember && (
+        <section className="v14-card rounded-[26px] p-5 sm:p-6 border-l-4 border-l-sky-500 bg-sky-50/40 dark:bg-sky-950/20 animate-v14-in space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md shrink-0">
+                <Bell className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Notifikasi Tugas Hari Ini — {userNama}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-sky-500 text-white">
+                    Member
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Admin Faruq telah menugaskan{" "}
+                  <strong className="text-sky-600 dark:text-sky-400 font-extrabold">
+                    {myTodayTasks.length} pekerjaan
+                  </strong>{" "}
+                  untuk Anda kerjakan hari ini ({formatTanggalId(todayIso)}).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-white dark:bg-[#1a1e28] text-slate-700 dark:text-slate-200 border border-black/5 dark:border-white/10 shadow-2xs">
+                Progres: {myDoneCount}/{myTodayTasks.length} Selesai
+              </span>
+            </div>
+          </div>
+
+          {myTodayTasks.length === 0 ? (
+            <div className="rounded-2xl v14-subcard p-6 text-center text-xs text-slate-500 dark:text-slate-400 border-dashed">
+              🎉 Tidak ada jadwal pekerjaan aktif yang ditugaskan kepada Anda hari ini. Bersiap untuk agenda berikutnya!
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {myTodayTasks.map((task) => {
+                const currentStatus = optimisticStatusMap[task.id] || task.status;
+                const isUpdating = updatingTaskId === task.id;
+                const displayJudul = task.subScopeJudul || task.workItemJudul;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="p-3.5 rounded-2xl v14-subcard border hover:border-sky-400 transition-all flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: task.projectWarna }}
+                          />
+                          <span className="text-[11px] font-bold text-slate-500 truncate">
+                            {task.projectClient} • {task.laneNama}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                            currentStatus === "DONE"
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
+                              : currentStatus === "ON_PROGRESS"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
+                              : "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
+                          }`}
+                        >
+                          {SCHEDULE_CELL_LABELS[currentStatus]}
+                        </span>
+                      </div>
+
+                      <div className="font-extrabold text-sm text-slate-900 dark:text-white leading-snug">
+                        {displayJudul}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {task.projectNama} • {WORK_TYPE_LABELS[task.jenis]}
+                      </div>
+                      {task.catatan && (
+                        <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-300 bg-white/70 dark:bg-[#12141a] px-2.5 py-1 rounded-lg border border-black/5">
+                          💬 {task.catatan}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 1-Click Status Controls for Member */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-white/10 flex items-center justify-between gap-2">
+                      <Link
+                        href={`/jadwal/lane/${task.laneId}`}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-sky-600 flex items-center gap-0.5"
+                      >
+                        Detail <ArrowRight className="w-3 h-3" />
+                      </Link>
+
+                      {currentStatus === "TARGET" && (
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={(e) => handleQuickStatusChange(task, "ON_PROGRESS", e)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Play className="w-3 h-3 fill-current" />
+                          )}
+                          Mulai Kerjakan
+                        </button>
+                      )}
+
+                      {currentStatus === "ON_PROGRESS" && (
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={(e) => handleQuickStatusChange(task, "DONE", e)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          Tandai Selesai
+                        </button>
+                      )}
+
+                      {currentStatus === "DONE" && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Selesai Dikerjakan
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ==================== RINGKASAN DELEGASI TIM ADMIN ==================== */}
+      {isAdmin && (
+        <section className="v14-card rounded-[26px] p-5 sm:p-6 border-l-4 border-l-[#F05232] bg-orange-50/30 dark:bg-orange-950/15 animate-v14-in space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F45B38] to-[#D9381E] text-white flex items-center justify-center shadow-md shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Delegasi Pekerjaan Tim &amp; Penjadwalan
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#F05232] text-white">
+                    Admin Faruq
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Tentukan pekerjaan, jadwalkan tanggal, &amp; pilih siapa PIC yang mengerjakan (Admin juga dapat bekerja).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/jadwal/buat"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#141518] hover:bg-neutral-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-[#111216] text-xs font-bold shadow-xs transition"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                Jadwalkan / Delegasikan Tugas
+              </Link>
+            </div>
+          </div>
+
+          {/* Team Member Distribution Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setPicFilter(picFilter === "FARUQ" ? "ALL" : "FARUQ")}
+              className={`p-3.5 rounded-2xl v14-subcard flex items-center justify-between transition text-left cursor-pointer ${
+                picFilter === "FARUQ" ? "ring-2 ring-[#F05232] bg-orange-50/80 dark:bg-orange-500/10" : ""
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#F45B38] to-[#D9381E] text-white text-xs font-extrabold flex items-center justify-center shrink-0 shadow-xs">
+                  FQ
+                </span>
+                <div>
+                  <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    Faruq
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-orange-100 text-[#F05232]">
+                      Admin
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">Pekerjaan Hari Ini</div>
+                </div>
+              </div>
+              <div className="text-lg font-black text-[#F05232]">
+                {faruqTodayTasks.length} <span className="text-xs font-semibold text-slate-400">tugas</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPicFilter(picFilter === "APIP" ? "ALL" : "APIP")}
+              className={`p-3.5 rounded-2xl v14-subcard flex items-center justify-between transition text-left cursor-pointer ${
+                picFilter === "APIP" ? "ring-2 ring-sky-500 bg-sky-50/80 dark:bg-sky-500/10" : ""
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0 shadow-xs">
+                  AP
+                </span>
+                <div>
+                  <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    Apip
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-600">
+                      Member
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">Pekerjaan Hari Ini</div>
+                </div>
+              </div>
+              <div className="text-lg font-black text-sky-600">
+                {apipTodayTasks.length} <span className="text-xs font-semibold text-slate-400">tugas</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPicFilter(picFilter === "RAJIP" ? "ALL" : "RAJIP")}
+              className={`p-3.5 rounded-2xl v14-subcard flex items-center justify-between transition text-left cursor-pointer ${
+                picFilter === "RAJIP" ? "ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-500/10" : ""
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0 shadow-xs">
+                  RJ
+                </span>
+                <div>
+                  <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    Rajip
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-600">
+                      Member
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">Pekerjaan Hari Ini</div>
+                </div>
+              </div>
+              <div className="text-lg font-black text-emerald-600">
+                {rajipTodayTasks.length} <span className="text-xs font-semibold text-slate-400">tugas</span>
+              </div>
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* ==================== ZONE 1: ALERT & TINDAK LANJUT (FULL WIDTH ACTION PANEL) ==================== */}
       {alerts.length > 0 && (
@@ -780,6 +1233,83 @@ export function DashboardClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* PIC Filter Pills */}
+              <div className="inline-flex items-center rounded-full v14-subcard p-1 gap-0.5">
+                {isMember ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("MY_TASKS")}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "MY_TASKS"
+                          ? "bg-sky-500 text-white shadow-2xs"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Tugas Saya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("ALL")}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "ALL"
+                          ? "bg-[#141518] text-white dark:bg-white dark:text-[#111216]"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Semua Tim
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("ALL")}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "ALL"
+                          ? "bg-[#141518] text-white dark:bg-white dark:text-[#111216]"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("FARUQ")}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "FARUQ"
+                          ? "bg-[#F05232] text-white shadow-2xs"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Faruq
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("APIP")}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "APIP"
+                          ? "bg-sky-500 text-white shadow-2xs"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Apip
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicFilter("RAJIP")}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                        picFilter === "RAJIP"
+                          ? "bg-emerald-600 text-white shadow-2xs"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Rajip
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* Search */}
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -788,7 +1318,7 @@ export function DashboardClient({
                   value={agendaSearch}
                   onChange={(e) => setAgendaSearch(e.target.value)}
                   placeholder="Cari agenda..."
-                  className="pl-8 pr-3 py-1.5 rounded-full v14-subcard text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#F05232]/40 w-36 sm:w-44"
+                  className="pl-8 pr-3 py-1.5 rounded-full v14-subcard text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#F05232]/40 w-32 sm:w-40"
                 />
               </div>
 

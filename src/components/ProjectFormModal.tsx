@@ -17,6 +17,7 @@ import {
   PROJECT_TYPE_LABELS,
   type ProjectType,
 } from "@/lib/constants";
+import { SYSTEM_PICS } from "@/lib/users";
 
 export interface EditableProject {
   id?: string;
@@ -287,9 +288,29 @@ export function ProjectFormModal({
                 type="text"
                 value={pic}
                 onChange={(e) => setPic(e.target.value)}
-                placeholder="Contoh: Faruq / Tim Otomasi"
+                placeholder="Pilih atau ketik nama PIC..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
+              <div className="flex items-center gap-1.5 mt-1.5">
+                {SYSTEM_PICS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPic(p.value)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                      pic === p.value
+                        ? "bg-slate-900 text-white shadow-2xs"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: p.color }}
+                    />
+                    {p.value}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <label className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-950 cursor-pointer">

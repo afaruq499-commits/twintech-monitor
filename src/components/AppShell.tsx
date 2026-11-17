@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { SessionUser } from "@/lib/auth";
 import {
   BrainCircuit,
   CalendarDays,
   CalendarPlus,
+  CheckCircle2,
   ChevronDown,
   ClipboardList,
   Command,
@@ -21,9 +23,12 @@ import {
   Moon,
   Search,
   Settings,
+  ShieldCheck,
   Sun,
   Type,
   Upload,
+  User,
+  Users,
   X,
 } from "lucide-react";
 
@@ -122,10 +127,12 @@ const TOP_PILL_ITEMS = [
 export function AppShell({
   companyName,
   logoBase64,
+  currentUser,
   children,
 }: {
   companyName: string;
   logoBase64?: string | null;
+  currentUser?: SessionUser | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -387,70 +394,139 @@ export function AppShell({
                 onClick={() => setProfileMenuOpen((v) => !v)}
                 className="inline-flex items-center gap-2.5 rounded-full bg-white dark:bg-[#16181f] border border-black/[0.06] dark:border-white/[0.08] pl-1.5 pr-3 py-1.5 shadow-[0_2px_12px_rgba(15,23,42,0.04)] hover:shadow-md transition cursor-pointer"
               >
-                <span className="w-7 h-7 rounded-full bg-gradient-to-br from-[#F45B38] to-[#D9381E] text-white text-[11px] font-extrabold flex items-center justify-center shrink-0">
-                  TP
+                <span
+                  className={`w-7 h-7 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shrink-0 shadow-xs ${
+                    currentUser?.role === "ADMIN"
+                      ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
+                      : currentUser?.username === "rajip"
+                      ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+                      : "bg-gradient-to-br from-sky-500 to-blue-600"
+                  }`}
+                >
+                  {currentUser?.avatarText ?? "TP"}
                 </span>
                 <div className="text-left leading-tight hidden xl:block">
-                  <div className="text-xs font-extrabold text-slate-900 dark:text-white">
-                    Engineering
+                  <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span>{currentUser?.nama ?? "Engineering"}</span>
+                    {currentUser?.role === "ADMIN" ? (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-500/20 text-[#F05232]">
+                        Admin
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400">
+                        Member
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {companyName}
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                    {currentUser?.jabatan ?? companyName}
                   </div>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {profileMenuOpen && (
-                <div className="absolute right-0 mt-2.5 w-64 rounded-2xl bg-white dark:bg-[#1b1e27] border border-black/[0.08] dark:border-white/[0.1] shadow-xl p-2 z-50 space-y-1">
-                  <div className="px-2.5 py-2 border-b border-slate-100 dark:border-white/[0.08] space-y-1.5">
-                    <div
-                      data-keep-light="true"
-                      className="rounded-xl bg-white px-2.5 py-1.5 border border-slate-200/80 flex items-center justify-center"
+                <div className="absolute right-0 mt-2.5 w-72 rounded-2xl bg-white dark:bg-[#1b1e27] border border-black/[0.08] dark:border-white/[0.1] shadow-xl p-2.5 z-50 space-y-2">
+                  {/* Active User Card */}
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-100 dark:border-white/[0.06] flex items-center gap-3">
+                    <span
+                      className={`w-10 h-10 rounded-xl text-white text-sm font-extrabold flex items-center justify-center shrink-0 shadow-sm ${
+                        currentUser?.role === "ADMIN"
+                          ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
+                          : currentUser?.username === "rajip"
+                          ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+                          : "bg-gradient-to-br from-sky-500 to-blue-600"
+                      }`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={logoBase64 || "/logo-twintech.png"}
-                        alt={companyName}
-                        className="h-6 w-auto max-w-full object-contain"
-                      />
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      Pintasan modul &amp; sesi
+                      {currentUser?.avatarText ?? "TP"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                          {currentUser?.nama ?? "Engineering"}
+                        </span>
+                        <span
+                          className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                            currentUser?.role === "ADMIN"
+                              ? "bg-[#F05232] text-white"
+                              : "bg-sky-500 text-white"
+                          }`}
+                        >
+                          {currentUser?.role === "ADMIN" ? "Admin" : "Member"}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {currentUser?.jabatan ?? companyName}
+                      </div>
                     </div>
                   </div>
-                  <Link
-                    href="/jadwal/buat"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
-                  >
-                    <CalendarPlus className="w-4 h-4 text-[#F05232]" />
-                    Buat Schedule Proyek
-                  </Link>
-                  <Link
-                    href="/import-schedule"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
-                  >
-                    <Upload className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    Import Schedule Excel
-                  </Link>
-                  <Link
-                    href="/import-pr"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    Import PR Excel
-                  </Link>
-                  <Link
-                    href="/template"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
-                  >
-                    <Layers className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    Template Pekerjaan
-                  </Link>
+
+                  <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-1 uppercase tracking-wider">
+                    {currentUser?.role === "ADMIN" ? "Menu Admin & Penjadwalan" : "Menu Member"}
+                  </div>
+
+                  {currentUser?.role === "ADMIN" ? (
+                    <>
+                      <Link
+                        href="/jadwal/buat"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <CalendarPlus className="w-4 h-4 text-[#F05232]" />
+                        <div>
+                          <div>Buat &amp; Jadwalkan Proyek</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Tentukan tanggal &amp; delegasi PIC</div>
+                        </div>
+                      </Link>
+                      <Link
+                        href="/import-schedule"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <Upload className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        Import Schedule Excel
+                      </Link>
+                      <Link
+                        href="/import-pr"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        Import PR Excel
+                      </Link>
+                      <Link
+                        href="/template"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <Layers className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        Template Pekerjaan
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-sky-500" />
+                        <div>
+                          <div>Notifikasi Pekerjaan Hari Ini</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Lihat tugas yang diberikan Admin Faruq</div>
+                        </div>
+                      </Link>
+                      <Link
+                        href="/jadwal"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.07]"
+                      >
+                        <CalendarDays className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        Jadwal &amp; Kalender Proyek
+                      </Link>
+                    </>
+                  )}
+
                   {installPrompt && (
                     <button
                       type="button"
@@ -464,14 +540,15 @@ export function AppShell({
                       Pasang Aplikasi (PWA)
                     </button>
                   )}
-                  <div className="pt-1 border-t border-slate-100 dark:border-white/[0.08]">
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-white/[0.08]">
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer transition"
                     >
-                      <LogOut className="w-4 h-4" />
-                      Keluar Sesi
+                      <LogOut className="w-3.5 h-3.5" />
+                      Ganti Akun / Keluar Sesi
                     </button>
                   </div>
                 </div>
@@ -754,6 +831,40 @@ export function AppShell({
                 >
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* Mobile Active User Banner */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/10 flex items-center gap-3">
+                <span
+                  className={`w-9 h-9 rounded-xl text-white text-xs font-black flex items-center justify-center shrink-0 shadow-xs ${
+                    currentUser?.role === "ADMIN"
+                      ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
+                      : currentUser?.username === "rajip"
+                      ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+                      : "bg-gradient-to-br from-sky-500 to-blue-600"
+                  }`}
+                >
+                  {currentUser?.avatarText ?? "TP"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {currentUser?.nama ?? "Engineering"}
+                    </span>
+                    <span
+                      className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-full ${
+                        currentUser?.role === "ADMIN"
+                          ? "bg-[#F05232] text-white"
+                          : "bg-sky-500 text-white"
+                      }`}
+                    >
+                      {currentUser?.role === "ADMIN" ? "Admin" : "Member"}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                    {currentUser?.jabatan ?? "Sistem Aktif"}
+                  </div>
+                </div>
               </div>
               <div className="space-y-1">
                 {NAV_ITEMS.map((item) => {

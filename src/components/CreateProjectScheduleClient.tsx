@@ -28,6 +28,7 @@ import {
   AUTOMATION_KECIL_TEMPLATE,
   getTemplateByProjectType,
 } from "@/lib/project-templates";
+import { SYSTEM_PICS } from "@/lib/users";
 
 interface ExistingProjectOption {
   id: string;
@@ -569,9 +570,32 @@ export function CreateProjectScheduleClient({
                 type="text"
                 value={picUtama}
                 onChange={(e) => setPicUtama(e.target.value)}
-                placeholder="Contoh: Faruq / Andi & Tim Elektrik"
+                placeholder="Pilih delegasi PIC atau ketik manual..."
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-base focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[11px] font-bold text-slate-500 mr-1">
+                Delegasikan ke:
+              </span>
+              {SYSTEM_PICS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPicUtama(p.value)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    picUtama === p.value
+                      ? "bg-slate-900 text-white shadow-xs ring-2 ring-slate-400"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: p.color }}
+                  />
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -714,7 +738,7 @@ export function CreateProjectScheduleClient({
                         </div>
                         <div>
                           <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">
-                            PIC
+                            PIC Pelaksana
                           </label>
                           <input
                             type="text"
@@ -722,9 +746,28 @@ export function CreateProjectScheduleClient({
                             onChange={(e) =>
                               updatePekerjaan(wIdx, "pic", e.target.value)
                             }
-                            placeholder={picUtama || "Nama PIC"}
+                            placeholder={picUtama || "Pilih / Ketik PIC"}
                             className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
                           />
+                          <div className="flex items-center gap-1 mt-1">
+                            {SYSTEM_PICS.map((p) => (
+                              <button
+                                key={p.value}
+                                type="button"
+                                onClick={() =>
+                                  updatePekerjaan(wIdx, "pic", p.value)
+                                }
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition ${
+                                  w.pic === p.value
+                                    ? "bg-slate-900 text-white shadow-2xs"
+                                    : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                                }`}
+                                title={`Tugaskan ke ${p.label}`}
+                              >
+                                {p.value}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 

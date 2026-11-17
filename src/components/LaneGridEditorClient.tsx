@@ -44,6 +44,7 @@ import {
   type ScheduleCellStatus,
   type WorkType,
 } from "@/lib/constants";
+import { SYSTEM_PICS } from "@/lib/users";
 import {
   addDaysIso,
   formatHariTanggalSingkat,
@@ -1847,9 +1848,29 @@ export function LaneGridEditorClient({
                     type="text"
                     value={wiPic}
                     onChange={(e) => setWiPic(e.target.value)}
-                    placeholder="Contoh: Faruq / Tim Elektrik"
+                    placeholder="Pilih atau ketik nama PIC..."
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300"
                   />
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {SYSTEM_PICS.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setWiPic(p.value)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                          wiPic === p.value
+                            ? "bg-slate-900 text-white shadow-2xs"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        {p.value}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1">
@@ -2157,9 +2178,31 @@ export function LaneGridEditorClient({
                     onChange={(e) =>
                       setLaneForm({ ...laneForm, pic: e.target.value })
                     }
-                    placeholder="Contoh: Faruq"
+                    placeholder="Pilih atau ketik PIC..."
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300"
                   />
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {SYSTEM_PICS.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() =>
+                          setLaneForm({ ...laneForm, pic: p.value })
+                        }
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                          laneForm.pic === p.value
+                            ? "bg-slate-900 text-white shadow-2xs"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        {p.value}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block font-bold mb-1">Deadline</label>
