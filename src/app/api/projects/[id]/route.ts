@@ -67,6 +67,15 @@ export async function PATCH(
         ...(d.plcProgramFileSize !== undefined
           ? { plcProgramFileSize: d.plcProgramFileSize ?? null }
           : {}),
+        ...(d.hmiProgramFileUrl !== undefined
+          ? { hmiProgramFileUrl: d.hmiProgramFileUrl || null }
+          : {}),
+        ...(d.hmiProgramFileName !== undefined
+          ? { hmiProgramFileName: d.hmiProgramFileName || null }
+          : {}),
+        ...(d.hmiProgramFileSize !== undefined
+          ? { hmiProgramFileSize: d.hmiProgramFileSize ?? null }
+          : {}),
         ...(d.panelLayoutJson !== undefined
           ? { panelLayoutJson: d.panelLayoutJson || null }
           : {}),

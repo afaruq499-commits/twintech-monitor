@@ -62,6 +62,7 @@ import {
   type ProjectDetailTabKey,
 } from "./ProjectFileChecklistCard";
 import { ProjectPlcProgramPanel } from "./ProjectPlcProgramPanel";
+import { ProjectHmiProgramPanel } from "./ProjectHmiProgramPanel";
 
 interface ComponentDTO {
   id: string;
@@ -145,6 +146,9 @@ interface ProjectDetailDTO {
   plcProgramFileUrl?: string | null;
   plcProgramFileName?: string | null;
   plcProgramFileSize?: number | null;
+  hmiProgramFileUrl?: string | null;
+  hmiProgramFileName?: string | null;
+  hmiProgramFileSize?: number | null;
   panelLayoutJson?: string | null;
   fileChecklistJson?: string | null;
   components: ComponentDTO[];
@@ -272,6 +276,8 @@ export function ProjectDetailClient({
     wiringDiagramPdfName: project.wiringDiagramPdfName,
     plcProgramFileUrl: project.plcProgramFileUrl,
     plcProgramFileName: project.plcProgramFileName,
+    hmiProgramFileUrl: project.hmiProgramFileUrl,
+    hmiProgramFileName: project.hmiProgramFileName,
   });
   const checklistProgress = computeChecklistProgress(
     checklistState,
@@ -666,6 +672,15 @@ export function ProjectDetailClient({
             initialFileUrl={project.plcProgramFileUrl}
             initialFileName={project.plcProgramFileName}
             initialFileSize={project.plcProgramFileSize}
+            onUpdateSuccess={() => router.refresh()}
+          />
+
+          {/* 4. Berkas Program HMI & Desain Layar Mesin (Download & Upload Segala Format HMI) */}
+          <ProjectHmiProgramPanel
+            projectId={project.id}
+            initialFileUrl={project.hmiProgramFileUrl}
+            initialFileName={project.hmiProgramFileName}
+            initialFileSize={project.hmiProgramFileSize}
             onUpdateSuccess={() => router.refresh()}
           />
         </div>
@@ -1502,6 +1517,15 @@ export function ProjectDetailClient({
             initialFileUrl={project.plcProgramFileUrl}
             initialFileName={project.plcProgramFileName}
             initialFileSize={project.plcProgramFileSize}
+            onUpdateSuccess={() => router.refresh()}
+          />
+
+          {/* Berkas Program HMI Mesin */}
+          <ProjectHmiProgramPanel
+            projectId={project.id}
+            initialFileUrl={project.hmiProgramFileUrl}
+            initialFileName={project.hmiProgramFileName}
+            initialFileSize={project.hmiProgramFileSize}
             onUpdateSuccess={() => router.refresh()}
           />
 

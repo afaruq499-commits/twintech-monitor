@@ -65,6 +65,9 @@ export const projectSchema = z.object({
   plcProgramFileUrl: z.string().trim().optional().nullable(),
   plcProgramFileName: z.string().trim().max(300).optional().nullable(),
   plcProgramFileSize: z.coerce.number().optional().nullable(),
+  hmiProgramFileUrl: z.string().trim().optional().nullable(),
+  hmiProgramFileName: z.string().trim().max(300).optional().nullable(),
+  hmiProgramFileSize: z.coerce.number().optional().nullable(),
   panelLayoutJson: z.string().trim().optional().nullable(),
   fileChecklistJson: z.string().trim().optional().nullable(),
 });

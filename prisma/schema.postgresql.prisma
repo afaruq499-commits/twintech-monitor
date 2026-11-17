@@ -33,6 +33,9 @@ model Project {
   plcProgramFileUrl String? @map("plc_program_file_url") @db.Text
   plcProgramFileName String? @map("plc_program_file_name") @db.VarChar(300)
   plcProgramFileSize Int? @map("plc_program_file_size")
+  hmiProgramFileUrl String? @map("hmi_program_file_url") @db.Text
+  hmiProgramFileName String? @map("hmi_program_file_name") @db.VarChar(300)
+  hmiProgramFileSize Int? @map("hmi_program_file_size")
   panelLayoutJson String? @map("panel_layout_json") @db.Text
   fileChecklistJson String? @map("file_checklist_json") @db.Text
   createdAt    DateTime  @default(now()) @map("created_at")

@@ -177,15 +177,20 @@ export function ProjectFileChecklistCard({
     {
       key: "pemprograman",
       nomor: 8,
-      nama: "Pemprograman (Program PLC)",
+      nama: "Pemprograman (PLC & HMI)",
       icon: FileCode2,
-      kategori: "PLC Software & Ladder Logic",
-      deskripsi: "Cadangan berkas program PLC (Keyence KV-8000, Panasonic FPWIN Pro 7, Fatek UpperLogic, dll.) siap diunduh.",
+      kategori: "PLC Software & HMI Screen Design",
+      deskripsi: "Cadangan berkas program PLC & file desain layar HMI (Keyence, Panasonic, Fatek, Omron, Mitsubishi, Pro-face, Weintek, Siemens, dll.) siap diunduh.",
       tabTarget: "alur-sekuens",
       autoDetected: autoByKey.pemprograman,
-      autoDetail: projectData.hasPlcProgram
-        ? `Program ${projectData.plcProgramFileName || "PLC"} tersimpan`
-        : "Belum ada berkas program PLC",
+      autoDetail:
+        projectData.hasPlcProgram && projectData.hasHmiProgram
+          ? `Program PLC & HMI lengkap (${projectData.plcProgramFileName || "PLC"} + ${projectData.hmiProgramFileName || "HMI"})`
+          : projectData.hasPlcProgram
+          ? `Program PLC tersimpan (${projectData.plcProgramFileName || "PLC"})`
+          : projectData.hasHmiProgram
+          ? `Program HMI tersimpan (${projectData.hmiProgramFileName || "HMI"})`
+          : "Belum ada berkas program PLC / HMI",
     },
   ];
 

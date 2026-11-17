@@ -155,6 +155,8 @@ export async function getProjectsOverview() {
         wiringDiagramPdfName: p.wiringDiagramPdfName,
         plcProgramFileUrl: p.plcProgramFileUrl,
         plcProgramFileName: p.plcProgramFileName,
+        hmiProgramFileUrl: p.hmiProgramFileUrl,
+        hmiProgramFileName: p.hmiProgramFileName,
       })
     );
 
@@ -259,6 +261,9 @@ export async function getProjectDetail(projectId: string) {
     plcProgramFileUrl: p.plcProgramFileUrl,
     plcProgramFileName: p.plcProgramFileName,
     plcProgramFileSize: p.plcProgramFileSize,
+    hmiProgramFileUrl: p.hmiProgramFileUrl,
+    hmiProgramFileName: p.hmiProgramFileName,
+    hmiProgramFileSize: p.hmiProgramFileSize,
     panelLayoutJson: p.panelLayoutJson,
     fileChecklistJson: p.fileChecklistJson,
     components: p.components.map((c) => ({

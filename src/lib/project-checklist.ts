@@ -36,6 +36,8 @@ export interface ChecklistDetectionSummary {
   wiringPdfName?: string | null;
   hasPlcProgram: boolean;
   plcProgramFileName?: string | null;
+  hasHmiProgram: boolean;
+  hmiProgramFileName?: string | null;
 }
 
 export interface ChecklistDetectionInput {
@@ -50,6 +52,8 @@ export interface ChecklistDetectionInput {
   wiringDiagramPdfName?: string | null;
   plcProgramFileUrl?: string | null;
   plcProgramFileName?: string | null;
+  hmiProgramFileUrl?: string | null;
+  hmiProgramFileName?: string | null;
 }
 
 export interface ChecklistProgressResult {
@@ -134,6 +138,8 @@ export function deriveChecklistDetection(
     wiringPdfName: input.wiringDiagramPdfName ?? null,
     hasPlcProgram: Boolean(input.plcProgramFileUrl),
     plcProgramFileName: input.plcProgramFileName ?? null,
+    hasHmiProgram: Boolean(input.hmiProgramFileUrl),
+    hmiProgramFileName: input.hmiProgramFileName ?? null,
   };
 }
 
@@ -153,7 +159,7 @@ export function computeChecklistProgress(
     layout_panel_utama: detection.hasPanelMain,
     flowchart: detection.hasFlowchart,
     diagram_wiring: detection.hasWiringPdf,
-    pemprograman: Boolean(detection.hasPlcProgram),
+    pemprograman: Boolean(detection.hasPlcProgram || detection.hasHmiProgram),
   };
 
   let completedCount = 0;
