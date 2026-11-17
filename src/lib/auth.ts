@@ -1,13 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import {
-  authenticateUser,
-  getDefaultAdminUser,
-  getUserByUsername,
-  SessionUser,
-  toSessionUser,
-  UserRole,
-} from "./users";
+import { DEFAULT_USERS, SessionUser, toSessionUser, UserRole } from "./users";
 
 export type { SessionUser, UserRole };
 export const SESSION_COOKIE_NAME = "pm_session";
@@ -21,21 +14,23 @@ function getSecretKey(): Uint8Array {
 
 export function verifyPassword(
   inputPassword: string,
-  username?: string
+  username?: string,
+  role?: UserRole
 ): boolean {
-  if (username) {
-    const user = authenticateUser(username, inputPassword);
-    return Boolean(user);
-  }
   const expected = process.env.APP_PASSWORD || "twintech2026";
   if (inputPassword === expected) return true;
-  return Boolean(authenticateUser("", inputPassword));
+
+  return DEFAULT_USERS.some((u) => {
+    if (username && u.username.toLowerCase() !== username.toLowerCase()) return false;
+    if (role && u.role !== role) return false;
+    return u.allowedPasswords.includes(inputPassword);
+  });
 }
 
 export async function createSessionToken(
   user?: SessionUser | null
 ): Promise<string> {
-  const sessionUser = user || toSessionUser(getDefaultAdminUser());
+  const sessionUser = user || toSessionUser(DEFAULT_USERS[0]);
 
   return new SignJWT({
     sub: sessionUser.id,
@@ -74,9 +69,6 @@ export async function parseSessionToken(
     if (payload.authenticated !== true) return null;
 
     if (payload.username && typeof payload.username === "string") {
-      const known = getUserByUsername(payload.username);
-      if (known) return toSessionUser(known);
-
       return {
         id: (payload.sub as string) || "user-session",
         username: payload.username,
@@ -89,7 +81,7 @@ export async function parseSessionToken(
     }
 
     // Default fallback untuk token legacy
-    return toSessionUser(getDefaultAdminUser());
+    return toSessionUser(DEFAULT_USERS[0]);
   } catch {
     return null;
   }

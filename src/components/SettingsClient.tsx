@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   Building2,
   CheckCircle2,
+  Eye,
+  EyeOff,
   Image as ImageIcon,
+  KeyRound,
+  Lock,
   Save,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
+  User,
+  Users,
 } from "lucide-react";
 import {
   WORK_TYPES,
@@ -16,6 +24,7 @@ import {
   type WorkType,
 } from "@/lib/constants";
 import type { AppSettingsDTO } from "@/lib/data-queries";
+import type { SessionUser } from "@/lib/auth";
 
 function toLogoDataUrl(logoBase64: string | null): string | null {
   if (!logoBase64) return null;
@@ -27,8 +36,10 @@ function toLogoDataUrl(logoBase64: string | null): string | null {
 
 export function SettingsClient({
   initialSettings,
+  currentUser,
 }: {
   initialSettings: AppSettingsDTO;
+  currentUser?: SessionUser | null;
 }) {
   const router = useRouter();
   const [kapasitasPerHari, setKapasitasPerHari] = useState(
@@ -56,6 +67,159 @@ export function SettingsClient({
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ==================== STATE PENGATURAN AKUN SAYA ====================
+  const [selfNama, setSelfNama] = useState(currentUser?.nama || "");
+  const [selfUsername, setSelfUsername] = useState(currentUser?.username || "");
+  const [selfCurrentPassword, setSelfCurrentPassword] = useState("");
+  const [selfNewPassword, setSelfNewPassword] = useState("");
+  const [selfConfirmNewPassword, setSelfConfirmNewPassword] = useState("");
+  const [selfShowPassword, setSelfShowPassword] = useState(false);
+  const [selfSaving, setSelfSaving] = useState(false);
+  const [selfSuccessMsg, setSelfSuccessMsg] = useState<string | null>(null);
+  const [selfErrorMsg, setSelfErrorMsg] = useState<string | null>(null);
+
+  // ==================== STATE KELOLA AKUN TIM (ADMIN) ====================
+  const isAdmin = currentUser?.role === "ADMIN";
+  const [teamUsers, setTeamUsers] = useState<
+    Array<{
+      id: string;
+      username: string;
+      nama: string;
+      role: string;
+      jabatan: string;
+      avatarText: string;
+      warna: string;
+    }>
+  >([]);
+  const [selectedTeamUserId, setSelectedTeamUserId] = useState<string>("");
+  const [teamNama, setTeamNama] = useState("");
+  const [teamUsername, setTeamUsername] = useState("");
+  const [teamJabatan, setTeamJabatan] = useState("");
+  const [teamNewPassword, setTeamNewPassword] = useState("");
+  const [teamShowPassword, setTeamShowPassword] = useState(false);
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [teamSuccessMsg, setTeamSuccessMsg] = useState<string | null>(null);
+  const [teamErrorMsg, setTeamErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetch("/api/auth/users")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.teamUsers) && data.teamUsers.length > 0) {
+            setTeamUsers(data.teamUsers);
+            const first = data.teamUsers[0];
+            setSelectedTeamUserId(first.id);
+            setTeamNama(first.nama);
+            setTeamUsername(first.username);
+            setTeamJabatan(first.jabatan);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAdmin]);
+
+  function handleSelectTeamUser(id: string) {
+    setSelectedTeamUserId(id);
+    setTeamSuccessMsg(null);
+    setTeamErrorMsg(null);
+    setTeamNewPassword("");
+    const target = teamUsers.find((u) => u.id === id);
+    if (target) {
+      setTeamNama(target.nama);
+      setTeamUsername(target.username);
+      setTeamJabatan(target.jabatan);
+    }
+  }
+
+  async function handleUpdateSelfCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    setSelfSaving(true);
+    setSelfSuccessMsg(null);
+    setSelfErrorMsg(null);
+
+    if (selfNewPassword && selfNewPassword !== selfConfirmNewPassword) {
+      setSelfErrorMsg("Konfirmasi password baru tidak cocok.");
+      setSelfSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_SELF",
+          currentPassword: selfCurrentPassword,
+          newUsername: selfUsername,
+          newNama: selfNama,
+          newPassword: selfNewPassword || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setSelfErrorMsg(data.error || "Gagal memperbarui akun.");
+        return;
+      }
+
+      setSelfSuccessMsg(data.message || "Akun Anda berhasil diperbarui.");
+      setSelfCurrentPassword("");
+      setSelfNewPassword("");
+      setSelfConfirmNewPassword("");
+      router.refresh();
+    } catch {
+      setSelfErrorMsg("Gagal menghubungi server.");
+    } finally {
+      setSelfSaving(false);
+    }
+  }
+
+  async function handleUpdateTeamUser(e: React.FormEvent) {
+    e.preventDefault();
+    setTeamSaving(true);
+    setTeamSuccessMsg(null);
+    setTeamErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_TEAM_USER",
+          targetUserId: selectedTeamUserId,
+          newUsername: teamUsername,
+          newNama: teamNama,
+          newJabatan: teamJabatan,
+          newPassword: teamNewPassword || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setTeamErrorMsg(data.error || "Gagal memperbarui akun anggota.");
+        return;
+      }
+
+      setTeamSuccessMsg(data.message || "Akun anggota berhasil diperbarui.");
+      setTeamNewPassword("");
+
+      // Update teamUsers state lokal
+      setTeamUsers((prev) =>
+        prev.map((u) =>
+          u.id === selectedTeamUserId
+            ? { ...u, nama: teamNama, username: teamUsername, jabatan: teamJabatan }
+            : u
+        )
+      );
+      router.refresh();
+    } catch {
+      setTeamErrorMsg("Gagal menghubungi server.");
+    } finally {
+      setTeamSaving(false);
+    }
+  }
 
   function toggleExemptType(wt: WorkType) {
     setJenisDikecualikan((prev) =>
@@ -117,7 +281,8 @@ export function SettingsClient({
   const logoPreviewUrl = toLogoDataUrl(logoBase64);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
+    <div className="space-y-10 max-w-4xl pb-10">
+      <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Pengaturan Sistem</h1>
         <p className="text-sm text-slate-600 mt-1">
@@ -363,5 +528,342 @@ export function SettingsClient({
         </button>
       </div>
     </form>
+
+    {/* ==================== KEAMANAN AKUN & MANAJEMEN PASSWORD ==================== */}
+    <div id="keamanan" className="space-y-6 pt-6 border-t border-slate-200 dark:border-white/10">
+      <div>
+        <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-[#F05232]" />
+          Keamanan Akun &amp; Manajemen Password
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Atur username, nama profil, dan password login Anda di sini setelah masuk ke sistem.
+        </p>
+      </div>
+
+      {/* 1. Pengaturan Kredensial Akun Saya */}
+      <section className="bg-white dark:bg-[#161820] rounded-2xl border border-slate-200 dark:border-white/10 p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100 dark:border-white/[0.08]">
+          <div className="flex items-center gap-3">
+            <span
+              className={`w-10 h-10 rounded-xl text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-xs ${
+                currentUser?.role === "ADMIN"
+                  ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
+                  : "bg-gradient-to-br from-sky-500 to-blue-600"
+              }`}
+            >
+              {currentUser?.avatarText ?? "TP"}
+            </span>
+            <div>
+              <div className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>{selfNama || currentUser?.nama}</span>
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    currentUser?.role === "ADMIN"
+                      ? "bg-[#F05232] text-white"
+                      : "bg-sky-500 text-white"
+                  }`}
+                >
+                  {currentUser?.role === "ADMIN" ? "Admin" : "Member"}
+                </span>
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Username aktif: <strong className="text-slate-700 dark:text-slate-300 font-mono">@{selfUsername}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-400 italic">
+            Perubahan username atau password akan berlaku pada sesi login berikutnya.
+          </div>
+        </div>
+
+        {selfSuccessMsg && (
+          <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 px-3.5 py-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            {selfSuccessMsg}
+          </div>
+        )}
+
+        {selfErrorMsg && (
+          <div className="mb-4 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 px-3.5 py-2.5 text-xs font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            {selfErrorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleUpdateSelfCredentials} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Nama Lengkap / Tampilan
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={selfNama}
+                  onChange={(e) => setSelfNama(e.target.value)}
+                  placeholder="Nama tampilan Anda..."
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Username Login
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={selfUsername}
+                  onChange={(e) => setSelfUsername(e.target.value)}
+                  placeholder="Username login baru..."
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Password Saat Ini <span className="text-slate-400 font-normal">(Wajib diisi untuk konfirmasi keamanan)</span>
+              </label>
+              <div className="relative max-w-md">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type={selfShowPassword ? "text" : "password"}
+                  required
+                  value={selfCurrentPassword}
+                  onChange={(e) => setSelfCurrentPassword(e.target.value)}
+                  placeholder="Masukkan password saat ini..."
+                  className="w-full pl-9 pr-10 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelfShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  {selfShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Password Baru <span className="text-slate-400 font-normal">(Kosongkan jika tidak ingin ganti)</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type={selfShowPassword ? "text" : "password"}
+                  value={selfNewPassword}
+                  onChange={(e) => setSelfNewPassword(e.target.value)}
+                  placeholder="Password baru (min. 4 karakter)..."
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Ulangi Password Baru
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type={selfShowPassword ? "text" : "password"}
+                  value={selfConfirmNewPassword}
+                  onChange={(e) => setSelfConfirmNewPassword(e.target.value)}
+                  placeholder="Ulangi password baru..."
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={selfSaving}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-[#111216] text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{selfSaving ? "Menyimpan Kredensial..." : "Simpan Perubahan Kredensial Saya"}</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* 2. Kelola Akun Anggota Tim (Khusus Admin) */}
+      {isAdmin && (
+        <section className="bg-white dark:bg-[#161820] rounded-2xl border border-orange-200 dark:border-orange-500/20 p-5 sm:p-6 shadow-xs space-y-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#F05232]" />
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                Kelola Akun Anggota Tim (Khusus Admin)
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#F05232] text-white">
+                Admin
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Sebagai Admin, Anda dapat mengatur nama, username login, serta mengatur atau mereset password baru untuk setiap anggota tim.
+            </p>
+          </div>
+
+          {/* Selector Anggota Tim */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 mr-1">
+              Pilih Akun yang Ingin Diedit:
+            </span>
+            {teamUsers.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => handleSelectTeamUser(u.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTeamUserId === u.id
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-[#111216] shadow-xs ring-2 ring-[#F05232]/50"
+                    : "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                }`}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: u.warna }}
+                />
+                <span>{u.nama} ({u.role === "ADMIN" ? "Admin" : "Member"})</span>
+              </button>
+            ))}
+          </div>
+
+          {teamSuccessMsg && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 px-3.5 py-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              {teamSuccessMsg}
+            </div>
+          )}
+
+          {teamErrorMsg && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 px-3.5 py-2.5 text-xs font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              {teamErrorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleUpdateTeamUser} className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Lengkap Anggota
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={teamNama}
+                  onChange={(e) => setTeamNama(e.target.value)}
+                  placeholder="Nama anggota tim..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Username Login
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={teamUsername}
+                  onChange={(e) => setTeamUsername(e.target.value)}
+                  placeholder="Username login..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Jabatan / Posisi
+                </label>
+                <input
+                  type="text"
+                  value={teamJabatan}
+                  onChange={(e) => setTeamJabatan(e.target.value)}
+                  placeholder="Contoh: Automation Engineer..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reset / Set Password Baru <span className="text-slate-400 font-normal">(Kosongkan jika tidak diubah)</span>
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={teamShowPassword ? "text" : "password"}
+                    value={teamNewPassword}
+                    onChange={(e) => setTeamNewPassword(e.target.value)}
+                    placeholder="Masukkan password baru untuk anggota ini..."
+                    className="w-full pl-9 pr-10 py-2 rounded-xl border border-slate-300 dark:border-white/10 text-sm bg-white dark:bg-[#12141a] text-slate-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTeamShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  >
+                    {teamShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={teamSaving}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F45B38] to-[#D9381E] hover:brightness-105 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>{teamSaving ? "Menyimpan Akun Anggota..." : "Perbarui Akun Anggota"}</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Daftar Ringkasan Akun */}
+          <div className="pt-3 border-t border-slate-100 dark:border-white/[0.08]">
+            <div className="text-xs font-bold text-slate-500 mb-2">Daftar Akun Tim Aktif:</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {teamUsers.map((u) => (
+                <div
+                  key={u.id}
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/10 flex items-center gap-2.5"
+                >
+                  <span
+                    className="w-8 h-8 rounded-lg text-white font-black text-xs flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: u.warna }}
+                  >
+                    {u.avatarText}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                      {u.nama}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      @{u.username} • {u.role === "ADMIN" ? "Admin" : "Member"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  </div>
   );
 }

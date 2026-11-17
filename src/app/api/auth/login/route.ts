@@ -3,21 +3,21 @@ import {
   createSessionToken,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import { authenticateUser, toSessionUser } from "@/lib/users";
+import { toSessionUser, UserRole } from "@/lib/users";
+import { authenticateUser } from "@/lib/users-store";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const username = typeof body?.username === "string" ? body.username.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
-    const role = typeof body?.role === "string" ? body.role : "";
+    const role = (body?.role === "ADMIN" || body?.role === "MEMBER" ? body.role : undefined) as UserRole | undefined;
 
-    const identifier = username || (role ? role.toLowerCase() : "");
-    const user = authenticateUser(identifier, password);
+    const user = authenticateUser(username, password, role);
 
     if (!user) {
       return NextResponse.json(
-        { error: "Password atau akun salah. Periksa kembali kredensial Anda." },
+        { error: "Username atau password yang Anda masukkan tidak valid." },
         { status: 401 }
       );
     }
