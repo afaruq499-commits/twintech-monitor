@@ -17,6 +17,7 @@ export default async function DashboardPage() {
       tomorrowTasks={data.tomorrowTasks}
       alerts={data.alerts}
       topPriorities={data.topPriorities}
+      projectChecklists={data.projectChecklists}
     />
   );
 }

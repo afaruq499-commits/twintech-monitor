@@ -11,6 +11,7 @@ import {
   CalendarClock,
   CalendarPlus,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   Download,
@@ -30,7 +31,10 @@ import {
   type ScheduleCellStatus,
   type WorkType,
 } from "@/lib/constants";
-import type { DashboardAlertItem } from "@/lib/data-queries";
+import type {
+  DashboardAlertItem,
+  ProjectChecklistSummaryItem,
+} from "@/lib/data-queries";
 import { formatTanggalId } from "@/lib/date-utils";
 
 interface TaskItem {
@@ -133,6 +137,7 @@ export function DashboardClient({
   tomorrowTasks,
   alerts,
   topPriorities,
+  projectChecklists,
 }: {
   todayIso: string;
   tomorrowIso: string;
@@ -149,6 +154,7 @@ export function DashboardClient({
   tomorrowTasks: TaskItem[];
   alerts: DashboardAlertItem[];
   topPriorities: TopPriorityItem[];
+  projectChecklists?: ProjectChecklistSummaryItem[];
 }) {
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -157,6 +163,8 @@ export function DashboardClient({
   const [agendaTab, setAgendaTab] = useState<"ALL" | "TODAY" | "TOMORROW">("ALL");
   const [agendaSearch, setAgendaSearch] = useState("");
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
+  const [checklistSearch, setChecklistSearch] = useState("");
+  const [checklistFilter, setChecklistFilter] = useState<"ALL" | "INCOMPLETE" | "COMPLETE">("ALL");
 
   useEffect(() => {
     setMounted(true);
@@ -221,6 +229,41 @@ export function DashboardClient({
 
   const filteredToday = filterTasks(todayTasks);
   const filteredTomorrow = filterTasks(tomorrowTasks);
+
+  const checklistList = useMemo(
+    () => projectChecklists ?? [],
+    [projectChecklists]
+  );
+
+  const { completeCount, incompleteCount } = useMemo(() => {
+    let complete = 0;
+    let incomplete = 0;
+    for (const p of checklistList) {
+      if (p.completedCount === p.totalCount && p.totalCount > 0) complete++;
+      else incomplete++;
+    }
+    return { completeCount: complete, incompleteCount: incomplete };
+  }, [checklistList]);
+
+  const filteredProjectChecklists = useMemo(() => {
+    const q = checklistSearch.trim().toLowerCase();
+    return checklistList.filter((p) => {
+      const matchesSearch =
+        !q ||
+        p.nama.toLowerCase().includes(q) ||
+        (p.kode && p.kode.toLowerCase().includes(q)) ||
+        p.client.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+
+      if (checklistFilter === "INCOMPLETE") {
+        return p.completedCount < p.totalCount;
+      }
+      if (checklistFilter === "COMPLETE") {
+        return p.completedCount === p.totalCount && p.totalCount > 0;
+      }
+      return true;
+    });
+  }, [checklistList, checklistSearch, checklistFilter]);
 
   function renderTaskCard(task: TaskItem) {
     const bgHex = task.warnaCustom || `#${SCHEDULE_STATUS_RGB[task.status]}`;
@@ -643,7 +686,7 @@ export function DashboardClient({
       </div>
 
       {/* ==================== ROW 2: PROGRESS STRIP + AGENDA AKTIVITAS (V14) ==================== */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
         {/* Left Column (4 cols): Component Progress Limit Card + Prioritas Minggu Ini */}
         <div className="xl:col-span-4 space-y-5 animate-v14-in v14-delay-4">
           {/* Progress Kedatangan Komponen (mirrors Monthly Spending Limit) */}
@@ -727,7 +770,7 @@ export function DashboardClient({
                 Belum ada proyek aktif yang diprioritaskan.
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
                 {topPriorities.map((item) => (
                   <Link
                     key={item.project.id}
@@ -845,7 +888,7 @@ export function DashboardClient({
                       Tidak ada pekerjaan terjadwal hari ini.
                     </div>
                   ) : (
-                    <div className="space-y-2.5">{filteredToday.map(renderTaskCard)}</div>
+                    <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">{filteredToday.map(renderTaskCard)}</div>
                   )}
                 </div>
               )}
@@ -866,7 +909,7 @@ export function DashboardClient({
                       Belum ada agenda untuk besok.
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
                       {filteredTomorrow.map(renderTaskCard)}
                     </div>
                   )}
@@ -901,7 +944,7 @@ export function DashboardClient({
                 </span>
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 max-h-[290px] overflow-y-auto pr-1">
                 {alerts.map((a) => {
                   const isBusy = busyKey === a.key;
                   const accentClass =
@@ -993,6 +1036,166 @@ export function DashboardClient({
           </section>
         </div>
       </div>
+
+      {/* ==================== ROW 3: MONITOR CEKLIS DOKUMEN TIAP PROYEK (1 KOLOM OVERVIEW) ==================== */}
+      <section className="v14-card rounded-[26px] p-5 sm:p-6 animate-v14-in v14-delay-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-[#F05232]/10 dark:bg-[#F05232]/20 text-[#F05232] flex items-center justify-center shrink-0">
+              <ClipboardCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                Monitor Ceklis &amp; Kesiapan Dokumen Tiap Proyek
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Overview status 8 berkas engineering per proyek: PR, Jadwal, I/O, Layout HMI, Layout Panel, Flowchart, Wiring, &amp; Program
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search filter */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={checklistSearch}
+                onChange={(e) => setChecklistSearch(e.target.value)}
+                placeholder="Cari proyek / client..."
+                className="pl-8 pr-3 py-1.5 rounded-full v14-subcard text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#F05232]/40 w-44 sm:w-52"
+              />
+            </div>
+
+            {/* Segmented Filter Pills */}
+            <div className="inline-flex items-center rounded-full v14-subcard p-1 gap-0.5">
+              {(
+                [
+                  ["ALL", `Semua (${checklistList.length})`],
+                  ["INCOMPLETE", `Belum Lengkap (${incompleteCount})`],
+                  ["COMPLETE", `Lengkap (${completeCount})`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setChecklistFilter(key)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                    checklistFilter === key
+                      ? "bg-[#141518] text-white dark:bg-white dark:text-[#111216]"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {filteredProjectChecklists.length === 0 ? (
+          <div className="rounded-2xl v14-subcard border-dashed p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            {checklistSearch
+              ? `Tidak ditemukan proyek yang cocok dengan kata kunci "${checklistSearch}".`
+              : "Belum ada data proyek untuk dimonitor."}
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+            {filteredProjectChecklists.map((p) => {
+              const isAllDone =
+                p.completedCount === p.totalCount && p.totalCount > 0;
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-2xl v14-subcard p-4 sm:p-4.5 transition-all hover:border-[#F05232]/40 hover:shadow-xs group"
+                >
+                  {/* Top Bar: Project Info + Progress Counter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white dark:ring-[#16181f] shadow-xs"
+                        style={{ backgroundColor: p.warna || "#6366f1" }}
+                      />
+                      {p.kode && (
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-slate-700 dark:text-slate-300 shrink-0">
+                          {p.kode}
+                        </span>
+                      )}
+                      <Link
+                        href={`/proyek/${p.id}`}
+                        className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white group-hover:text-[#F05232] transition-colors truncate"
+                      >
+                        {p.nama}
+                      </Link>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        • {p.client}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      {isAllDone ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-500/30">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          {p.completedCount}/{p.totalCount} Lengkap (100%)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/30">
+                          <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          {p.completedCount}/{p.totalCount} Selesai ({p.progressPct}%)
+                        </span>
+                      )}
+
+                      <Link
+                        href={`/proyek/${p.id}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-[#F05232] dark:hover:text-[#F05232] transition ml-1"
+                      >
+                        Detail <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Slim Progress Bar */}
+                  <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-white/[0.06] overflow-hidden my-2.5">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isAllDone
+                          ? "bg-emerald-500"
+                          : "bg-gradient-to-r from-[#F45B38] to-[#D9381E]"
+                      }`}
+                      style={{ width: `${p.progressPct}%` }}
+                    />
+                  </div>
+
+                  {/* 8 Checklist Items Grid / Badges */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-0.5">
+                    {p.items.map((item) =>
+                      item.isComplete ? (
+                        <div
+                          key={item.key}
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-emerald-50/90 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-500/25 text-[11px] font-bold min-w-0"
+                          title={`${item.label}: Sudah selesai & diceklis`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                      ) : (
+                        <div
+                          key={item.key}
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium min-w-0"
+                          title={`${item.label}: Belum diceklis / belum lengkap`}
+                        >
+                          <span className="w-2 h-2 rounded-full border border-slate-300 dark:border-slate-600 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

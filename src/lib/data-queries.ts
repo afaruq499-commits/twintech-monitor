@@ -21,6 +21,8 @@ import {
   computeChecklistProgress,
   deriveChecklistDetection,
   parseFileChecklistJson,
+  PROJECT_CHECKLIST_KEYS,
+  type ProjectChecklistKey,
 } from "@/lib/project-checklist";
 
 export interface AppSettingsDTO extends ConflictSettings {
@@ -348,6 +350,27 @@ export interface DashboardAlertItem {
   description: string;
   href: string;
   cellId?: string;
+}
+
+export interface ProjectChecklistItemSummary {
+  key: ProjectChecklistKey;
+  label: string;
+  isComplete: boolean;
+}
+
+export interface ProjectChecklistSummaryItem {
+  id: string;
+  kode: string | null;
+  nama: string;
+  client: string;
+  warna: string;
+  status: string;
+  prioritas: string;
+  deadline: string | null;
+  completedCount: number;
+  totalCount: number;
+  progressPct: number;
+  items: ProjectChecklistItemSummary[];
 }
 
 export async function getDashboardSummary() {
@@ -708,6 +731,77 @@ export async function getDashboardSummary() {
     };
   });
 
+  const CHECKLIST_LABELS: Record<ProjectChecklistKey, string> = {
+    komponen_pr: "PR Komponen",
+    schedule_pengerjaan: "Jadwal",
+    alamat_io: "Alamat I/O",
+    layout_panel_hmi: "Panel HMI",
+    layout_panel_utama: "Panel Utama",
+    flowchart: "Flowchart",
+    diagram_wiring: "Wiring",
+    pemprograman: "Program",
+  };
+
+  const projectChecklists: ProjectChecklistSummaryItem[] = projects.map((p) => {
+    const activeComps = p.components.filter(
+      (c) => c.statusImport !== "HILANG_DI_REVISI"
+    );
+    const scheduledCellsCount = p.lanes.reduce(
+      (sum, l) =>
+        sum + l.workItems.reduce((ws, w) => ws + w.scheduleCells.length, 0),
+      0
+    );
+
+    const manualState = parseFileChecklistJson(p.fileChecklistJson);
+    const detection = deriveChecklistDetection({
+      prStatus: p.prStatus,
+      componentsCount: activeComps.length,
+      lanesCount: p.lanes.length,
+      scheduleCellsCount: scheduledCellsCount,
+      plcAddressesJson: p.plcAddressesJson,
+      panelLayoutJson: p.panelLayoutJson,
+      flowSequenceJson: p.flowSequenceJson,
+      wiringDiagramPdfUrl: p.wiringDiagramPdfUrl,
+      wiringDiagramPdfName: p.wiringDiagramPdfName,
+      plcProgramFileUrl: p.plcProgramFileUrl,
+      plcProgramFileName: p.plcProgramFileName,
+      hmiProgramFileUrl: p.hmiProgramFileUrl,
+      hmiProgramFileName: p.hmiProgramFileName,
+    });
+
+    const progress = computeChecklistProgress(manualState, detection);
+
+    const items: ProjectChecklistItemSummary[] = PROJECT_CHECKLIST_KEYS.map((key) => ({
+      key,
+      label: CHECKLIST_LABELS[key],
+      isComplete: Boolean(progress.autoByKey[key] || manualState[key]?.checked),
+    }));
+
+    return {
+      id: p.id,
+      kode: p.kode,
+      nama: p.nama,
+      client: p.client,
+      warna: p.warna,
+      status: p.status,
+      prioritas: p.prioritas,
+      deadline: toIsoDateStr(p.deadline),
+      completedCount: progress.completedCount,
+      totalCount: progress.totalCount,
+      progressPct: progress.progressPct,
+      items,
+    };
+  });
+
+  projectChecklists.sort((a, b) => {
+    if (a.status !== "SELESAI" && b.status === "SELESAI") return -1;
+    if (a.status === "SELESAI" && b.status !== "SELESAI") return 1;
+    if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+    if (a.deadline) return -1;
+    if (b.deadline) return 1;
+    return a.nama.localeCompare(b.nama);
+  });
+
   return {
     todayIso,
     tomorrowIso,
@@ -731,6 +825,7 @@ export async function getDashboardSummary() {
     next7DaysTasks,
     alerts,
     topPriorities: ranked.slice(0, 5),
+    projectChecklists,
   };
 }
 
