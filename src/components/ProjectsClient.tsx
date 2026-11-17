@@ -227,9 +227,11 @@ export function ProjectsClient({
                             ? "bg-purple-100 text-purple-800"
                             : p.tipeProyek === "AUTOMATION_BESAR"
                               ? "bg-indigo-100 text-indigo-800"
-                              : p.tipeProyek === "AFTER_SALES"
-                                ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                : "bg-teal-100 text-teal-800"
+                              : p.tipeProyek === "INTEGRASI_ROBOT"
+                                ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                : p.tipeProyek === "AFTER_SALES"
+                                  ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                  : "bg-teal-100 text-teal-800"
                         }`}
                       >
                         {PROJECT_TYPE_LABELS[(p.tipeProyek as ProjectType)] ??

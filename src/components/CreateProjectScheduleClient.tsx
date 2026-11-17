@@ -451,6 +451,8 @@ export function CreateProjectScheduleClient({
                   "✨ Otomatis memuat template arsitektur IoT, firmware edge, dan dashboard."}
                 {tipeProyek === "AUTOMATION_BESAR" &&
                   "✨ Otomatis memuat template multi-station SPM, robot & PLC motion control."}
+                {tipeProyek === "INTEGRASI_ROBOT" &&
+                  "✨ Otomatis memuat template analisis jangkauan, teaching point robot, safety zone & handshake PLC."}
                 {tipeProyek === "AFTER_SALES" &&
                   "✨ Otomatis memuat template troubleshooting, perbaikan part, update program, dan service report."}
               </p>

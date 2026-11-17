@@ -377,12 +377,122 @@ export const AFTER_SALES_TEMPLATE: TemplatePekerjaan[] = [
   },
 ];
 
+/**
+ * Template Pekerjaan Proyek Integrasi Robot (Articulated Robot, SCARA, Delta, Cobot)
+ */
+export const INTEGRASI_ROBOT_TEMPLATE: TemplatePekerjaan[] = [
+  {
+    judul: "Analisis Jangkauan & Cycle Time",
+    jenis: "COMMISSIONING",
+    subPekerjaan: [
+      {
+        judul: "1. Analisis Layout & Reachability",
+        rincianText:
+          "a. Analisis jangkauan kerja robot (reach study), payload, dan end-effector/gripper.\nb. Simulasi cycle time, jalur pergerakan, dan mitigasi area blind spot.",
+      },
+      {
+        judul: "2. Spesifikasi Interlock & Safety Zone",
+        rincianText:
+          "a. Penentuan zona aman (safety fence, light curtain, safety scanner).\nb. Konfigurasi safety signal (E-Stop, fence door interlock, safe speed).",
+      },
+    ],
+  },
+  {
+    judul: "List Part & Pengadaan Robot System",
+    jenis: "COMMISSIONING",
+    subPekerjaan: [
+      {
+        judul: "1. Pembuatan PR Robot & Aksesoris",
+        rincianText:
+          "a. Pemilihan robot controller, teach pendant, kabel robot, dan base mounting.\nb. Pemilihan gripper, vacuum generator, tool changer, sensor deteksi part, dan kabel fleksi.\nc. Pembuatan Purchase Requisition (PR) dan monitoring lead time.",
+      },
+    ],
+  },
+  {
+    judul: "Desain Elektrikal & Interface Komunikasi",
+    jenis: "COMMISSIONING",
+    subPekerjaan: [
+      {
+        judul: "1. Diagram Wiring Interface PLC-Robot",
+        rincianText:
+          "a. Desain wiring I/O digital atau fieldbus (CC-Link, Profinet, EtherNet/IP, DeviceNet).\nb. Pemetaan alamat sinyal handshake (Robot Ready, Program Call, Cycle Start, Busy, Part Grip, Alarm).",
+      },
+      {
+        judul: "2. Layout Panel & Jalur Kabel Robot",
+        rincianText:
+          "a. Penempatan controller robot, panel utama, dan rute cable track fleksibel ke arm.\nb. Review integrasi grounding dan proteksi surge.",
+      },
+    ],
+  },
+  {
+    judul: "Instalasi Mekanikal & Wiring Robot",
+    jenis: "WIRING",
+    subPekerjaan: [
+      {
+        judul: "1. Base Mounting & Leveling Robot",
+        rincianText:
+          "a. Pemasangan robot ke pedestal/frame dan pengecekan kekokohan baut dinabolt/anchor.\nb. Leveling kerataan base robot.",
+      },
+      {
+        judul: "2. Pemasangan Tooling Gripper & Wiring",
+        rincianText:
+          "a. Pemasangan mechanical gripper pada flange wrist robot.\nb. Penataan selang pneumatik dan kabel sensor pada arm robot dengan cable clamp.",
+      },
+    ],
+  },
+  {
+    judul: "Pemrograman PLC & Teaching Point Robot",
+    jenis: "PROGRAMMING",
+    subPekerjaan: [
+      {
+        judul: "1. Teaching Posisi Gerakan Robot",
+        rincianText:
+          "a. Kalibrasi tool center point (TCP) dan base coordinate system.\nb. Teaching posisi Home, Standby, Pick Point, Retract, Transfer, dan Place Point.\nc. Optimasi kecepatan akselerasi/deselerasi dan penghindaran tabrakan (anti-collision).",
+      },
+      {
+        judul: "2. Pemrograman PLC & Interlock Handshake",
+        rincianText:
+          "a. Pembuatan program PLC sequence kontrol stasiun mesin dan handshake sinyal robot.\nb. Integrasi HMI untuk status robot, mode manual jog, pemilihan resep/tipe produk, dan display alarm.",
+      },
+    ],
+  },
+  {
+    judul: "Commissioning & Uji Coba Integrasi",
+    jenis: "COMMISSIONING",
+    subPekerjaan: [
+      {
+        judul: "1. Dry Run & Slow Motion Test",
+        rincianText:
+          "a. Uji pergerakan robot langkah per langkah (step test) pada kecepatan rendah (T1 mode).\nb. Pengecekan respons Emergency Stop, safety fence open, dan auto-hold.",
+      },
+      {
+        judul: "2. Full Speed Cycle Run & Akurasi",
+        rincianText:
+          "a. Uji continuous running pada 100% kecepatan kerja dengan beban produk aktual.\nb. Verifikasi akurasi penempatan (repeatability) dan pencapaian target cycle time.",
+      },
+    ],
+  },
+  {
+    judul: "Dokumentasi & Serah Terima",
+    jenis: "COMMISSIONING",
+    subPekerjaan: [
+      {
+        judul: "1. Backup & Pelatihan Operator",
+        rincianText:
+          "a. Backup program robot (.tp / .src / .prg) dan program PLC ke flashdisk/cloud.\nb. Penyusunan manual operasional, panduan recovery alarm, dan training teknisi/operator client.",
+      },
+    ],
+  },
+];
+
 export function getTemplateByProjectType(type: ProjectType): TemplatePekerjaan[] {
   switch (type) {
     case "IOT":
       return IOT_PROYEK_TEMPLATE;
     case "AUTOMATION_BESAR":
       return AUTOMATION_BESAR_TEMPLATE;
+    case "INTEGRASI_ROBOT":
+      return INTEGRASI_ROBOT_TEMPLATE;
     case "AFTER_SALES":
       return AFTER_SALES_TEMPLATE;
     case "AUTOMATION_KECIL":

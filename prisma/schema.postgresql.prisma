@@ -17,7 +17,7 @@ model Project {
   tanggalMulai DateTime? @map("tanggal_mulai") @db.Date
   deadline     DateTime? @db.Date
   prioritas    String    @default("SEDANG") @db.VarChar(30) // TINGGI | SEDANG | RENDAH
-  tipeProyek   String    @default("AUTOMATION_KECIL") @map("tipe_proyek") @db.VarChar(50) // IOT | AUTOMATION_KECIL | AUTOMATION_BESAR | AFTER_SALES
+  tipeProyek   String    @default("AUTOMATION_KECIL") @map("tipe_proyek") @db.VarChar(50) // IOT | AUTOMATION_KECIL | AUTOMATION_BESAR | INTEGRASI_ROBOT | AFTER_SALES
   status       String    @default("PLANNING") @db.VarChar(50) // PLANNING | MENUNGGU_KOMPONEN | WIRING | PROGRAMMING | COMMISSIONING | SELESAI
   prStatus     String    @default("DRAFT") @map("pr_status") @db.VarChar(30) // DRAFT | PREPARED | CHECKED | PURCHASING | APPROVED
   catatan      String?   @db.Text

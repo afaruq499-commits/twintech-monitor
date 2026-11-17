@@ -2,15 +2,17 @@ export const PROJECT_TYPES = [
   "IOT",
   "AUTOMATION_KECIL",
   "AUTOMATION_BESAR",
+  "INTEGRASI_ROBOT",
   "AFTER_SALES",
 ] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
-  IOT: "1. IoT Proyek",
-  AUTOMATION_KECIL: "2. Automation Kecil",
-  AUTOMATION_BESAR: "3. Automation Besar",
-  AFTER_SALES: "4. After Sale",
+  IOT: "IoT Proyek",
+  AUTOMATION_KECIL: "Automation Kecil",
+  AUTOMATION_BESAR: "Automation Besar",
+  INTEGRASI_ROBOT: "Integrasi Robot",
+  AFTER_SALES: "After Sale",
 };
 
 export const PROJECT_PRIORITIES = ["TINGGI", "SEDANG", "RENDAH"] as const;

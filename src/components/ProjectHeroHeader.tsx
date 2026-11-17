@@ -245,9 +245,11 @@ export function ProjectHeroHeader({
                       ? "bg-purple-100 text-purple-800"
                       : project.tipeProyek === "AUTOMATION_BESAR"
                         ? "bg-indigo-100 text-indigo-800"
-                        : project.tipeProyek === "AFTER_SALES"
-                          ? "bg-amber-100 text-amber-800 border border-amber-300"
-                          : "bg-teal-100 text-teal-800"
+                        : project.tipeProyek === "INTEGRASI_ROBOT"
+                          ? "bg-rose-100 text-rose-800 border border-rose-300"
+                          : project.tipeProyek === "AFTER_SALES"
+                            ? "bg-amber-100 text-amber-800 border border-amber-300"
+                            : "bg-teal-100 text-teal-800"
                   }`}
                 >
                   {
