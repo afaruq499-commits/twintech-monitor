@@ -50,14 +50,17 @@ export function getHmiBrandBadge(fileName?: string | null): {
   const ext = fileName.toLowerCase().split(".").pop() || "";
 
   switch (ext) {
-    // 1. Keyence VT STUDIO (VT5 / VT3 / VT2 Series)
+    // 1. Keyence VT STUDIO (VT8G / VT5 / VT3 / VT2 Series)
+    case "vfx":
     case "vtp":
     case "vt5":
     case "vt3":
     case "vt2":
     case "vt":
+    case "vtd":
+    case "vfd":
       return {
-        label: "Keyence VT STUDIO (.vtp)",
+        label: ext === "vfx" ? "Keyence VT STUDIO (.vfx)" : "Keyence VT STUDIO (.vtp)",
         badgeClass: "bg-red-50 text-red-700 border-red-300 font-black",
         brand: "Keyence",
       };
@@ -221,6 +224,7 @@ export function ProjectHmiProgramPanel({
   const [fileName, setFileName] = useState<string | null>(initialFileName ?? null);
   const [fileSize, setFileSize] = useState<number | null>(initialFileSize ?? null);
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const brandInfo = getHmiBrandBadge(fileName);
@@ -273,8 +277,29 @@ export function ProjectHmiProgramPanel({
       alert(err instanceof Error ? err.message : "Gagal mengunggah berkas program HMI");
     } finally {
       setUploading(false);
+      setIsDragging(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) void handleFileUpload(f);
   }
 
   async function handleDeleteFile() {
@@ -353,6 +378,16 @@ export function ProjectHmiProgramPanel({
 
         {/* Action Button Unggah / Ganti */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {fileUrl && (
+            <a
+              href={fileUrl}
+              download={fileName || "program-hmi"}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-700" />
+              Unduh Berkas HMI
+            </a>
+          )}
           <button
             type="button"
             disabled={uploading}
@@ -389,6 +424,9 @@ export function ProjectHmiProgramPanel({
                       • {formatBytes(fileSize)}
                     </span>
                   )}
+                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Tersimpan &amp; Siap Diunduh
+                  </span>
                 </div>
                 <h4
                   className="text-sm font-black text-slate-800 truncate"
@@ -396,8 +434,8 @@ export function ProjectHmiProgramPanel({
                 >
                   {fileName || "File Program HMI"}
                 </h4>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">
-                  Tersedia untuk diunduh langsung ke software desain HMI terkait.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Berkas desain HMI tersimpan aman di server proyek. Tidak perlu dibuka di browser web — klik tombol <strong>Unduh Berkas HMI</strong> untuk membukanya langsung di laptop Anda menggunakan software HMI vendor.
                 </p>
               </div>
             </div>
@@ -407,8 +445,6 @@ export function ProjectHmiProgramPanel({
               <a
                 href={fileUrl}
                 download={fileName || "program-hmi"}
-                target="_blank"
-                rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition active:scale-95"
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" />
@@ -429,16 +465,24 @@ export function ProjectHmiProgramPanel({
           /* Placeholder Kosong / Drop Area */
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="p-6 rounded-xl border-2 border-dashed border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/30 transition text-center cursor-pointer group"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`p-6 rounded-xl border-2 border-dashed transition text-center cursor-pointer group ${
+              isDragging
+                ? "border-amber-500 bg-amber-100/50 scale-[1.01]"
+                : "border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/30"
+            }`}
           >
             <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 mx-auto flex items-center justify-center mb-2.5 group-hover:scale-105 transition">
               <HardDriveDownload className="w-6 h-6" />
             </div>
             <p className="text-sm font-bold text-slate-800 group-hover:text-amber-700 transition">
-              Belum ada Program HMI
+              {isDragging ? "Lepaskan Berkas HMI di Sini" : "Belum ada Program HMI"}
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              Klik di sini untuk memilih dan mengunggah berkas proyek HMI (Keyence, Panasonic, Fatek, Omron, Mitsubishi, Pro-face, Weintek, dll.)
+              Klik di sini atau <strong>seret &amp; lepas (drag &amp; drop)</strong> untuk mengunggah berkas proyek HMI (<strong>Keyence VT .vfx/.vtp</strong>, <strong>Panasonic GTWIN .gtn</strong>, Fatek, Omron, Mitsubishi, Pro-face, Weintek, dll.).
+              Berkas akan tersimpan aman dan dapat diunduh kapan saja oleh tim untuk dibuka di laptop.
             </p>
           </div>
         )}
@@ -451,7 +495,7 @@ export function ProjectHmiProgramPanel({
           </div>
           <div className="flex flex-wrap gap-1.5 text-[11px]">
             <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-semibold">
-              Keyence: VT STUDIO (.vtp, .vt5)
+              Keyence: VT STUDIO (.vfx, .vtp, .vt5)
             </span>
             <span className="px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200 font-semibold">
               Panasonic: GTWIN (.gtn, .gtw)

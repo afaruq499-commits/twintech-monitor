@@ -29,6 +29,7 @@ export function ProjectWiringPdfPanel({
   const [fileUrl, setFileUrl] = useState<string | null>(initialPdfUrl ?? null);
   const [fileName, setFileName] = useState<string | null>(initialPdfName ?? null);
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,8 +85,29 @@ export function ProjectWiringPdfPanel({
       alert(err instanceof Error ? err.message : "Gagal mengunggah berkas diagram wiring");
     } finally {
       setUploading(false);
+      setIsDragging(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) void handleFileUpload(f);
   }
 
   async function handleDeleteFile() {
@@ -127,15 +149,15 @@ export function ProjectWiringPdfPanel({
             </h3>
           </div>
           <p className="text-xs text-slate-600 mt-1">
-            Simpan berkas gambar skematik elektrikal, power distribution, PLC I/O wiring, dan servo driver.
-            Mendukung berkas <strong>AutoCAD DWG (.dwg)</strong>, DXF, maupun dokumen <strong>PDF (.pdf)</strong>.
+            Simpan berkas skematik elektrikal, power distribution, PLC I/O wiring, dan servo driver.
+            Mendukung gambar teknik <strong>AutoCAD DWG (.dwg)</strong>, DXF, maupun dokumen <strong>PDF (.pdf)</strong>.
           </p>
         </div>
 
+        {/* Input file tanpa filter MIME pembatas agar dialog Windows tidak menyembunyikan berkas .dwg */}
         <input
           ref={fileInputRef}
           type="file"
-          accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.svg,.zip,.rar,application/pdf,application/acad,image/vnd.dwg"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -189,17 +211,27 @@ export function ProjectWiringPdfPanel({
         {!fileUrl ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="p-10 border-2 border-dashed border-rose-200 hover:border-rose-400 rounded-2xl bg-rose-50/20 hover:bg-rose-50/40 text-center transition cursor-pointer group"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`p-10 border-2 border-dashed rounded-2xl text-center transition cursor-pointer group ${
+              isDragging
+                ? "border-rose-500 bg-rose-100/50 scale-[1.01]"
+                : "border-rose-200 hover:border-rose-400 bg-rose-50/20 hover:bg-rose-50/40"
+            }`}
           >
             <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition shadow-xs">
               <Compass className="w-7 h-7" />
             </div>
             <h4 className="font-extrabold text-slate-800 text-sm">
-              Belum Ada Berkas Diagram Wiring yang Diunggah
+              {isDragging
+                ? "Lepaskan Berkas DWG / PDF di Sini"
+                : "Belum Ada Berkas Diagram Wiring yang Diunggah"}
             </h4>
             <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1 mb-4 leading-relaxed">
-              Klik di sini untuk mengunggah berkas diagram wiring elektrikal hasil desain. Mendukung gambar teknik{" "}
-              <strong>AutoCAD DWG (.dwg)</strong>, DXF, maupun dokumen <strong>PDF (.pdf)</strong>. Berkas akan tersimpan aman dan siap diunduh tim engineering kapan saja.
+              Klik di sini atau <strong>seret &amp; lepas (drag &amp; drop)</strong> berkas gambar teknik{" "}
+              <strong>AutoCAD DWG (.dwg)</strong>, DXF, maupun dokumen <strong>PDF (.pdf)</strong>.
+              Berkas akan tersimpan aman di server dan siap diunduh tim untuk dibuka di software laptop masing-masing.
             </p>
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 group-hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs">
               <Upload className="w-4 h-4" />
@@ -228,7 +260,7 @@ export function ProjectWiringPdfPanel({
                   </h4>
                   <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
                     Berkas gambar teknik CAD diagram wiring elektrikal telah tersimpan aman di server proyek.
-                    Dapat diunduh kapan saja oleh tim untuk dibuka di AutoCAD, Autodesk TrueView, atau CAD viewer.
+                    Tidak perlu dibuka di browser web — silakan klik tombol <strong>Unduh Berkas DWG</strong> di sebelah kanan untuk membukanya langsung di software AutoCAD atau Autodesk TrueView pada laptop Anda.
                   </p>
                 </div>
               </div>

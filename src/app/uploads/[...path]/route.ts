@@ -12,10 +12,16 @@ const MIME_TYPES: Record<string, string> = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".pdf": "application/pdf",
+  ".dwg": "application/acad",
+  ".dxf": "image/vnd.dxf",
+  ".zip": "application/zip",
+  ".rar": "application/vnd.rar",
+  ".7z": "application/x-7z-compressed",
+  ".json": "application/json",
 };
 
 export async function GET(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ path: string[] }> }
 ) {
   try {
@@ -42,11 +48,28 @@ export async function GET(
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
+    const originalFilename = path.basename(filePath);
+    // Jika nama berkas diawali timestamp angka_ misal 173000000_nama.ext, kita bisa bersihkan jika diinginkan,
+    // namun kita gunakan encodeURIComponent untuk keselamatan header HTTP
+    const cleanDownloadName = originalFilename.replace(/^\d+_/, "") || originalFilename;
+
+    const url = new URL(req.url);
+    const forceDownload = url.searchParams.get("download") === "1";
+
+    const isInlineViewable =
+      !forceDownload &&
+      [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"].includes(ext);
+
+    const disposition = isInlineViewable
+      ? `inline; filename="${encodeURIComponent(cleanDownloadName)}"`
+      : `attachment; filename="${encodeURIComponent(cleanDownloadName)}"`;
+
     return new Response(buffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
         "Content-Length": buffer.length.toString(),
+        "Content-Disposition": disposition,
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });

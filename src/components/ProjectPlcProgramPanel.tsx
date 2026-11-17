@@ -50,20 +50,23 @@ function getPlcBrandBadge(fileName?: string | null): {
     case "kvr":
     case "kvd":
     case "kbp":
+    case "kvz":
     case "kv":
       return {
         label: "Keyence KV STUDIO (KV-8000)",
         badgeClass: "bg-red-50 text-red-700 border-red-300 font-black",
       };
 
-    // 2. Panasonic Control FPWIN Pro 7 / FP Series
+    // 2. Panasonic Control FPWIN Pro 7 / FPWIN GR / FP Series
+    case "kpr":
     case "p7":
     case "p6":
     case "fp":
     case "fpw":
     case "fpe":
+    case "prg":
       return {
-        label: "Panasonic FPWIN Pro 7 (.p7)",
+        label: ext === "kpr" ? "Panasonic FPWIN GR (.kpr)" : "Panasonic FPWIN Pro 7 (.p7)",
         badgeClass: "bg-sky-50 text-sky-800 border-sky-300 font-black",
       };
 
@@ -176,6 +179,7 @@ export function ProjectPlcProgramPanel({
   const [fileName, setFileName] = useState<string | null>(initialFileName ?? null);
   const [fileSize, setFileSize] = useState<number | null>(initialFileSize ?? null);
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const brandInfo = getPlcBrandBadge(fileName);
@@ -228,8 +232,29 @@ export function ProjectPlcProgramPanel({
       alert(err instanceof Error ? err.message : "Gagal mengunggah berkas program PLC");
     } finally {
       setUploading(false);
+      setIsDragging(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) void handleFileUpload(f);
   }
 
   async function handleDeleteFile() {
@@ -280,14 +305,14 @@ export function ProjectPlcProgramPanel({
           </div>
           <p className="text-xs text-slate-600 mt-1">
             Simpan cadangan berkas logika ladder / instruksi program PLC proyek mesin ini.
-            Mendukung semua format berkas PLC (<strong>Keyence KV-8000 .kvp/.kvs</strong>, <strong>Panasonic FPWIN Pro 7 .p7/.pro</strong>, <strong>Fatek UpperLogic .fkg/.pms</strong>, Omron, Mitsubishi, Siemens, maupun arsip <strong>ZIP/RAR</strong>).
+            Mendukung semua format berkas PLC (<strong>Panasonic FPWIN GR / Pro 7 .kpr/.p7</strong>, <strong>Keyence KV-8000 .kvp/.kvs</strong>, <strong>Fatek UpperLogic .fkg/.pms</strong>, Omron, Mitsubishi, Siemens, maupun arsip <strong>ZIP/RAR</strong>).
           </p>
         </div>
 
+        {/* File input tanpa batasan MIME agar Windows File Dialog membuka opsi Semua Berkas (*.*) */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="*/*"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -330,17 +355,25 @@ export function ProjectPlcProgramPanel({
         {!fileUrl ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="p-10 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-2xl bg-indigo-50/20 hover:bg-indigo-50/40 text-center transition cursor-pointer group"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`p-10 border-2 border-dashed rounded-2xl text-center transition cursor-pointer group ${
+              isDragging
+                ? "border-indigo-500 bg-indigo-100/50 scale-[1.01]"
+                : "border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40"
+            }`}
           >
             <div className="w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition shadow-xs">
               <Cpu className="w-7 h-7" />
             </div>
             <h4 className="font-extrabold text-slate-800 text-sm">
-              Belum Ada Program PLC
+              {isDragging ? "Lepaskan Berkas PLC di Sini" : "Belum Ada Program PLC"}
             </h4>
             <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1 mb-4 leading-relaxed">
-              Klik di sini untuk mengunggah berkas program PLC hasil pemrograman mesin. Mendukung semua format software PLC:
-              <strong>Keyence KV STUDIO KV-8000</strong> (<code>.kvp</code>, <code>.kvs</code>), <strong>Panasonic FPWIN Pro 7</strong> (<code>.p7</code>, <code>.pro</code>), <strong>Fatek UpperLogic</strong> (<code>.fkg</code>, <code>.pms</code>), Omron (<code>.cxp</code>), Mitsubishi GX Works (<code>.gx3</code>), Siemens, maupun arsip ZIP/RAR.
+              Klik di sini atau <strong>seret &amp; lepas (drag &amp; drop)</strong> berkas program PLC hasil pemrograman mesin. Mendukung semua format software PLC:
+              <strong>Panasonic FPWIN GR / Pro 7</strong> (<code>.kpr</code>, <code>.p7</code>, <code>.pro</code>), <strong>Keyence KV STUDIO KV-8000</strong> (<code>.kvp</code>, <code>.kvs</code>), <strong>Fatek UpperLogic</strong> (<code>.fkg</code>, <code>.pms</code>), Omron (<code>.cxp</code>), Mitsubishi GX Works (<code>.gx3</code>), Siemens, maupun arsip ZIP/RAR.
+              Berkas akan tersimpan utuh di server untuk diunduh dan dibuka di laptop.
             </p>
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs">
               <Upload className="w-4 h-4" />
@@ -375,7 +408,7 @@ export function ProjectPlcProgramPanel({
                     {fileName || "Program_PLC_Mesin"}
                   </h4>
                   <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-                    Berkas cadangan program PLC ini tersimpan aman di sistem. Teknisi atau engineer commissioning dapat mengunduhnya kapan pun untuk pengujian mesin, transfer ke PLC, atau perbaikan program di lapangan.
+                    Berkas program PLC tersimpan aman di server proyek. Tidak perlu dibuka di browser web — klik tombol <strong>Unduh Program PLC</strong> untuk membukanya langsung di laptop Anda menggunakan software PLC terkait.
                   </p>
                 </div>
               </div>
@@ -423,7 +456,7 @@ export function ProjectPlcProgramPanel({
                 </p>
                 <p className="leading-relaxed">
                   Semua berkas program yang diunggah akan otomatis melengkapi ceklis <strong>Pemprograman (Program PLC)</strong> pada berkas proyek.
-                  File cadangan dapat diunduh langsung tanpa perlu konversi, siap dibuka oleh software pemrograman PLC masing-masing vendor.
+                  File cadangan dapat diunduh langsung tanpa perlu konversi, siap dibuka oleh software pemrograman PLC masing-masing vendor di laptop engineer.
                 </p>
               </div>
             </div>
