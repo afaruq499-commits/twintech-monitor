@@ -49,9 +49,11 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
     expect(isSensorOrFieldComponent("E2E-X5ME1", "Proximity Sensor M12", "Sensor")).toBe(true);
     expect(isSensorOrFieldComponent("CDQ2B20-20DCZ", "Cylinder Pneumatic Stopper", "Pneumatic")).toBe(true);
 
-    // Nameplate & box panel kosong tidak dirender jadi tombol
+    // Nameplate, box panel, dan cooling fan ventilasi bodi tidak dimasukkan ke layout plat dasar
     expect(isNameplateOrEnclosureShell("TAG-EMG", "Name Tag Legend Plate", "Panel")).toBe(true);
     expect(isNameplateOrEnclosureShell("BOX-MAIN", "Main Panel Box 700x900x315", "Panel")).toBe(true);
+    expect(isNameplateOrEnclosureShell("FORT XF1232ASH", "FAN 12CM", "Panel")).toBe(true);
+    expect(isNameplateOrEnclosureShell("FAN-12CM", "Cooling Fan 120mm", "Aksesoris")).toBe(true);
   });
 
   it("mendeteksi visual komponen iQ-R, MCCB, Main Switch, NS-205, Tower Lamp, dan Terminal OP", () => {

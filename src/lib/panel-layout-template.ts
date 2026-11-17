@@ -426,6 +426,21 @@ export function isNameplateOrEnclosureShell(
     return true;
   }
 
+  // Cooling Fan, Exhaust Fan, Filter Grille, Blower adalah ventilasi bodi enclosure box panel,
+  // BUKAN komponen internal plat dasar DIN Rail!
+  if (
+    t.includes("FAN") ||
+    t.includes("COOLING") ||
+    t.includes("EXHAUST") ||
+    t.includes("BLOWER") ||
+    t.includes("XF1232") ||
+    t.includes("AIR FILTER") ||
+    t.includes("FINGER GUARD") ||
+    t.includes("GRIL")
+  ) {
+    return true;
+  }
+
   const ptName = `${partType || ""} ${partName || ""}`.toUpperCase().replace(/\s+/g, " ").trim();
   const hasMountedPartKeyword =
     ptName.includes("TERMINAL") ||
@@ -435,8 +450,6 @@ export function isNameplateOrEnclosureShell(
     ptName.includes("TBD-") ||
     ptName.includes("T30-") ||
     ptName.includes("TBR-") ||
-    ptName.includes("FAN") ||
-    ptName.includes("COOLING") ||
     ptName.includes("MCCB") ||
     ptName.includes("MCB") ||
     ptName.includes("EZC") ||
@@ -3240,13 +3253,25 @@ export function parseDualPanelLayoutJson(
       }
     }
 
+    const filterMainItems = (items: PanelLayoutItem[]): PanelLayoutItem[] => {
+      return items.filter((it: any) => {
+        if (it?.category === "FAN") return false;
+        const tag = `${it?.tagLabel || ""} ${it?.partType || ""} ${it?.partName || ""}`.toUpperCase();
+        if (tag.includes("FAN") || tag.includes("XF1232") || tag.includes("COOLING")) return false;
+        return true;
+      });
+    };
+
     let main: PanelLayoutData;
     if (parsed?.main?.enclosure && Array.isArray(parsed?.main?.items)) {
-      main = parsed.main;
+      main = {
+        ...parsed.main,
+        items: filterMainItems(parsed.main.items),
+      };
     } else if (parsed?.enclosure && Array.isArray(parsed?.items)) {
       main = {
         enclosure: parsed.enclosure,
-        items: parsed.items,
+        items: filterMainItems(parsed.items),
         lastSaved: parsed.lastSaved,
       };
     } else {

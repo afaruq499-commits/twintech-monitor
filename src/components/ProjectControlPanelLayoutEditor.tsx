@@ -2346,7 +2346,7 @@ export function ProjectControlPanelLayoutEditor({
               {activePanelMode === "MAIN" && (
                 <div className="mb-2 px-2.5 py-2 bg-blue-50 border border-blue-200 rounded-xl text-[10px] text-blue-800 leading-relaxed shrink-0">
                   <span className="font-extrabold block mb-0.5">📦 Panel Kontrol Utama</span>
-                  Menampilkan komponen DIN Rail elektrikal. <span className="font-bold">Komponen HMI/Operator</span> ada di tab Panel HMI. <span className="font-bold">Sensor & komponen lapangan</span> tidak perlu dimasukan ke layout panel.
+                  Menampilkan komponen DIN Rail elektrikal. <span className="font-bold">Komponen HMI/Operator</span> ada di tab Panel HMI. <span className="font-bold">Fan, sensor &amp; komponen lapangan</span> tidak dimasukkan ke layout plat dasar panel.
                 </div>
               )}
               {activePanelMode === "HMI" && (
