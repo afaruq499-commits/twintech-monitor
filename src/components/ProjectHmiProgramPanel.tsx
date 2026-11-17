@@ -325,7 +325,7 @@ export function ProjectHmiProgramPanel({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-black text-slate-800 tracking-tight">
-                Berkas Desain Layar & Program HMI
+                Program HMI
               </h3>
               {fileUrl && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -435,7 +435,7 @@ export function ProjectHmiProgramPanel({
               <HardDriveDownload className="w-6 h-6" />
             </div>
             <p className="text-sm font-bold text-slate-800 group-hover:text-amber-700 transition">
-              Belum ada berkas program HMI yang diunggah
+              Belum ada Program HMI
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
               Klik di sini untuk memilih dan mengunggah berkas proyek HMI (Keyence, Panasonic, Fatek, Omron, Mitsubishi, Pro-face, Weintek, dll.)

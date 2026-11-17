@@ -598,7 +598,7 @@ export function ProjectDetailClient({
           }`}
         >
           <Workflow className="w-4 h-4 text-indigo-600" />
-          <span>Alur Sekuens, Diagram Wiring &amp; Program PLC</span>
+          <span>Flowchart, Wiring &amp; Program</span>
         </button>
         <button
           type="button"
@@ -610,42 +610,42 @@ export function ProjectDetailClient({
           }`}
         >
           <Layers className="w-4 h-4 text-blue-600" />
-          <span>Layout Panel &amp; HMI 2D (Drag &amp; Drop)</span>
+          <span>Layout Panel</span>
         </button>
-          <button
-            type="button"
-            onClick={() => setTab("komponen")}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer ${
-              tab === "komponen"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            Komponen PR ({activeComps.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("jadwal")}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer ${
-              tab === "jadwal"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            Jadwal & Lane ({project.lanes.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("pengelamatan-plc")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer ${
-              tab === "pengelamatan-plc"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5 text-blue-600" /> Pengelamatan I/O & Register PLC
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setTab("komponen")}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "komponen"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          Komponen PR ({activeComps.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("jadwal")}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "jadwal"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          Jadwal ({project.lanes.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("pengelamatan-plc")}
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "pengelamatan-plc"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Cpu className="w-3.5 h-3.5 text-blue-600" /> Alamat I/O
+        </button>
+      </div>
 
       {/* TAB 0: ALUR SEKUEN MESIN, DIAGRAM WIRING (PDF/DWG) & PROGRAM PLC */}
       {tab === "alur-sekuens" && (

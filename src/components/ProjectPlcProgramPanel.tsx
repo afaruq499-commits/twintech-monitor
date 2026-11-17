@@ -275,7 +275,7 @@ export function ProjectPlcProgramPanel({
               <Cpu className="w-4 h-4" />
             </span>
             <h3 className="font-extrabold text-slate-900 text-base">
-              Berkas Program PLC &amp; Pemrograman Mesin
+              Program PLC
             </h3>
           </div>
           <p className="text-xs text-slate-600 mt-1">
@@ -336,7 +336,7 @@ export function ProjectPlcProgramPanel({
               <Cpu className="w-7 h-7" />
             </div>
             <h4 className="font-extrabold text-slate-800 text-sm">
-              Belum Ada Berkas Program PLC yang Diunggah
+              Belum Ada Program PLC
             </h4>
             <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1 mb-4 leading-relaxed">
               Klik di sini untuk mengunggah berkas program PLC hasil pemrograman mesin. Mendukung semua format software PLC:
@@ -344,7 +344,7 @@ export function ProjectPlcProgramPanel({
             </p>
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs">
               <Upload className="w-4 h-4" />
-              Pilih Berkas Program PLC dari Komputer
+              Pilih Program PLC
             </span>
           </div>
         ) : (

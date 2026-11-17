@@ -401,7 +401,7 @@ export function ProjectFlowchartPngViewer({
               <FileImage className="w-4 h-4" />
             </span>
             <h3 className="text-base font-bold text-slate-800">
-              Flowchart Alur Sekuens Mesin
+              Flowchart
             </h3>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-wider">
               Dokumentasi Mesin

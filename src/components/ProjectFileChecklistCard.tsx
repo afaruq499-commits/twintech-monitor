@@ -164,7 +164,7 @@ export function ProjectFileChecklistCard({
     {
       key: "diagram_wiring",
       nomor: 7,
-      nama: "Diagram Wiring (PDF / DWG)",
+      nama: "Diagram Wiring",
       icon: FileText,
       kategori: "Schematic & Control Circuit",
       deskripsi: "Gambar skema kelistrikan (AutoCAD DWG / PDF), daya utama 3-phase, & kontrol 24VDC.",
@@ -177,7 +177,7 @@ export function ProjectFileChecklistCard({
     {
       key: "pemprograman",
       nomor: 8,
-      nama: "Pemprograman (PLC & HMI)",
+      nama: "Program PLC & HMI",
       icon: FileCode2,
       kategori: "PLC Software & HMI Screen Design",
       deskripsi: "Cadangan berkas program PLC & file desain layar HMI (Keyence, Panasonic, Fatek, Omron, Mitsubishi, Pro-face, Weintek, Siemens, dll.) siap diunduh.",

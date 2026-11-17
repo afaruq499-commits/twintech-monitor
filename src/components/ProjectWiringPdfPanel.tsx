@@ -123,7 +123,7 @@ export function ProjectWiringPdfPanel({
               <FileText className="w-4 h-4" />
             </span>
             <h3 className="font-extrabold text-slate-900 text-base">
-              Hasil Diagram Wiring Elektrikal (PDF / AutoCAD DWG)
+              Diagram Wiring
             </h3>
           </div>
           <p className="text-xs text-slate-600 mt-1">
