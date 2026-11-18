@@ -2576,9 +2576,14 @@ export function detectPrMainBoxPanel(components: PanelComponentInput[]): Detecte
 /**
  * Membangun Dual+OP Panel Layout lengkap OTOMATIS dari daftar komponen PR proyek
  * mengikuti tata letak standar industri Twintech FR-EG-EP-006 (Hal. 1-4).
+ * Menyesuaikan ukuran plat dasar dan kedalaman/tebal yang sudah ditentukan (targetDimensions).
  */
 export function buildStandardPanelLayoutFromComponents(
-  components: PanelComponentInput[]
+  components: PanelComponentInput[],
+  targetDimensions?: {
+    main?: { widthMm?: number; heightMm?: number; depthMm?: number };
+    hmi?: { widthMm?: number; heightMm?: number; depthMm?: number };
+  }
 ): DualPanelLayoutData {
   const activeComponents = (components || []).filter(
     (c) => c.statusImport !== "HILANG_DI_REVISI"
@@ -2854,31 +2859,30 @@ export function buildStandardPanelLayoutFromComponents(
     bottomDuctH;
 
   // Ukuran plat dasar (Tinggi):
-  // 1. Jika ada box panel di PR yang ukurannya lebih kecil dari standar (misal MTM 550x450),
+  // 1. Jika pengguna telah menentukan ukuran (targetDimensions.main.heightMm), selalu patuhi ukuran tersebut!
+  // 2. Jika ada box panel di PR yang ukurannya lebih kecil dari standar (misal MTM 550x450),
   //    gunakan plat kompak yang pas di dalam box (misal 500 atau 450 mm).
-  // 2. Jika tidak ada box atau box standar (>= 800mm), gunakan standar 800mm atau membesar jika komponen banyak.
+  // 3. Jika tidak ada box atau box standar (>= 800mm), gunakan standar 800mm atau membesar jika komponen banyak.
   let targetPlateH: number;
-  if (prBox && prBox.boxHeightMm < 800) {
+  if (targetDimensions?.main?.heightMm && targetDimensions.main.heightMm > 0) {
+    targetPlateH = targetDimensions.main.heightMm;
+  } else if (prBox && prBox.boxHeightMm < 800) {
     targetPlateH = Math.max(prBox.suggestedPlateHeightMm, Math.ceil(minTotalNeededH / 50) * 50);
   } else {
     targetPlateH = Math.max(800, Math.ceil(minTotalNeededH / 50) * 50);
   }
 
-  // Distribusikan sisa ketinggian secukupnya saja agar celah antar kabel duct tetap ngepress dan rapi
-  const extraH = Math.max(0, targetPlateH - minTotalNeededH);
-  const r1Clearance = r1ClearanceReq + Math.min(22, Math.round(extraH * 0.28));
-  const r2Clearance = r2ClearanceReq + Math.min(18, Math.round(extraH * 0.22));
-  const r3Clearance = r3ClearanceReq + Math.min(16, Math.round(extraH * 0.20));
-  const r4Clearance = r4ClearanceReq + Math.min(14, Math.round(extraH * 0.15));
-
   // Lebar plat dasar (Lebar):
-  // 1. Jika box di PR lebih sempit dari 600mm (misal MTM 450mm), gunakan plat kompak (misal 400mm).
-  // 2. Standar 600mm, atau melebar otomatis jika komponen melimpah.
+  // 1. Jika pengguna telah menentukan ukuran (targetDimensions.main.widthMm), selalu patuhi ukuran tersebut!
+  // 2. Jika box di PR lebih sempit dari 600mm (misal MTM 450mm), gunakan plat kompak (misal 400mm).
+  // 3. Standar 600mm, atau melebar otomatis jika komponen melimpah.
   const maxNeededRowW = Math.max(row1TotalW, row2TotalW, row3TotalW, row4TotalW);
   const rawNeededPlateW = leftDuctW + rightDuctW + maxNeededRowW + 28;
 
   let targetPlateW: number;
-  if (prBox && prBox.boxWidthMm < 600) {
+  if (targetDimensions?.main?.widthMm && targetDimensions.main.widthMm > 0) {
+    targetPlateW = targetDimensions.main.widthMm;
+  } else if (prBox && prBox.boxWidthMm < 600) {
     targetPlateW = Math.max(prBox.suggestedPlateWidthMm, Math.ceil(rawNeededPlateW / 50) * 50);
   } else {
     const standardAvailRowW = 600 - leftDuctW - rightDuctW - 24;
@@ -2888,6 +2892,23 @@ export function buildStandardPanelLayoutFromComponents(
         : 0;
     targetPlateW = 600 + extraWidthMm;
   }
+
+  const mainDepthMm = targetDimensions?.main?.depthMm || 200;
+
+  // Distribusikan sisa ketinggian secukupnya saja agar celah antar kabel duct tetap ngepress dan rapi
+  // Pastikan r1Clearance + r2Clearance + r3Clearance + r4Clearance tepat sama dengan availH
+  const availH = Math.max(80, targetPlateH - topDuctH - bottomDuctH - 3 * midDuctH);
+  const r1Weight = Math.max(r1MaxH + 12, 60);
+  const r2Weight = Math.max(r2MaxH + 12, 60);
+  const r3Weight = Math.max(r3MaxH + 12, 50);
+  const r4Weight = Math.max(r4MaxH + 10, 40);
+  const totalWeight = r1Weight + r2Weight + r3Weight + r4Weight;
+
+  const r1Clearance = Math.round((availH * r1Weight) / totalWeight);
+  const r2Clearance = Math.round((availH * r2Weight) / totalWeight);
+  const r3Clearance = Math.round((availH * r3Weight) / totalWeight);
+  const r4Clearance = Math.max(30, availH - (r1Clearance + r2Clearance + r3Clearance));
+
   const rightDuctX = targetPlateW - rightDuctW;
   const innerSpan = rightDuctX - leftDuctW;
   const railSpan = innerSpan - 14;
@@ -2918,7 +2939,7 @@ export function buildStandardPanelLayoutFromComponents(
     enclosure: {
       widthMm: targetPlateW,
       heightMm: targetPlateH,
-      depthMm: 200,
+      depthMm: mainDepthMm,
       name: `Assy Mounting Control Panel (${targetPlateW} × ${targetPlateH} mm)`,
     },
     items: [
@@ -3073,6 +3094,13 @@ export function buildStandardPanelLayoutFromComponents(
     defaultGap = 6,
     idPrefix: string
   ) => {
+    const availRowW = Math.max(50, railSpan - 12);
+    const sumUnitW = itemsList.reduce((acc, u) => acc + u.visual.widthMm, 0);
+    let effectiveDefaultGap = defaultGap;
+    if (itemsList.length > 1 && sumUnitW + (itemsList.length - 1) * defaultGap > availRowW) {
+      effectiveDefaultGap = Math.max(1, Math.floor((availRowW - sumUnitW) / (itemsList.length - 1)));
+    }
+
     let cursorX = startX;
     itemsList.forEach((u, idx) => {
       const v = u.visual;
@@ -3130,7 +3158,7 @@ export function buildStandardPanelLayoutFromComponents(
         next &&
         v.category === next.visual.category &&
         (v.category === "TERMINAL" || v.category === "RELAY" || v.category === "MCB");
-      const gap = tight ? (v.category === "TERMINAL" ? 1 : 2) : defaultGap;
+      const gap = tight ? (v.category === "TERMINAL" ? 1 : Math.min(2, effectiveDefaultGap)) : effectiveDefaultGap;
       cursorX += v.widthMm + gap;
     });
 
@@ -3226,26 +3254,40 @@ export function buildStandardPanelLayoutFromComponents(
   // -------------------------------------------------------------------------
   let opWidthMm = 430;
   let opHeightMm = 440;
-  const opBoxComp = activeComponents.find(
-    (c) =>
-      c.partType.toUpperCase().includes("OP PANEL") ||
-      c.partName.toUpperCase().includes("OP PANEL") ||
-      c.partName.toUpperCase().includes("BOX OPERATOR")
-  );
-  if (opBoxComp) {
-    const match = `${opBoxComp.partType} ${opBoxComp.partName}`.match(/(\d+)\s*[x×]\s*(\d+)/i);
-    if (match) {
-      const d1 = parseInt(match[1], 10);
-      const d2 = parseInt(match[2], 10);
-      // Pertahankan minimal 430x440 standar FR-EG-EP-006 bila komponen 10" HMI / matriks 5 kolom digunakan,
-      // atau pakai ukuran PR jika lebih besar
-      if (Math.max(d1, d2) >= 430) {
-        opWidthMm = Math.min(d1, d2) >= 400 ? d1 : Math.min(d1, d2);
-        opHeightMm = Math.min(d1, d2) >= 400 ? d2 : Math.max(d1, d2);
-        opWidthMm = Math.max(430, opWidthMm);
-        opHeightMm = Math.max(440, opHeightMm);
+  let opDepthMm = 180;
+
+  if (targetDimensions?.hmi?.widthMm && targetDimensions.hmi.widthMm > 0) {
+    opWidthMm = targetDimensions.hmi.widthMm;
+  } else {
+    const opBoxComp = activeComponents.find(
+      (c) =>
+        c.partType.toUpperCase().includes("OP PANEL") ||
+        c.partName.toUpperCase().includes("OP PANEL") ||
+        c.partName.toUpperCase().includes("BOX OPERATOR")
+    );
+    if (opBoxComp) {
+      const match = `${opBoxComp.partType} ${opBoxComp.partName}`.match(/(\d+)\s*[x×]\s*(\d+)/i);
+      if (match) {
+        const d1 = parseInt(match[1], 10);
+        const d2 = parseInt(match[2], 10);
+        // Pertahankan minimal 430x440 standar FR-EG-EP-006 bila komponen 10" HMI / matriks 5 kolom digunakan,
+        // atau pakai ukuran PR jika lebih besar
+        if (Math.max(d1, d2) >= 430) {
+          opWidthMm = Math.min(d1, d2) >= 400 ? d1 : Math.min(d1, d2);
+          opHeightMm = Math.min(d1, d2) >= 400 ? d2 : Math.max(d1, d2);
+          opWidthMm = Math.max(430, opWidthMm);
+          opHeightMm = Math.max(440, opHeightMm);
+        }
       }
     }
+  }
+
+  if (targetDimensions?.hmi?.heightMm && targetDimensions.hmi.heightMm > 0) {
+    opHeightMm = targetDimensions.hmi.heightMm;
+  }
+
+  if (targetDimensions?.hmi?.depthMm && targetDimensions.hmi.depthMm > 0) {
+    opDepthMm = targetDimensions.hmi.depthMm;
   }
 
   const hmiItems: PanelLayoutItem[] = [];
@@ -3497,7 +3539,7 @@ export function buildStandardPanelLayoutFromComponents(
         extraRowX = 24;
         extraRowY += v.heightMm + 12;
       }
-      if (extraRowY + v.heightMm + 16 > opHeightMm) {
+      if (!targetDimensions?.hmi?.heightMm && extraRowY + v.heightMm + 16 > opHeightMm) {
         opHeightMm = extraRowY + v.heightMm + 24;
       }
       hmiItems.push({
@@ -3510,7 +3552,7 @@ export function buildStandardPanelLayoutFromComponents(
         category: v.category,
         specificModel: v.specificModel,
         xMm: extraRowX,
-        yMm: extraRowY,
+        yMm: Math.min(opHeightMm - v.heightMm - 8, extraRowY),
         widthMm: v.widthMm,
         heightMm: v.heightMm,
         tagLabel: v.defaultTag,
@@ -3523,8 +3565,8 @@ export function buildStandardPanelLayoutFromComponents(
     enclosure: {
       widthMm: opWidthMm,
       heightMm: opHeightMm,
-      depthMm: 180,
-      name: `Total Ass OP Panel (${opWidthMm} × ${opHeightMm} mm)`,
+      depthMm: opDepthMm,
+      name: `Total Ass OP Panel (${opWidthMm} × ${opHeightMm} × ${opDepthMm} mm)`,
     },
     items: hmiItems,
   };

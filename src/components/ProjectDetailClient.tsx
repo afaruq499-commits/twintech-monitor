@@ -728,69 +728,71 @@ export function ProjectDetailClient({
         <div className="space-y-4">
           {/* Toolbar Filter & Export Komponen */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 flex-1">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={compSearch}
-                    onChange={(e) => setCompSearch(e.target.value)}
-                    placeholder="Cari tipe, merk, nama part, supplier, catatan..."
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                  />
-                </div>
-
-                <select
-                  value={compGroupFilter}
-                  onChange={(e) => setCompGroupFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold"
-                >
-                  <option value="ALL">Semua Kelompok</option>
-                  {distinctGroups.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={compStatusFilter}
-                  onChange={(e) => setCompStatusFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer"
-                >
-                  <option value="ALL">Semua Status Pembelian</option>
-                  {PURCHASE_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {PURCHASE_STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={compImportFilter}
-                  onChange={(e) => setCompImportFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer"
-                >
-                  <option value="ALL">Semua Tipe Komponen ({project.components.length})</option>
-                  <option value="ACTIVE_ONLY">Komponen Aktif Saja ({activeComps.length})</option>
-                  <option value="HILANG_DI_REVISI">
-                    Hilang di Revisi ({missingRevisionComps.length})
-                  </option>
-                  <option value="BARU">Baru di Revisi</option>
-                </select>
-
-                <label className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={onlyNeedsCheck}
-                    onChange={(e) => setOnlyNeedsCheck(e.target.checked)}
-                  />
-                  Hanya Perlu Dicek
-                </label>
+            {/* Baris 1: Filter & Pencarian */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={compSearch}
+                  onChange={(e) => setCompSearch(e.target.value)}
+                  placeholder="Cari tipe, merk, nama part, supplier, catatan..."
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <select
+                value={compGroupFilter}
+                onChange={(e) => setCompGroupFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold hover:border-slate-400 transition"
+              >
+                <option value="ALL">Semua Kelompok</option>
+                {distinctGroups.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={compStatusFilter}
+                onChange={(e) => setCompStatusFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer hover:border-slate-400 transition"
+              >
+                <option value="ALL">Semua Status Pembelian</option>
+                {PURCHASE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {PURCHASE_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={compImportFilter}
+                onChange={(e) => setCompImportFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer hover:border-slate-400 transition"
+              >
+                <option value="ALL">Semua Tipe Komponen ({project.components.length})</option>
+                <option value="ACTIVE_ONLY">Komponen Aktif Saja ({activeComps.length})</option>
+                <option value="HILANG_DI_REVISI">
+                  Hilang di Revisi ({missingRevisionComps.length})
+                </option>
+                <option value="BARU">Baru di Revisi</option>
+              </select>
+
+              <label className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl cursor-pointer hover:bg-amber-100/70 transition">
+                <input
+                  type="checkbox"
+                  checked={onlyNeedsCheck}
+                  onChange={(e) => setOnlyNeedsCheck(e.target.checked)}
+                />
+                Hanya Perlu Dicek
+              </label>
+            </div>
+
+            {/* Baris 2: Tombol Aksi Komponen & Export */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/import-pr?projectId=${project.id}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition"
@@ -800,36 +802,39 @@ export function ProjectDetailClient({
                 </Link>
                 <Link
                   href={`/buat-pr?projectId=${project.id}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition"
                 >
                   <ClipboardList className="w-3.5 h-3.5" /> Susun PR dari Katalog
                 </Link>
                 <button
                   type="button"
                   onClick={() => setAddCompOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold cursor-pointer transition"
                 >
                   <Plus className="w-3.5 h-3.5" /> Tambah 1 Item
                 </button>
                 <button
                   type="button"
                   onClick={() => setTab("pengelamatan-plc")}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-300 text-blue-800 text-xs font-bold hover:bg-blue-100 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 border border-blue-300 text-blue-800 text-xs font-bold hover:bg-blue-100 cursor-pointer transition"
                   title="Lihat alokasi alamat I/O, AI, AO, dan Register PLC otomatis dari daftar komponen PR ini"
                 >
                   <Cpu className="w-3.5 h-3.5 text-blue-600" />
                   Alamat I/O & Register PLC
                 </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <a
                   href={`/api/export/pr?projectId=${project.id}`}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-2xs transition"
                   title="Download Excel Purchase Requisition (part berstatus Sudah Ada / Sudah Datang / Terpasang otomatis dikecualikan)"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" /> Export Format PR (Sesuai Import)
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Export Format PR
                 </a>
                 <a
                   href={`/api/export/komponen?projectId=${project.id}`}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-2xs transition"
                 >
                   <Download className="w-3.5 h-3.5" /> Export Monitoring
                 </a>

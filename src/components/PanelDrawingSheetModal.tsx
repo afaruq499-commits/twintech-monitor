@@ -20,6 +20,7 @@ interface PanelDrawingSheetModalProps {
   mode: "HMI" | "MAIN" | "OP_MOUNTING" | "OUTER";
   plateWidth: number;
   plateHeight: number;
+  plateDepth?: number;
   items: PanelLayoutItem[];
   outerPanel?: OuterPanelLayoutData;
   project: {
@@ -36,6 +37,7 @@ export function PanelDrawingSheetModal({
   mode,
   plateWidth,
   plateHeight,
+  plateDepth,
   items,
   outerPanel,
   project,
@@ -68,7 +70,9 @@ export function PanelDrawingSheetModal({
       material:
         mode === "OUTER"
           ? "SPCC t=1.5mm / Powder Coating RAL 7035"
-          : "SPCC t=2.0mm",
+          : mode === "HMI"
+            ? "SPCC t=1.5mm (Enclosure OP Door)"
+            : "SPCC t=2.0mm",
       dateStr,
     };
   }, [project, mode]);
@@ -79,6 +83,7 @@ export function PanelDrawingSheetModal({
         ? {
             plateWidth,
             plateHeight,
+            depthMm: outerPanel?.enclosure.depthMm || 265,
             cutouts: [],
             holes: [],
             holeLeaderText: "",
@@ -88,8 +93,14 @@ export function PanelDrawingSheetModal({
             xDimensions: [],
             yDimensions: [],
           }
-        : extractPanelFeatures(plateWidth, plateHeight, items, mode as "HMI" | "MAIN" | "OP_MOUNTING"),
-    [plateWidth, plateHeight, items, mode]
+        : extractPanelFeatures(
+            plateWidth,
+            plateHeight,
+            items,
+            mode as "HMI" | "MAIN" | "OP_MOUNTING",
+            plateDepth
+          ),
+    [plateWidth, plateHeight, plateDepth, items, mode, outerPanel]
   );
 
   const dxfContent = useMemo(
@@ -176,7 +187,9 @@ export function PanelDrawingSheetModal({
               <p className="text-xs text-slate-400">
                 {mode === "OUTER"
                   ? `Gambar teknik standar Twintech Precision — Dimensi Box Luar ${outerPanel?.enclosure.widthMm || plateWidth}×${outerPanel?.enclosure.heightMm || plateHeight}×${outerPanel?.enclosure.depthMm || 265} mm (Tampak Depan & Tampak Samping).`
-                  : `Gambar teknik standar Twintech Precision — ukuran plat ${plateWidth}×${plateHeight} mm dengan lubang bor &amp; cutout presisi 1:1.`}
+                  : mode === "HMI"
+                    ? `Gambar teknik standar Twintech Precision — Dimensi OP Panel / HMI Door ${plateWidth}×${plateHeight}×${plateDepth || 180} mm (Tampak Depan & Tampak Samping dengan ukuran tebal).`
+                    : `Gambar teknik standar Twintech Precision — ukuran plat ${plateWidth}×${plateHeight} mm dengan lubang bor &amp; cutout presisi 1:1.`}
               </p>
             </div>
           </div>
@@ -865,6 +878,237 @@ export function PanelDrawingSheetModal({
                           fontWeight="bold"
                           fill="#000000"
                         >
+                          TAMPAK SAMPING (SIDE VIEW)
+                        </text>
+                      </g>
+                    );
+                  })()
+                ) : mode === "HMI" ? (
+                  // ================= GAMBAR 2D PANEL HMI (TAMPAK DEPAN & TAMPAK SAMPING DENGAN UKURAN TEBAL) =================
+                  (() => {
+                    const hmiW = plateWidth || 430;
+                    const hmiH = plateHeight || 440;
+                    const hmiD = plateDepth || 180;
+                    const gap = 80;
+                    const totalCadW = hmiW + gap + hmiD;
+                    const s = Math.min(usableW / totalCadW, usableH / hmiH, 1.15);
+                    const sw = hmiW * s;
+                    const sh = hmiH * s;
+                    const sd = hmiD * s;
+                    const sgap = gap * s;
+
+                    const fx = plateOriginX;
+                    const fy = plateBottomY;
+                    const sx = fx + sw + sgap;
+                    const sy = plateBottomY;
+
+                    const frontCadToX = (cadX: number) => fx + cadX * s;
+                    const frontCadToY = (cadY: number) => fy - cadY * s;
+
+                    return (
+                      <g id="hmi-sheet-dual-view">
+                        {/* ================= TAMPAK DEPAN (FRONT VIEW) ================= */}
+                        {/* 1. Kontur Box/Door Luar */}
+                        <rect
+                          x={fx}
+                          y={fy - sh}
+                          width={sw}
+                          height={sh}
+                          fill="#f8fafc"
+                          stroke="#000000"
+                          strokeWidth="2.0"
+                        />
+
+                        {/* 2. Bevel Door Seam */}
+                        <rect
+                          x={fx + 14 * s}
+                          y={fy - sh + 14 * s}
+                          width={sw - 28 * s}
+                          height={sh - 28 * s}
+                          fill="none"
+                          stroke="#64748b"
+                          strokeWidth="0.8"
+                          strokeDasharray="4,2"
+                        />
+
+                        {/* 3. Cutout HMI */}
+                        {features.cutouts.map((c, idx) => {
+                          const cutX = frontCadToX(c.minX);
+                          const cutY = frontCadToY(c.maxY);
+                          const cutW = c.widthMm * s;
+                          const cutH = c.heightMm * s;
+                          return (
+                            <g key={`hmi-cut-${idx}`}>
+                              <rect
+                                x={cutX}
+                                y={cutY}
+                                width={cutW}
+                                height={cutH}
+                                fill="#ffffff"
+                                stroke="#000000"
+                                strokeWidth="1.6"
+                              />
+                              <text
+                                x={cutX + cutW / 2}
+                                y={cutY + cutH / 2 + 3}
+                                textAnchor="middle"
+                                fontSize="9"
+                                fill="#334155"
+                                fontWeight="bold"
+                              >
+                                {c.label} ({c.widthMm}×{c.heightMm})
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* 4. Lubang Bor Tombol (Ø22 / Ø30 mm) & Garis Sumbu */}
+                        {features.holes.map((h, idx) => {
+                          const hX = frontCadToX(h.cx);
+                          const hY = frontCadToY(h.cy);
+                          const r = (h.diameter / 2) * s;
+                          const arm = r + 5;
+                          return (
+                            <g key={`hmi-hole-${idx}`}>
+                              <circle
+                                cx={hX}
+                                cy={hY}
+                                r={r}
+                                fill="none"
+                                stroke="#000000"
+                                strokeWidth="1.4"
+                              />
+                              <line x1={hX - arm} y1={hY} x2={hX + arm} y2={hY} stroke="#000000" strokeWidth="0.7" />
+                              <line x1={hX} y1={hY - arm} x2={hX} y2={hY + arm} stroke="#000000" strokeWidth="0.7" />
+                            </g>
+                          );
+                        })}
+
+                        {/* 5. Leader Callout Lubang */}
+                        {features.holes.length > 0 && features.holeLeaderText && (() => {
+                          const target = features.holes.reduce((p, c) => (c.cx > p.cx ? c : p));
+                          const tX = frontCadToX(target.cx) + (target.diameter / 2) * s * 0.7;
+                          const tY = frontCadToY(target.cy) - (target.diameter / 2) * s * 0.7;
+                          const elbX = tX + 35;
+                          const elbY = tY - 25;
+                          const endX = elbX + 80;
+                          return (
+                            <g id="hmi-hole-leader">
+                              <line x1={tX} y1={tY} x2={elbX} y2={elbY} stroke="#000000" strokeWidth="1.2" />
+                              <line x1={elbX} y1={elbY} x2={endX} y2={elbY} stroke="#000000" strokeWidth="1.2" />
+                              <polygon points={`${tX},${tY} ${tX + 7},${tY - 2} ${tX + 4},${tY - 5}`} fill="#000" />
+                              <text x={elbX + 4} y={elbY - 4} fontSize="10" fontWeight="bold" fill="#000">
+                                {features.holeLeaderText.replace("%%c", "⌀")}
+                              </text>
+                            </g>
+                          );
+                        })()}
+
+                        {/* 6. Dimensi Lebar Tampak Depan (Bawah) */}
+                        <line x1={fx} y1={fy + 25} x2={fx + sw} y2={fy + 25} stroke="#000000" strokeWidth="1.0" />
+                        <polygon points={`${fx},${fy + 25} ${fx + 7},${fy + 22} ${fx + 7},${fy + 28}`} fill="#000" />
+                        <polygon points={`${fx + sw},${fy + 25} ${fx + sw - 7},${fy + 22} ${fx + sw - 7},${fy + 28}`} fill="#000" />
+                        <line x1={fx} y1={fy} x2={fx} y2={fy + 32} stroke="#000" strokeWidth="0.6" />
+                        <line x1={fx + sw} y1={fy} x2={fx + sw} y2={fy + 32} stroke="#000" strokeWidth="0.6" />
+                        <text x={fx + sw / 2} y={fy + 20} textAnchor="middle" fontSize="11" fontWeight="bold">
+                          {hmiW}
+                        </text>
+
+                        {/* 7. Dimensi Tinggi Tampak Depan (Kiri) */}
+                        <line x1={fx - 25} y1={fy} x2={fx - 25} y2={fy - sh} stroke="#000000" strokeWidth="1.0" />
+                        <polygon points={`${fx - 25},${fy} ${fx - 28},${fy - 7} ${fx - 22},${fy - 7}`} fill="#000" />
+                        <polygon points={`${fx - 25},${fy - sh} ${fx - 28},${fy - sh + 7} ${fx - 22},${fy - sh + 7}`} fill="#000" />
+                        <line x1={fx} y1={fy} x2={fx - 32} y2={fy} stroke="#000" strokeWidth="0.6" />
+                        <line x1={fx} y1={fy - sh} x2={fx - 32} y2={fy - sh} stroke="#000" strokeWidth="0.6" />
+                        <text x={fx - 32} y={fy - sh / 2 + 4} textAnchor="end" fontSize="11" fontWeight="bold">
+                          {hmiH}
+                        </text>
+
+                        {/* Label Judul Tampak Depan */}
+                        <text x={fx + sw / 2} y={fy + 48} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#000000">
+                          TAMPAK DEPAN (FRONT VIEW)
+                        </text>
+
+                        {/* ================= TAMPAK SAMPING (SIDE VIEW) ================= */}
+                        {/* 1. Box Samping Enclosure OP Panel */}
+                        <rect
+                          x={sx}
+                          y={sy - sh}
+                          width={sd}
+                          height={sh}
+                          fill="#f8fafc"
+                          stroke="#000000"
+                          strokeWidth="2.0"
+                        />
+
+                        {/* 2. Profil Daun Pintu Depan */}
+                        <line x1={sx - 6 * s} y1={sy - sh} x2={sx - 6 * s} y2={sy} stroke="#000000" strokeWidth="1.4" />
+                        <line x1={sx - 6 * s} y1={sy - sh} x2={sx} y2={sy - sh} stroke="#000000" strokeWidth="1.0" />
+                        <line x1={sx - 6 * s} y1={sy} x2={sx} y2={sy} stroke="#000000" strokeWidth="1.0" />
+
+                        {/* 3. Tonjolan Bezel HMI di Tampak Samping */}
+                        {features.cutouts.length > 0 && (() => {
+                          const c = features.cutouts[0];
+                          const topY = frontCadToY(c.maxY);
+                          const cH = c.heightMm * s;
+                          return (
+                            <g id="hmi-side-bezel">
+                              <rect
+                                x={sx - 12 * s}
+                                y={topY}
+                                width={6 * s}
+                                height={cH}
+                                rx={1}
+                                fill="#0284c7"
+                                stroke="#000000"
+                                strokeWidth="1.0"
+                              />
+                              <line x1={sx - 12 * s} y1={topY + cH / 2} x2={sx - 24 * s} y2={topY + cH / 2} stroke="#000" strokeWidth="0.8" />
+                              <text x={sx - 28 * s} y={topY + cH / 2 + 3} textAnchor="end" fontSize="8" fontWeight="bold" fill="#0284c7">
+                                HMI BEZEL
+                              </text>
+                            </g>
+                          );
+                        })()}
+
+                        {/* 4. Tonjolan Push Button & Emergency Stop di Tampak Samping */}
+                        {features.holes.length > 0 && (() => {
+                          const minHoleY = Math.min(...features.holes.map((h) => h.cy));
+                          const maxHoleY = Math.max(...features.holes.map((h) => h.cy));
+                          const topY = frontCadToY(maxHoleY + 11);
+                          const pbH = (maxHoleY - minHoleY + 22) * s;
+                          return (
+                            <g id="hmi-side-push-buttons">
+                              <rect
+                                x={sx - 18 * s}
+                                y={topY}
+                                width={12 * s}
+                                height={pbH}
+                                rx={2}
+                                fill="#ef4444"
+                                stroke="#000000"
+                                strokeWidth="1.0"
+                              />
+                              <line x1={sx - 18 * s} y1={topY + pbH / 2} x2={sx - 28 * s} y2={topY + pbH / 2} stroke="#000" strokeWidth="0.8" />
+                              <text x={sx - 32 * s} y={topY + pbH / 2 + 3} textAnchor="end" fontSize="8" fontWeight="bold" fill="#ef4444">
+                                PUSH BUTTON / E-STOP
+                              </text>
+                            </g>
+                          );
+                        })()}
+
+                        {/* 5. Dimensi Kedalaman / Tebal (Bawah Tampak Samping) */}
+                        <line x1={sx} y1={sy + 25} x2={sx + sd} y2={sy + 25} stroke="#000000" strokeWidth="1.0" />
+                        <polygon points={`${sx},${sy + 25} ${sx + 7},${sy + 22} ${sx + 7},${sy + 28}`} fill="#000" />
+                        <polygon points={`${sx + sd},${sy + 25} ${sx + sd - 7},${sy + 22} ${sx + sd - 7},${sy + 28}`} fill="#000" />
+                        <line x1={sx} y1={sy} x2={sx} y2={sy + 32} stroke="#000" strokeWidth="0.6" />
+                        <line x1={sx + sd} y1={sy} x2={sx + sd} y2={sy + 32} stroke="#000" strokeWidth="0.6" />
+                        <text x={sx + sd / 2} y={sy + 20} textAnchor="middle" fontSize="11" fontWeight="bold">
+                          {hmiD}
+                        </text>
+
+                        {/* Label Judul Tampak Samping */}
+                        <text x={sx + sd / 2} y={sy + 48} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#000000">
                           TAMPAK SAMPING (SIDE VIEW)
                         </text>
                       </g>

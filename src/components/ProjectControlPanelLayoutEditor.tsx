@@ -1358,12 +1358,23 @@ export function ProjectControlPanelLayoutEditor({
   const handleResetToStandard = () => {
     if (
       !confirm(
-        "Susun ulang seluruh panel (Panel Utama & Pintu OP/HMI) otomatis dari daftar PR sesuai standar FR-EG-EP-006 (kabel duct & dimensi plat menyesuaikan agar cukup)?"
+        "Susun ulang seluruh panel (Panel Utama & Pintu OP/HMI) otomatis dari daftar PR sesuai standar FR-EG-EP-006 (menyesuaikan ukuran plat dan tebal yang sudah ditentukan)?"
       )
     ) {
       return;
     }
-    const generated = buildStandardPanelLayoutFromComponents(components);
+    const generated = buildStandardPanelLayoutFromComponents(components, {
+      main: {
+        widthMm: mainLayoutData.enclosure.widthMm,
+        heightMm: mainLayoutData.enclosure.heightMm,
+        depthMm: mainLayoutData.enclosure.depthMm,
+      },
+      hmi: {
+        widthMm: hmiLayoutData.enclosure.widthMm,
+        heightMm: hmiLayoutData.enclosure.heightMm,
+        depthMm: hmiLayoutData.enclosure.depthMm,
+      },
+    });
     hasLocalDirtyRef.current = true;
     setMainLayoutData(generated.main);
     setHmiLayoutData(generated.hmi);
@@ -1673,7 +1684,8 @@ export function ProjectControlPanelLayoutEditor({
         layoutData.enclosure.widthMm,
         layoutData.enclosure.heightMm,
         layoutData.items,
-        modeKey
+        modeKey,
+        layoutData.enclosure.depthMm || (modeKey === "HMI" ? 180 : 200)
       );
 
       const dxf = generatePanelLayoutDxf(feats, meta, modeKey);
@@ -2272,6 +2284,27 @@ export function ProjectControlPanelLayoutEditor({
               className="w-16 px-1.5 py-0.5 bg-white border border-slate-300 rounded text-center font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
             />
             <span className="text-slate-500 font-normal">mm</span>
+
+            {activePanelMode === "HMI" && (
+              <>
+                <span className="text-slate-400">×</span>
+                <span className="text-[11px] font-semibold text-slate-500 ml-0.5">Tebal:</span>
+                <DeferredNumberInput
+                  value={layoutData.enclosure.depthMm || 180}
+                  min={50}
+                  max={800}
+                  onCommit={(val) =>
+                    setLayoutData((prev) => ({
+                      ...prev,
+                      enclosure: { ...prev.enclosure, depthMm: val },
+                    }))
+                  }
+                  title="Ketik tebal/kedalaman box/door HMI (mm) lalu tekan Enter"
+                  className="w-14 px-1.5 py-0.5 bg-white border border-slate-300 rounded text-center font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
+                />
+                <span className="text-slate-500 font-normal">mm</span>
+              </>
+            )}
           </div>
 
           {/* Quick Enclosure Size Presets */}
@@ -5979,6 +6012,11 @@ export function ProjectControlPanelLayoutEditor({
           activePanelMode === "OUTER"
             ? outerPanelData.enclosure.heightMm
             : layoutData.enclosure.heightMm
+        }
+        plateDepth={
+          activePanelMode === "OUTER"
+            ? outerPanelData.enclosure.depthMm
+            : layoutData.enclosure.depthMm || (activePanelMode === "HMI" ? 180 : 200)
         }
         items={layoutData.items}
         outerPanel={outerPanelData}

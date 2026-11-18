@@ -64,6 +64,7 @@ export interface DxfRailFeature {
 export interface ExtractedPanelFeatures {
   plateWidth: number;
   plateHeight: number;
+  depthMm?: number;
   holes: DxfHoleFeature[];
   cutouts: DxfCutoutFeature[];
   ducts: DxfDuctFeature[];
@@ -89,7 +90,8 @@ export function extractPanelFeatures(
   plateWidth: number,
   plateHeight: number,
   items: PanelLayoutItem[],
-  _mode?: "HMI" | "MAIN" | "OP_MOUNTING"
+  _mode?: "HMI" | "MAIN" | "OP_MOUNTING",
+  depthMm?: number
 ): ExtractedPanelFeatures {
   const holes: DxfHoleFeature[] = [];
   const cutouts: DxfCutoutFeature[] = [];
@@ -269,6 +271,7 @@ export function extractPanelFeatures(
   return {
     plateWidth,
     plateHeight,
+    depthMm: depthMm || (_mode === "HMI" ? 180 : 200),
     holes,
     cutouts,
     ducts,
@@ -393,6 +396,8 @@ export function generatePanelLayoutDxf(
     addLine(layer, x1, y2, x1, y1, color);
   }
 
+  const totalCadW = mode === "HMI" ? plateWidth + 100 + (features.depthMm || 180) : plateWidth;
+
   // ==================== 1. HEADER SECTION ====================
   add(0, "SECTION");
   add(2, "HEADER");
@@ -407,7 +412,7 @@ export function generatePanelLayoutDxf(
   add(20, "-100.0");
   add(30, "0.0");
   add(9, "$EXTMAX");
-  add(10, `${plateWidth + 150}`);
+  add(10, `${totalCadW + 150}`);
   add(20, `${plateHeight + 150}`);
   add(30, "0.0");
   add(0, "ENDSEC");
@@ -624,11 +629,59 @@ export function generatePanelLayoutDxf(
     addText("6_DIMENSIONS", dimLeftX - 8, yVal - 2, 6.0, fmtCoord(yVal), 0, 7, 2);
   }
 
+  // Label Tampak Depan untuk HMI
+  if (mode === "HMI") {
+    addText("7_TITLE_BLOCK", plateWidth / 2, -65, 6.0, "TAMPAK DEPAN (FRONT VIEW)", 0, 7, 1);
+
+    // ==================== TAMPAK SAMPING (SIDE VIEW) HMI ====================
+    const D = features.depthMm || 180;
+    const sideX = plateWidth + 100;
+
+    // 1. Box Samping Enclosure OP Panel
+    addRect("0_PLATE_OUTLINE", sideX, 0, sideX + D, plateHeight, 7);
+
+    // 2. Door Profile / Bezel Line di sisi depan
+    addLine("0_PLATE_OUTLINE", sideX - 6, 0, sideX - 6, plateHeight, 3);
+    addLine("0_PLATE_OUTLINE", sideX - 6, 0, sideX, 0, 3);
+    addLine("0_PLATE_OUTLINE", sideX - 6, plateHeight, sideX, plateHeight, 3);
+
+    // 3. Siluet Bezel Layar Sentuh HMI di Tampak Samping
+    if (cutouts.length > 0) {
+      const c = cutouts[0];
+      addRect("1_CUTOUT_HMI", sideX - 12, c.minY, sideX - 6, c.maxY, 1);
+      addText("6_DIMENSIONS", sideX - 14, (c.minY + c.maxY) / 2 - 2, 4.0, "HMI BEZEL", 90, 1, 1);
+    }
+
+    // 4. Siluet Push Button & Emergency Stop di Tampak Samping
+    if (holes.length > 0) {
+      const minHoleY = Math.min(...holes.map((h) => h.cy));
+      const maxHoleY = Math.max(...holes.map((h) => h.cy));
+      addRect(
+        "2_DRILL_HOLES",
+        sideX - 18,
+        Math.max(0, minHoleY - 12),
+        sideX - 6,
+        Math.min(plateHeight, maxHoleY + 12),
+        4
+      );
+    }
+
+    // 5. Dimensi Tebal/Kedalaman Tampak Samping
+    const sideDimY = -30;
+    addLine("6_DIMENSIONS", sideX, 0, sideX, sideDimY - 5, 3);
+    addLine("6_DIMENSIONS", sideX + D, 0, sideX + D, sideDimY - 5, 3);
+    addLine("6_DIMENSIONS", sideX, sideDimY, sideX + D, sideDimY, 3);
+    addText("6_DIMENSIONS", sideX + D / 2, sideDimY + 4, 6.0, `${D}`, 0, 7, 1);
+
+    // Label Tampak Samping
+    addText("7_TITLE_BLOCK", sideX + D / 2, -65, 6.0, "TAMPAK SAMPING (SIDE VIEW)", 0, 7, 1);
+  }
+
   // G. TITLE BLOCK (KOP GAMBAR TWINTECH PRECISION)
   // Diletakkan rapi di pojok kanan bawah dari gambar
   const tbWidth = 220;
   const tbHeight = 65;
-  const tbX = Math.max(plateWidth + 10, 180);
+  const tbX = Math.max(totalCadW - tbWidth, 0);
   const tbY = -tbHeight - 20;
 
   // Kotak luar title block

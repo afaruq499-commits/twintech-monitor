@@ -202,4 +202,41 @@ describe("panel-dxf-generator", () => {
     expect(dia16).toBeDefined();
     expect(dia30).toBeDefined();
   });
+
+  it("menghasilkan Tampak Samping dengan ukuran tebal pada export gamtek HMI", () => {
+    const plateWidth = 430;
+    const plateHeight = 440;
+    const plateDepth = 180;
+
+    const items: PanelLayoutItem[] = [
+      {
+        id: "hmi-1",
+        type: "COMPONENT",
+        name: "Mitsubishi GS2107 7 Inch",
+        category: "HMI",
+        specificModel: "HMI_7INCH",
+        xMm: 112,
+        yMm: 30,
+        widthMm: 206,
+        heightMm: 152,
+      },
+    ];
+
+    const features = extractPanelFeatures(plateWidth, plateHeight, items, "HMI", plateDepth);
+    expect(features.depthMm).toBe(180);
+
+    const dxf = generatePanelLayoutDxf(
+      features,
+      {
+        kode: "26-TEST-001",
+        nama: "PROYEK TEST HMI",
+        partName: "DUMMY OP PANEL",
+      },
+      "HMI"
+    );
+
+    expect(dxf).toContain("TAMPAK DEPAN (FRONT VIEW)");
+    expect(dxf).toContain("TAMPAK SAMPING (SIDE VIEW)");
+    expect(dxf).toContain("180");
+  });
 });

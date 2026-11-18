@@ -723,5 +723,34 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(topGap).toBeGreaterThanOrEqual(5);
       expect(topGap).toBeLessThanOrEqual(25);
     });
+
+    it("Auto-Layout PR menyesuaikan ukuran plat yang sudah ditentukan (targetDimensions)", () => {
+      const bom: PanelComponentInput[] = [
+        makeComp("mcb1", "Schneider Acti9 iC60N 2P 10A", "MCB 2P", 3, "Panel Utama"),
+        makeComp("psu1", "Omron S8VK-C24024", "Power Supply 24V 240W", 1, "Panel Utama"),
+        makeComp("plc1", "Mitsubishi FX5U-32MT/ES", "PLC CPU FX5U", 1, "Panel Utama"),
+        makeComp("hmi1", "Mitsubishi GS2107-WTBD-N", "HMI 7 Inch", 1, "Panel HMI"),
+        makeComp("pb1", "IDEC YW1B-M1E10G", "Push Button Hijau", 2, "Panel HMI"),
+      ];
+
+      const customPlate = buildStandardPanelLayoutFromComponents(bom, {
+        main: { widthMm: 500, heightMm: 600 },
+        hmi: { widthMm: 400, heightMm: 350, depthMm: 160 },
+      });
+
+      expect(customPlate.main.enclosure.widthMm).toBe(500);
+      expect(customPlate.main.enclosure.heightMm).toBe(600);
+      expect(customPlate.hmi.enclosure.widthMm).toBe(400);
+      expect(customPlate.hmi.enclosure.heightMm).toBe(350);
+      expect(customPlate.hmi.enclosure.depthMm).toBe(160);
+
+      // Pastikan duct dan rel pas di dalam 500 x 600
+      const ductRight = customPlate.main.items.find((i) => i.id === "duct-right");
+      const ductBottom = customPlate.main.items.find((i) => i.id === "duct-bottom");
+      expect(ductRight).toBeDefined();
+      expect(ductBottom).toBeDefined();
+      expect(ductRight!.xMm + ductRight!.widthMm).toBe(500);
+      expect(ductBottom!.yMm + ductBottom!.heightMm).toBe(600);
+    });
   });
 });
