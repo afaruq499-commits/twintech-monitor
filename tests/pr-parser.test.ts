@@ -535,4 +535,59 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
     const highlighted = segs.filter((s) => s.highlighted).map((s) => s.text);
     expect(highlighted).toEqual(["FX5U", "ES"]);
   });
+
+  it("memisahkan kelompok OP Panel dan Sensor secara cerdas saat nomor urut reset kembali ke 1 tanpa baris kosong", async () => {
+    // Simulasi tabel PR Excel seperti kasus mtm.xlsx:
+    // Baris 1-8: HMI & tombol operator (No. 1 s.d. 8)
+    // Baris 9-10: Sensor proximity (No. 1 s.d. 2) langsung menyambung tanpa baris kosong
+    const ExcelJS = await import("exceljs");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("PR Test");
+
+    // Header blok
+    ws.getCell("B8").value = "PART TYPE";
+    ws.getCell("D8").value = "PARTS NAME";
+    ws.getCell("A8").value = "NO.";
+    ws.getCell("G8").value = "QTY";
+    ws.getCell("I8").value = "HARGA";
+
+    // Bagian 1: OP Panel (No 1..3)
+    ws.getCell("A9").value = 1;
+    ws.getCell("B9").value = "HMI_GS2107-WTBD-N (MITSUBISHI)";
+    ws.getCell("D9").value = "HMI";
+    ws.getCell("G9").value = 1;
+
+    ws.getCell("A10").value = 2;
+    ws.getCell("B10").value = "Push Button HIJAU Φ22";
+    ws.getCell("D10").value = "PUSH BOTTON";
+    ws.getCell("G10").value = 5;
+
+    ws.getCell("A11").value = 3;
+    ws.getCell("B11").value = "25MM AVW411ERP (FORT)";
+    ws.getCell("D11").value = "MERGENCY STOP";
+    ws.getCell("G11").value = 1;
+
+    // Bagian 2: Sensor (No 1..2 langsung tanpa baris kosong)
+    ws.getCell("A12").value = 1;
+    ws.getCell("B12").value = "E2E-X8MD1 2M OMS";
+    ws.getCell("D12").value = "SENSOR PROXYMITY";
+    ws.getCell("G12").value = 2;
+
+    ws.getCell("A13").value = 2;
+    ws.getCell("B13").value = "TL-W20ME1";
+    ws.getCell("D13").value = "SENSOR PROXYMITY";
+    ws.getCell("G13").value = 1;
+
+    // Footer
+    ws.getCell("D15").value = "PARTS NAME";
+
+    const { parsePrWorksheet } = await import("@/lib/pr-parser/parse-workbook");
+    const parsed = parsePrWorksheet(ws, "test-split.xlsx");
+
+    expect(parsed.groups).toEqual(["OP Panel", "Sensor & Push Button"]);
+    expect(parsed.rows.filter((r) => r.kelompok === "OP Panel").length).toBe(3);
+    expect(parsed.rows.filter((r) => r.kelompok === "Sensor & Push Button").length).toBe(2);
+    expect(parsed.rows[0].partName).toBe("HMI");
+    expect(parsed.rows[0].kelompok).toBe("OP Panel");
+  });
 });

@@ -150,6 +150,7 @@ export function parsePrWorksheet(ws: ExcelJS.Worksheet, filename = ""): ParsedPr
   let groupIdx = 0;
   let inGroup = false;
   let seq = 0;
+  let lastRowNo: number | null = null;
 
   for (let r = headerRow + 1; r < footerRow; r++) {
     const partType = cellText(ws, r, COL.TYPE);
@@ -160,12 +161,29 @@ export function parsePrWorksheet(ws: ExcelJS.Worksheet, filename = ""): ParsedPr
     const isBlank = !partType && !partName && !supplier && qtyRaw === null && harga === null;
     if (isBlank) {
       inGroup = false;
+      lastRowNo = null;
       continue;
     }
-    if (!inGroup) {
+
+    const noRaw = cellText(ws, r, COL.NO);
+    const noNum = noRaw ? parseInt(noRaw.trim(), 10) : NaN;
+    const isNumberReset =
+      inGroup &&
+      !isNaN(noNum) &&
+      noNum === 1 &&
+      lastRowNo !== null &&
+      lastRowNo > 1;
+
+    if (isNumberReset) {
+      groupIdx++;
+      groups.push(`Kelompok ${groupIdx}`);
+    } else if (!inGroup) {
       groupIdx++;
       groups.push(`Kelompok ${groupIdx}`);
       inGroup = true;
+    }
+    if (!isNaN(noNum)) {
+      lastRowNo = noNum;
     }
 
     const alasan: string[] = [];
@@ -180,7 +198,6 @@ export function parsePrWorksheet(ws: ExcelJS.Worksheet, filename = ""): ParsedPr
 
     const totalCell = toNumber(masterValue(ws, r, COL.TOTAL));
     const total = totalCell ?? price.total;
-    const noRaw = cellText(ws, r, COL.NO);
 
     const state: RowState = !partType && !partName ? "ERROR" : alasan.length ? "CHECK" : "OK";
     rows.push({
@@ -230,19 +247,61 @@ export function parsePrWorksheet(ws: ExcelJS.Worksheet, filename = ""): ParsedPr
     }
 
     const namesUpper = gRows.map((r) => (r.partName ?? "").toUpperCase());
+    const typesUpper = gRows.map((r) => (r.partType ?? "").toUpperCase());
     let inferred: string | null = explicitGroup;
     if (!inferred) {
-      if (namesUpper.some((n) => n.includes("BOX PANEL"))) {
+      const hasBoxPanel =
+        namesUpper.some((n) => n.includes("BOX PANEL")) ||
+        typesUpper.some((t) => t.includes("BOX PANEL"));
+      const hasHmiOrOp =
+        namesUpper.some(
+          (n) =>
+            n.includes("OP PANEL") ||
+            n === "HMI" ||
+            n.includes("TOUCHSCREEN") ||
+            n.includes("GOT") ||
+            n.includes("DISPLAY") ||
+            n.includes("OPERATOR")
+        ) ||
+        typesUpper.some(
+          (t) =>
+            t.includes("OP PANEL") ||
+            t.includes("GS2107") ||
+            t.includes("GS2110") ||
+            t.includes("HMI_") ||
+            t.includes("GOT") ||
+            t.includes("MT8071") ||
+            t.includes("WEINTEK") ||
+            t.includes("NB7W")
+        );
+      const hasSensor =
+        namesUpper.some((n) => n.includes("SENSOR")) ||
+        typesUpper.some(
+          (t) =>
+            t.includes("SENSOR") ||
+            t.includes("E2E-") ||
+            t.includes("TL-W") ||
+            t.includes("PHOTO")
+        );
+      const hasPushOrSwitch = namesUpper.some(
+        (n) =>
+          n.includes("PUS") ||
+          n.includes("PB") ||
+          n.includes("SWITCH") ||
+          n.includes("LAMP") ||
+          n.includes("BUZZER")
+      );
+
+      if (hasBoxPanel) {
         inferred = "Panel Utama";
-      } else if (namesUpper.some((n) => n.includes("OP PANEL"))) {
+      } else if (hasHmiOrOp) {
         inferred = "OP Panel";
-      } else if (
-        namesUpper.some((n) => n.includes("SENSOR")) &&
-        namesUpper.some((n) => n.includes("PUS") || n.includes("PB") || n.includes("SWITCH"))
-      ) {
+      } else if (hasSensor && hasPushOrSwitch) {
         inferred = "Sensor & Push Button";
-      } else if (namesUpper.some((n) => n.includes("SENSOR"))) {
-        inferred = "Sensor";
+      } else if (hasSensor) {
+        inferred = "Sensor & Push Button";
+      } else if (hasPushOrSwitch) {
+        inferred = "OP Panel";
       }
     }
     const finalName =
