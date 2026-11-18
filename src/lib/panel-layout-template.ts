@@ -1760,9 +1760,10 @@ export function inferComponentVisual(
     combined.includes("STBD") ||
     combined.includes("HMI");
   if (!isHmiModelCode && (combined.includes("TBD-10") || combined.includes("TBD-") || /\bTBD\d*\b/.test(combined))) {
+    const isPack = combined.includes("1 LUSIN") || combined.includes("12 PCS");
     return {
       category: "TERMINAL",
-      widthMm: 70,
+      widthMm: isPack ? 80 : 10,
       heightMm: 45,
       defaultTag: "TBD-10A",
       specificModel: "TERMINAL_10P",
@@ -2500,6 +2501,78 @@ function isOpSpecificTerminalOrStopper(comp: PanelComponentInput): boolean {
   );
 }
 
+export interface DetectedPrBoxPanel {
+  found: boolean;
+  boxWidthMm: number;
+  boxHeightMm: number;
+  boxDepthMm: number;
+  suggestedPlateWidthMm: number;
+  suggestedPlateHeightMm: number;
+}
+
+/**
+ * Mendeteksi spesifikasi box enclosure panel utama dari daftar komponen PR.
+ * Menghitung ukuran plat dasar mounting plate yang pas & ngepress di dalam box.
+ */
+export function detectPrMainBoxPanel(components: PanelComponentInput[]): DetectedPrBoxPanel | null {
+  const boxComp = (components || []).find((c) => {
+    const text = `${c.partType} ${c.partName}`.toUpperCase();
+    return (
+      (text.includes("BOX PANEL") ||
+        text.includes("PANEL BOX") ||
+        text.includes("TOTAL ASSY MAIN PANEL") ||
+        text.includes("BOX MAIN PANEL") ||
+        (text.includes("ENCLOSURE") && !text.includes("OP"))) &&
+      !text.includes("OP PANEL") &&
+      !text.includes("OPERATOR") &&
+      !text.includes("JUNCTION") &&
+      !text.includes("RELAY") &&
+      !text.includes("TERMINAL")
+    );
+  });
+
+  if (!boxComp) return null;
+
+  const text = `${boxComp.partType} ${boxComp.partName}`;
+  const triple = text.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
+  const double = text.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
+
+  let rawD1 = 0;
+  let rawD2 = 0;
+  let rawD3 = 200;
+
+  if (triple) {
+    rawD1 = parseInt(triple[1], 10);
+    rawD2 = parseInt(triple[2], 10);
+    rawD3 = parseInt(triple[3], 10);
+  } else if (double) {
+    rawD1 = parseInt(double[1], 10);
+    rawD2 = parseInt(double[2], 10);
+  }
+
+  if (rawD1 <= 0 || rawD2 <= 0) return null;
+
+  // Panel kontrol umumnya berbentuk portrait (Height >= Width)
+  const boxHeight = Math.max(rawD1, rawD2);
+  const boxWidth = Math.min(rawD1, rawD2);
+  const boxDepth = rawD3 || 265;
+
+  // Ukuran plat dasar (mounting plate) standar di dalam box berjarak ~100mm dari box (50mm margin tiap sisi)
+  // Contoh: Box 900 H x 700 W -> Plate 800 H x 600 W
+  // Contoh: Box 550 H x 450 W -> Plate 450 H x 350 W (atau 500 H x 400 W jika margin lebih sempit)
+  const suggestedPlateHeight = Math.max(350, Math.round((boxHeight - 100) / 50) * 50);
+  const suggestedPlateWidth = Math.max(300, Math.round((boxWidth - 100) / 50) * 50);
+
+  return {
+    found: true,
+    boxWidthMm: boxWidth,
+    boxHeightMm: boxHeight,
+    boxDepthMm: boxDepth,
+    suggestedPlateWidthMm: suggestedPlateWidth,
+    suggestedPlateHeightMm: suggestedPlateHeight,
+  };
+}
+
 /**
  * Membangun Dual+OP Panel Layout lengkap OTOMATIS dari daftar komponen PR proyek
  * mengikuti tata letak standar industri Twintech FR-EG-EP-006 (Hal. 1-4).
@@ -2753,12 +2826,15 @@ export function buildStandardPanelLayoutFromComponents(
   const r3MaxH = getRowMaxH(row3Items, 85);
   const r4MaxH = getRowMaxH(row4Items, 55);
 
-  // Clearance minimum setiap baris agar komponen tertinggi (misal PSU S8VK 240W 125mm)
-  // memiliki ruang bebas di atas dan di bawah rel DIN sehingga kabel duct tidak bertabrakan
-  const row1ClearanceReq = Math.max(160, r1MaxH + 34);
-  const row2ClearanceReq = Math.max(140, r2MaxH + 30);
-  const row3ClearanceReq = Math.max(120, r3MaxH + 28);
-  const row4ClearanceReq = Math.max(90, r4MaxH + 26);
+  // Deteksi box panel dari PR jika ada (misal "BOX PANEL_550 x 450 x 200")
+  const prBox = detectPrMainBoxPanel(components);
+
+  // Clearance adaptif yang NGEPRESS: cukup memberi celah kawat 10-14mm dari ujung komponen ke bibir kabel duct
+  // Tanpa jarak raksasa / spare kosong melompong yang berlebihan.
+  const r1ClearanceReq = r1MaxH > 0 ? r1MaxH + 20 : 80;
+  const r2ClearanceReq = r2MaxH > 0 ? r2MaxH + 20 : 80;
+  const r3ClearanceReq = row3Items.length > 0 ? r3MaxH + 18 : 50;
+  const r4ClearanceReq = row4Items.length > 0 ? r4MaxH + 16 : 50;
 
   const topDuctH = ductConfig.horizontalHeightMm;
   const midDuctH = ductConfig.horizontalHeightMm;
@@ -2768,35 +2844,50 @@ export function buildStandardPanelLayoutFromComponents(
 
   const minTotalNeededH =
     topDuctH +
-    row1ClearanceReq +
+    r1ClearanceReq +
     midDuctH +
-    row2ClearanceReq +
+    r2ClearanceReq +
     midDuctH +
-    row3ClearanceReq +
+    r3ClearanceReq +
     midDuctH +
-    row4ClearanceReq +
+    r4ClearanceReq +
     bottomDuctH;
 
-  // Ukuran plat dasar menyesuaikan agar cukup (minimal 600×800 mm standar FR-EG-EP-006)
-  const targetPlateH = Math.max(800, Math.ceil(minTotalNeededH / 50) * 50);
+  // Ukuran plat dasar (Tinggi):
+  // 1. Jika ada box panel di PR yang ukurannya lebih kecil dari standar (misal MTM 550x450),
+  //    gunakan plat kompak yang pas di dalam box (misal 500 atau 450 mm).
+  // 2. Jika tidak ada box atau box standar (>= 800mm), gunakan standar 800mm atau membesar jika komponen banyak.
+  let targetPlateH: number;
+  if (prBox && prBox.boxHeightMm < 800) {
+    targetPlateH = Math.max(prBox.suggestedPlateHeightMm, Math.ceil(minTotalNeededH / 50) * 50);
+  } else {
+    targetPlateH = Math.max(800, Math.ceil(minTotalNeededH / 50) * 50);
+  }
 
-  // Distribusikan sisa ketinggian plat secara proporsional agar penataan rapi & seimbang
-  const extraH = targetPlateH - minTotalNeededH;
-  const r1Clearance = row1ClearanceReq + Math.round(extraH * 0.35);
-  const r2Clearance = row2ClearanceReq + Math.round(extraH * 0.25);
-  const r3Clearance = row3ClearanceReq + Math.round(extraH * 0.20);
-  const r4Clearance =
-    row4ClearanceReq +
-    (extraH - Math.round(extraH * 0.35) - Math.round(extraH * 0.25) - Math.round(extraH * 0.20));
+  // Distribusikan sisa ketinggian secukupnya saja agar celah antar kabel duct tetap ngepress dan rapi
+  const extraH = Math.max(0, targetPlateH - minTotalNeededH);
+  const r1Clearance = r1ClearanceReq + Math.min(22, Math.round(extraH * 0.28));
+  const r2Clearance = r2ClearanceReq + Math.min(18, Math.round(extraH * 0.22));
+  const r3Clearance = r3ClearanceReq + Math.min(16, Math.round(extraH * 0.20));
+  const r4Clearance = r4ClearanceReq + Math.min(14, Math.round(extraH * 0.15));
 
+  // Lebar plat dasar (Lebar):
+  // 1. Jika box di PR lebih sempit dari 600mm (misal MTM 450mm), gunakan plat kompak (misal 400mm).
+  // 2. Standar 600mm, atau melebar otomatis jika komponen melimpah.
   const maxNeededRowW = Math.max(row1TotalW, row2TotalW, row3TotalW, row4TotalW);
-  const standardAvailRowW = 600 - leftDuctW - rightDuctW - 24;
-  const extraWidthMm =
-    maxNeededRowW > standardAvailRowW
-      ? Math.ceil((maxNeededRowW - standardAvailRowW) / 50) * 50
-      : 0;
+  const rawNeededPlateW = leftDuctW + rightDuctW + maxNeededRowW + 28;
 
-  const targetPlateW = 600 + extraWidthMm;
+  let targetPlateW: number;
+  if (prBox && prBox.boxWidthMm < 600) {
+    targetPlateW = Math.max(prBox.suggestedPlateWidthMm, Math.ceil(rawNeededPlateW / 50) * 50);
+  } else {
+    const standardAvailRowW = 600 - leftDuctW - rightDuctW - 24;
+    const extraWidthMm =
+      maxNeededRowW > standardAvailRowW
+        ? Math.ceil((maxNeededRowW - standardAvailRowW) / 50) * 50
+        : 0;
+    targetPlateW = 600 + extraWidthMm;
+  }
   const rightDuctX = targetPlateW - rightDuctW;
   const innerSpan = rightDuctX - leftDuctW;
   const railSpan = innerSpan - 14;
@@ -3550,38 +3641,20 @@ export function createDefaultOuterPanelLayout(
 ): OuterPanelLayoutData {
   const detected = detectOuterPanelPrFeatures(components);
 
-  // Cari apakah ada box enclosure yang ditentukan di PR (misal "BOX 700x600x265")
+  // Cari apakah ada box enclosure yang ditentukan di PR (misal "BOX PANEL_550x450x200" atau "700x900x315")
+  const prBox = detectPrMainBoxPanel(components);
   let widthMm = 700;
-  let heightMm = 600;
+  let heightMm = 900;
   let depthMm = 265;
 
-  const boxComp = (components || []).find((c) => {
-    const text = `${c.partType} ${c.partName}`.toUpperCase();
-    return (
-      (text.includes("BOX") || text.includes("PANEL") || text.includes("ENCLOSURE")) &&
-      !text.includes("RELAY") &&
-      !text.includes("TERMINAL")
-    );
-  });
-
-  if (boxComp) {
-    const text = `${boxComp.partType} ${boxComp.partName}`;
-    const triple = text.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
-    const double = text.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
-    if (triple) {
-      widthMm = parseInt(triple[1], 10);
-      heightMm = parseInt(triple[2], 10);
-      depthMm = parseInt(triple[3], 10);
-    } else if (double) {
-      widthMm = parseInt(double[1], 10);
-      heightMm = parseInt(double[2], 10);
-      depthMm = 265;
-    }
+  if (prBox) {
+    widthMm = prBox.boxWidthMm;
+    heightMm = prBox.boxHeightMm;
+    depthMm = prBox.boxDepthMm || 265;
   } else if (mainWidthMm && mainHeightMm) {
-    // Sesuaikan dengan ukuran plat dasar + toleransi margin box
-    // Jika plat dasar 600x800 -> box 700x900x265
-    widthMm = Math.max(700, mainWidthMm + 100);
-    heightMm = Math.max(600, mainHeightMm + 100);
+    // Sesuaikan dengan ukuran plat dasar + toleransi margin box (100mm)
+    widthMm = mainWidthMm + 100;
+    heightMm = mainHeightMm + 100;
     depthMm = 265;
   }
 

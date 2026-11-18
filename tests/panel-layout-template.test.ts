@@ -698,5 +698,30 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(ductTop!.tagLabel).toBe("DUCT 40x60");
       expect(ductMid1!.tagLabel).toBe("DUCT 40x60");
     });
+
+    it("menghasilkan layout kompak & ngepress sesuai box panel di PR (misal 550x450 mm)", () => {
+      const mtmLikePr: PanelComponentInput[] = [
+        makeComp("box", "BOX PANEL_550 x 450 x 200", "BOX PANEL", 1),
+        makeComp("plc", "PLC_FX5U-32MR/ES", "PLC", 1),
+        makeComp("mcb1", "MCB Chint NXB-63 2P 6A", "MCB", 4),
+        makeComp("psu", "S8VK-C24024", "POWER SUPLAY", 1),
+        makeComp("relay", "Omron MY2N-D2 24VDC", "Relay", 2),
+        makeComp("tb", "FORT TBD-10A", "Terminal Block", 12),
+      ];
+
+      const layout = buildStandardPanelLayoutFromComponents(mtmLikePr);
+      // Plat dasar kompak ~400mm x 600-700mm, BUKAN 600x800 raksasa
+      expect(layout.main.enclosure.widthMm).toBeLessThanOrEqual(450);
+      expect(layout.main.enclosure.heightMm).toBeLessThanOrEqual(700);
+
+      // Celah antar baris rapi dan ngepress (jarak dari komponen ke duct < 25mm)
+      const psu = layout.main.items.find((i) => i.componentId === "psu");
+      const ductTop = layout.main.items.find((i) => i.id === "duct-top");
+      expect(psu).toBeDefined();
+      expect(ductTop).toBeDefined();
+      const topGap = psu!.yMm - (ductTop!.yMm + ductTop!.heightMm);
+      expect(topGap).toBeGreaterThanOrEqual(5);
+      expect(topGap).toBeLessThanOrEqual(25);
+    });
   });
 });

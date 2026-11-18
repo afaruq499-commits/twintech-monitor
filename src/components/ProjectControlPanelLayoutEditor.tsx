@@ -2279,6 +2279,7 @@ export function ProjectControlPanelLayoutEditor({
             <span className="text-slate-400">Preset:</span>
             {(activePanelMode === "MAIN"
               ? [
+                  [400, 500],
                   [500, 600],
                   [600, 800],
                   [700, 900],
