@@ -41,6 +41,7 @@ import { PlcAddressTablePanel } from "@/components/PlcAddressTablePanel";
 import type { CatalogComponentDTO } from "@/lib/catalog-queries";
 import { formatRupiah, formatTanggalId } from "@/lib/date-utils";
 import { formatCatalogItemForPr } from "@/lib/pr-catalog-default";
+import type { UserRole } from "@/lib/users";
 import {
   computeChecklistProgress,
   deriveChecklistDetection,
@@ -164,8 +165,12 @@ interface ProjectDetailDTO {
 
 export function ProjectDetailClient({
   project,
+  currentUserRole = "MEMBER",
+  currentUserName = "Tim Engineering",
 }: {
   project: ProjectDetailDTO;
+  currentUserRole?: UserRole;
+  currentUserName?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -582,6 +587,8 @@ export function ProjectDetailClient({
         projectId={project.id}
         initialChecklistJson={project.fileChecklistJson}
         projectData={checklistDetection}
+        currentUserRole={currentUserRole}
+        currentUserName={currentUserName}
         onChecklistChange={setChecklistState}
         onNavigateTab={(targetTab) => setTab(targetTab)}
       />

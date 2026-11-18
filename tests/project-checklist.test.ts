@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_MANUAL_CHECKLIST_KEYS,
   PROJECT_CHECKLIST_KEYS,
   computeChecklistProgress,
   deriveChecklistDetection,
+  isAdminOnlyChecklistKey,
   parseFileChecklistJson,
 } from "../src/lib/project-checklist";
 
 describe("project-checklist", () => {
+  it("mengidentifikasi berkas verifikasi manual khusus Admin dengan benar", () => {
+    expect(ADMIN_MANUAL_CHECKLIST_KEYS).toEqual([
+      "komponen_pr",
+      "layout_panel_hmi",
+      "layout_panel_utama",
+    ]);
+
+    expect(isAdminOnlyChecklistKey("komponen_pr")).toBe(true);
+    expect(isAdminOnlyChecklistKey("layout_panel_hmi")).toBe(true);
+    expect(isAdminOnlyChecklistKey("layout_panel_utama")).toBe(true);
+    expect(isAdminOnlyChecklistKey("flowchart")).toBe(false);
+    expect(isAdminOnlyChecklistKey("diagram_wiring")).toBe(false);
+    expect(isAdminOnlyChecklistKey("pemprograman")).toBe(false);
+    expect(isAdminOnlyChecklistKey("schedule_pengerjaan")).toBe(false);
+    expect(isAdminOnlyChecklistKey("alamat_io")).toBe(false);
+  });
+
   it("mengembalikan 0/8 (0%) jika proyek belum memiliki berkas maupun centang manual", () => {
     const detection = deriveChecklistDetection({
       componentsCount: 0,
@@ -19,7 +38,7 @@ describe("project-checklist", () => {
     expect(res.progressPct).toBe(0);
   });
 
-  it("menghitung progress 4/8 (50%) sesuai deteksi otomatis 4 berkas terisi", () => {
+  it("komponen PR dan layout panel/HMI tidak lagi otomatis tercentang meskipun data ada di sistem", () => {
     const detection = deriveChecklistDetection({
       prStatus: "PREPARED",
       componentsCount: 24,
@@ -34,21 +53,35 @@ describe("project-checklist", () => {
       wiringDiagramPdfUrl: null,
       plcProgramFileUrl: null,
     });
+
+    // Auto detection tetap mendeteksi adanya data di proyek
+    expect(detection.componentsCount).toBe(24);
+    expect(detection.hasPanelMain).toBe(true);
+    expect(detection.panelMainCount).toBe(36);
+    expect(detection.hasPanelHmi).toBe(true);
+    expect(detection.panelHmiCount).toBe(6);
+    expect(detection.hasFlowchart).toBe(true);
+
     const res = computeChecklistProgress({}, detection);
 
-    expect(res.autoByKey.komponen_pr).toBe(true);
-    expect(res.autoByKey.layout_panel_hmi).toBe(true);
-    expect(res.autoByKey.layout_panel_utama).toBe(true);
+    // Namun autoByKey untuk berkas khusus admin harus false (manual checklist only)
+    expect(res.autoByKey.komponen_pr).toBe(false);
+    expect(res.autoByKey.layout_panel_hmi).toBe(false);
+    expect(res.autoByKey.layout_panel_utama).toBe(false);
+
+    // Berkas umum (flowchart) tetap auto-detected true
     expect(res.autoByKey.flowchart).toBe(true);
     expect(res.autoByKey.schedule_pengerjaan).toBe(false);
     expect(res.autoByKey.alamat_io).toBe(false);
     expect(res.autoByKey.diagram_wiring).toBe(false);
     expect(res.autoByKey.pemprograman).toBe(false);
-    expect(res.completedCount).toBe(4);
-    expect(res.progressPct).toBe(50);
+
+    // Total selesai hanya 1 (flowchart saja) karena berkas admin belum diverifikasi manual
+    expect(res.completedCount).toBe(1);
+    expect(res.progressPct).toBe(13); // 1 / 8 = 12.5% -> 13%
   });
 
-  it("menggabungkan centang manual tanpa menghitung ganda item yang sudah auto-detected", () => {
+  it("berkas khusus admin selesai jika diverifikasi manual melalui checklistState", () => {
     const detection = deriveChecklistDetection({
       componentsCount: 5,
       lanesCount: 1,
@@ -57,15 +90,18 @@ describe("project-checklist", () => {
     });
     const manualState = parseFileChecklistJson(
       JSON.stringify({
-        komponen_pr: { checked: true }, // sudah autoDetected -> tidak double count
-        alamat_io: { checked: true }, // manual baru -> +1
-        diagram_wiring: { checked: true }, // manual baru -> +1
+        komponen_pr: { checked: true, updatedAt: new Date().toISOString(), updatedBy: "Faruq (ADMIN)" },
+        layout_panel_hmi: { checked: true },
+        layout_panel_utama: { checked: true },
+        alamat_io: { checked: true },
+        diagram_wiring: { checked: true },
         pemprograman: { checked: false },
       })
     );
     const res = computeChecklistProgress(manualState, detection);
-    expect(res.completedCount).toBe(4);
-    expect(res.progressPct).toBe(50);
+    // 5 manual checked (komponen_pr, layout_panel_hmi, layout_panel_utama, alamat_io, diagram_wiring) + 1 auto (flowchart) = 6
+    expect(res.completedCount).toBe(6);
+    expect(res.progressPct).toBe(75);
   });
 
   it("mendukung panelLayoutJson format array lama dan JSON rusak secara aman", () => {

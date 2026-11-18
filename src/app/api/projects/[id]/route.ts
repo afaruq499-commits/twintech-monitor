@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fromIsoDateStr } from "@/lib/date-utils";
 import { projectSchema } from "@/lib/validation/schemas";
+import { getSessionUser } from "@/lib/auth";
+import {
+  ADMIN_MANUAL_CHECKLIST_KEYS,
+  parseFileChecklistJson,
+} from "@/lib/project-checklist";
 
 export async function PATCH(
   request: Request,
@@ -18,6 +23,30 @@ export async function PATCH(
       );
     }
     const d = parsed.data;
+
+    let finalFileChecklistJson = d.fileChecklistJson;
+    if (d.fileChecklistJson !== undefined) {
+      const session = await getSessionUser();
+      const isAdmin = session?.role === "ADMIN";
+      if (!isAdmin) {
+        // Non-admin (Member) tidak dapat mengubah status berkas khusus Admin
+        const existing = await prisma.project.findUnique({
+          where: { id },
+          select: { fileChecklistJson: true },
+        });
+        const currentChecklist = parseFileChecklistJson(existing?.fileChecklistJson);
+        const incomingChecklist = parseFileChecklistJson(d.fileChecklistJson);
+
+        ADMIN_MANUAL_CHECKLIST_KEYS.forEach((adminKey) => {
+          if (currentChecklist[adminKey]) {
+            incomingChecklist[adminKey] = currentChecklist[adminKey];
+          } else {
+            delete incomingChecklist[adminKey];
+          }
+        });
+        finalFileChecklistJson = JSON.stringify(incomingChecklist);
+      }
+    }
 
     const updated = await prisma.project.update({
       where: { id },
@@ -80,7 +109,7 @@ export async function PATCH(
           ? { panelLayoutJson: d.panelLayoutJson || null }
           : {}),
         ...(d.fileChecklistJson !== undefined
-          ? { fileChecklistJson: d.fileChecklistJson || null }
+          ? { fileChecklistJson: finalFileChecklistJson || null }
           : {}),
       },
     });

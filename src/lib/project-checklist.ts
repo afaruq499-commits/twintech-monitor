@@ -2,6 +2,7 @@ export interface FileChecklistState {
   [key: string]: {
     checked: boolean;
     updatedAt?: string;
+    updatedBy?: string;
   };
 }
 
@@ -19,6 +20,24 @@ export const PROJECT_CHECKLIST_KEYS = [
 export type ProjectChecklistKey = (typeof PROJECT_CHECKLIST_KEYS)[number];
 
 export const PROJECT_CHECKLIST_TOTAL_COUNT = PROJECT_CHECKLIST_KEYS.length;
+
+/**
+ * Berkas-berkas yang TIDAK otomatis tercentang oleh deteksi sistem dan
+ * hanya boleh diverifikasi / diceklis manual oleh pengguna dengan hak akses ADMIN.
+ */
+export const ADMIN_MANUAL_CHECKLIST_KEYS = [
+  "komponen_pr",
+  "layout_panel_hmi",
+  "layout_panel_utama",
+] as const;
+
+export type AdminManualChecklistKey = (typeof ADMIN_MANUAL_CHECKLIST_KEYS)[number];
+
+export function isAdminOnlyChecklistKey(
+  key: string
+): key is AdminManualChecklistKey {
+  return (ADMIN_MANUAL_CHECKLIST_KEYS as readonly string[]).includes(key);
+}
 
 export interface ChecklistDetectionSummary {
   prStatus: string;
@@ -144,19 +163,25 @@ export function deriveChecklistDetection(
 }
 
 /**
- * Computes completion counts and percentage across the 8 checklist items
- * (each item is complete when manually checked OR auto-detected by system data).
+ * Computes completion counts and percentage across the 8 checklist items.
+ *
+ * Catatan penting:
+ * - Berkas #1 (Komponen PR), #4 (Layout HMI), dan #5 (Layout Panel Utama) TIDAK LAGI
+ *   otomatis tercentang oleh deteksi sistem, melainkan murni verifikasi manual khusus ADMIN.
+ * - Berkas lainnya (Schedule, Alamat I/O, Flowchart, Diagram Wiring, Program PLC/HMI)
+ *   tetap tercentang otomatis jika berkas/data telah diinput atau dicentang manual.
  */
 export function computeChecklistProgress(
   checklistState: FileChecklistState,
   detection: ChecklistDetectionSummary
 ): ChecklistProgressResult {
   const autoByKey: Record<ProjectChecklistKey, boolean> = {
-    komponen_pr: detection.componentsCount > 0,
+    // Verifikasi manual khusus Admin (tidak otomatis aktif oleh deteksi sistem)
+    komponen_pr: false,
     schedule_pengerjaan: detection.scheduleCellsCount > 0,
     alamat_io: detection.hasPlcAddresses,
-    layout_panel_hmi: detection.hasPanelHmi,
-    layout_panel_utama: detection.hasPanelMain,
+    layout_panel_hmi: false,
+    layout_panel_utama: false,
     flowchart: detection.hasFlowchart,
     diagram_wiring: detection.hasWiringPdf,
     pemprograman: Boolean(detection.hasPlcProgram || detection.hasHmiProgram),

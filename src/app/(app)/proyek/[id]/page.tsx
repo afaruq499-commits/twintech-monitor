@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProjectDetailClient } from "@/components/ProjectDetailClient";
 import { getProjectDetail } from "@/lib/data-queries";
+import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,19 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = await getProjectDetail(id);
+  const [project, sessionUser] = await Promise.all([
+    getProjectDetail(id),
+    getSessionUser(),
+  ]);
   if (!project) notFound();
 
   return (
     <Suspense fallback={<div className="text-sm text-slate-500">Memuat proyek...</div>}>
-      <ProjectDetailClient project={project} />
+      <ProjectDetailClient
+        project={project}
+        currentUserRole={sessionUser?.role ?? "MEMBER"}
+        currentUserName={sessionUser?.nama ?? sessionUser?.username ?? "User"}
+      />
     </Suspense>
   );
 }
