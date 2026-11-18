@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fromIsoDateStr } from "@/lib/date-utils";
+import { syncAutoPanelLayoutForProject } from "@/lib/panel-layout-sync";
 import { bulkComponentUpdateSchema } from "@/lib/validation/schemas";
 
 export async function POST(request: Request) {
@@ -21,12 +22,25 @@ export async function POST(request: Request) {
         ...(d.statusPembelian !== undefined
           ? { statusPembelian: d.statusPembelian }
           : {}),
+        ...(d.statusImport !== undefined
+          ? { statusImport: d.statusImport }
+          : {}),
         ...(d.estimasiTiba !== undefined
           ? { estimasiTiba: fromIsoDateStr(d.estimasiTiba) }
           : {}),
         ...(d.kelompok !== undefined ? { kelompok: d.kelompok } : {}),
       },
     });
+
+    if (d.statusImport !== undefined || d.kelompok !== undefined) {
+      const sample = await prisma.component.findFirst({
+        where: { id: { in: d.componentIds } },
+        select: { projectId: true },
+      });
+      if (sample?.projectId) {
+        await syncAutoPanelLayoutForProject(prisma, sample.projectId);
+      }
+    }
 
     return NextResponse.json({ count: updated.count });
   } catch (err) {

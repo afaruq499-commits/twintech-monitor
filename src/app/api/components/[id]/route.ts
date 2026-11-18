@@ -60,6 +60,7 @@ export async function PATCH(
           ? { tanggalPakai: fromIsoDateStr(d.tanggalPakai) }
           : {}),
         ...(d.perluDicek !== undefined ? { perluDicek: d.perluDicek } : {}),
+        ...(d.statusImport !== undefined ? { statusImport: d.statusImport } : {}),
         ...(d.catatanPr !== undefined ? { catatanPr: d.catatanPr || null } : {}),
         ...(d.catatan !== undefined ? { catatan: d.catatan || null } : {}),
       },
@@ -69,7 +70,8 @@ export async function PATCH(
       d.partType !== undefined ||
       d.partName !== undefined ||
       d.qty !== undefined ||
-      d.kelompok !== undefined
+      d.kelompok !== undefined ||
+      d.statusImport !== undefined
     ) {
       await syncAutoPanelLayoutForProject(prisma, existing.projectId);
     }

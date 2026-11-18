@@ -195,6 +195,7 @@ export function ProjectDetailClient({
   const [compSearch, setCompSearch] = useState("");
   const [compGroupFilter, setCompGroupFilter] = useState("ALL");
   const [compStatusFilter, setCompStatusFilter] = useState("ALL");
+  const [compImportFilter, setCompImportFilter] = useState("ALL");
   const [onlyNeedsCheck, setOnlyNeedsCheck] = useState(
     searchParams.get("filter") === "check"
   );
@@ -252,6 +253,9 @@ export function ProjectDetailClient({
   const activeComps = project.components.filter(
     (c) => c.statusImport !== "HILANG_DI_REVISI"
   );
+  const missingRevisionComps = project.components.filter(
+    (c) => c.statusImport === "HILANG_DI_REVISI"
+  );
 
   // Peta komponen wajib PR yang saat ini aktif (qty > 0) pada proyek ini
   const mandatoryCompByKey = new Map<MandatoryPrKey, ComponentDTO>();
@@ -298,6 +302,16 @@ export function ProjectDetailClient({
       return false;
     if (compStatusFilter !== "ALL" && c.statusPembelian !== compStatusFilter)
       return false;
+    if (compImportFilter !== "ALL") {
+      if (compImportFilter === "ACTIVE_ONLY" && c.statusImport === "HILANG_DI_REVISI")
+        return false;
+      if (compImportFilter === "HILANG_DI_REVISI" && c.statusImport !== "HILANG_DI_REVISI")
+        return false;
+      if (compImportFilter === "BARU" && c.statusImport !== "BARU")
+        return false;
+      if (compImportFilter === "NORMAL" && c.statusImport !== "NORMAL")
+        return false;
+    }
     if (onlyNeedsCheck && !c.perluDicek) return false;
     if (compSearch.trim()) {
       const q = compSearch.toLowerCase();
@@ -743,7 +757,7 @@ export function ProjectDetailClient({
                 <select
                   value={compStatusFilter}
                   onChange={(e) => setCompStatusFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold"
+                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer"
                 >
                   <option value="ALL">Semua Status Pembelian</option>
                   {PURCHASE_STATUSES.map((s) => (
@@ -751,6 +765,19 @@ export function ProjectDetailClient({
                       {PURCHASE_STATUS_LABELS[s]}
                     </option>
                   ))}
+                </select>
+
+                <select
+                  value={compImportFilter}
+                  onChange={(e) => setCompImportFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold cursor-pointer"
+                >
+                  <option value="ALL">Semua Tipe Komponen ({project.components.length})</option>
+                  <option value="ACTIVE_ONLY">Komponen Aktif Saja ({activeComps.length})</option>
+                  <option value="HILANG_DI_REVISI">
+                    Hilang di Revisi ({missingRevisionComps.length})
+                  </option>
+                  <option value="BARU">Baru di Revisi</option>
                 </select>
 
                 <label className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl cursor-pointer">
@@ -764,6 +791,13 @@ export function ProjectDetailClient({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Link
+                  href={`/import-pr?projectId=${project.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition"
+                  title="Tambah komponen dari file Excel berbeda (Append) atau import ulang revisi"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Tambah dari Excel (Import)
+                </Link>
                 <Link
                   href={`/buat-pr?projectId=${project.id}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
@@ -788,7 +822,7 @@ export function ProjectDetailClient({
                 </button>
                 <a
                   href={`/api/export/pr?projectId=${project.id}`}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold"
                   title="Download Excel Purchase Requisition (part berstatus Sudah Ada / Sudah Datang / Terpasang otomatis dikecualikan)"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" /> Export Format PR (Sesuai Import)
@@ -803,50 +837,86 @@ export function ProjectDetailClient({
             </div>
 
             {/* Bulk Update Bar */}
-            {selectedIds.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 bg-blue-50/70 p-3 rounded-xl">
-                <div className="text-xs font-bold text-blue-900">
-                  {selectedIds.length} komponen dipilih
+            {selectedIds.length > 0 && (() => {
+              const selectedMissingCount = selectedIds.filter(
+                (id) =>
+                  project.components.find((c) => c.id === id)?.statusImport ===
+                  "HILANG_DI_REVISI"
+              ).length;
+
+              return (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 bg-blue-50/70 p-3 rounded-xl">
+                  <div className="text-xs font-bold text-blue-900">
+                    {selectedIds.length} komponen dipilih
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedMissingCount > 0 && (
+                      <button
+                        type="button"
+                        disabled={busyComp}
+                        onClick={async () => {
+                          setBusyComp(true);
+                          try {
+                            await fetch("/api/components/bulk", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                componentIds: selectedIds,
+                                statusImport: "NORMAL",
+                              }),
+                            });
+                            setSelectedIds([]);
+                            router.refresh();
+                          } finally {
+                            setBusyComp(false);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                        title="Ubah komponen terpilih yang hilang di revisi kembali menjadi Normal"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Ubah {selectedMissingCount} Hilang Revisi Jadi Normal
+                      </button>
+                    )}
+                    <select
+                      value={bulkStatus}
+                      onChange={(e) =>
+                        setBulkStatus(e.target.value as PurchaseStatus)
+                      }
+                      className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-white text-xs font-semibold"
+                    >
+                      {PURCHASE_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          Set: {PURCHASE_STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={bulkEta}
+                      onChange={(e) => setBulkEta(e.target.value)}
+                      title="Estimasi Tiba (opsional)"
+                      className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-white text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={busyComp}
+                      onClick={handleBulkUpdate}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Terapkan Bulk Update
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds([])}
+                      className="px-2.5 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-white cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={bulkStatus}
-                    onChange={(e) =>
-                      setBulkStatus(e.target.value as PurchaseStatus)
-                    }
-                    className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-white text-xs font-semibold"
-                  >
-                    {PURCHASE_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        Set: {PURCHASE_STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={bulkEta}
-                    onChange={(e) => setBulkEta(e.target.value)}
-                    title="Estimasi Tiba (opsional)"
-                    className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-white text-xs"
-                  />
-                  <button
-                    type="button"
-                    disabled={busyComp}
-                    onClick={handleBulkUpdate}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer"
-                  >
-                    Terapkan Bulk Update
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIds([])}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-white cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Kartu Komponen Wajib PR (tidak bisa dihapus, hanya value Qty diubah; 0 = tidak masuk PR) */}
@@ -1014,6 +1084,66 @@ export function ProjectDetailClient({
             )}
           </div>
 
+          {/* Banner Peringatan & Aksi Cepat jika ada komponen Hilang di Revisi Baru */}
+          {missingRevisionComps.length > 0 && (
+            <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 sm:mt-0" />
+                <div>
+                  <span className="font-extrabold text-rose-950 text-sm">
+                    Terdapat {missingRevisionComps.length} Komponen berstatus &quot;Hilang di Revisi Baru&quot;
+                  </span>
+                  <p className="text-rose-700 text-xs mt-0.5">
+                    Komponen ini dinonaktifkan sementara dari kalkulasi PR &amp; layout karena tidak ada di file Excel revisi terakhir. Anda dapat memulihkannya kembali menjadi Normal kapan saja.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  disabled={busyComp}
+                  onClick={() => {
+                    setSelectedIds(missingRevisionComps.map((c) => c.id));
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 font-bold cursor-pointer shadow-2xs"
+                >
+                  Pilih Semua ({missingRevisionComps.length})
+                </button>
+                <button
+                  type="button"
+                  disabled={busyComp}
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        `Pulihkan ${missingRevisionComps.length} komponen yang hilang di revisi kembali menjadi Normal?`
+                      )
+                    ) {
+                      return;
+                    }
+                    setBusyComp(true);
+                    try {
+                      await fetch("/api/components/bulk", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          componentIds: missingRevisionComps.map((c) => c.id),
+                          statusImport: "NORMAL",
+                        }),
+                      });
+                      router.refresh();
+                    } finally {
+                      setBusyComp(false);
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Check className="w-4 h-4" />
+                  Pulihkan Semua Menjadi Normal
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Tabel Komponen per Kelompok */}
           {groupedComponents.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">
@@ -1138,10 +1268,45 @@ export function ProjectDetailClient({
                                     </span>
                                   )}
                                   {isMissingRev && (
-                                    <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
-                                      Hilang di Revisi Baru
+                                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
+                                        Hilang di Revisi Baru
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          quickUpdateComponent(c.id, {
+                                            statusImport: "NORMAL",
+                                          })
+                                        }
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold shadow-2xs transition cursor-pointer border border-emerald-300"
+                                        title="Ubah status komponen ini kembali menjadi Normal (aktif)"
+                                      >
+                                        <Check className="w-2.5 h-2.5 text-emerald-700" />
+                                        Ubah ke Normal
+                                      </button>
                                     </span>
                                   )}
+                                  <select
+                                    value={c.statusImport}
+                                    onChange={(e) =>
+                                      quickUpdateComponent(c.id, {
+                                        statusImport: e.target.value,
+                                      })
+                                    }
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer ${
+                                      isMissingRev
+                                        ? "bg-rose-50 border-rose-300 text-rose-800"
+                                        : isNewRev
+                                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                                        : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300"
+                                    }`}
+                                    title="Edit status import / revisi komponen (Normal, Baru, Hilang di Revisi)"
+                                  >
+                                    <option value="NORMAL">Normal</option>
+                                    <option value="BARU">Baru (Revisi)</option>
+                                    <option value="HILANG_DI_REVISI">Hilang di Revisi</option>
+                                  </select>
                                 </div>
                                 <div className="text-slate-500 mt-0.5">
                                   {c.partName}{" "}

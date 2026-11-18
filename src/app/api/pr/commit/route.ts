@@ -58,14 +58,63 @@ export async function POST(request: Request) {
       });
 
       let summary = {
-        mode: existingComponents.length > 0 && d.importMode === "MERGE" ? "MERGE" : "INITIAL",
+        mode:
+          existingComponents.length > 0 && d.importMode === "MERGE"
+            ? "MERGE"
+            : existingComponents.length > 0 && d.importMode === "APPEND"
+            ? "APPEND"
+            : "INITIAL",
         totalSaved: 0,
         updated: 0,
         inserted: 0,
         missingInRevision: 0,
       };
 
-      if (existingComponents.length > 0 && d.importMode === "MERGE") {
+      if (existingComponents.length > 0 && d.importMode === "APPEND") {
+        const startUrutan = existingComponents.reduce(
+          (max, c) => Math.max(max, c.urutan),
+          0
+        );
+
+        for (let i = 0; i < resolvedRows.length; i++) {
+          const r = resolvedRows[i];
+          const hargaSatuan = r.hargaSatuan;
+          const qty = r.qty ?? 1;
+          const total =
+            r.total ?? (hargaSatuan !== null ? hargaSatuan * qty : null);
+
+          await tx.component.create({
+            data: {
+              projectId: targetProjectId,
+              urutan: startUrutan + i + 1,
+              kelompok: r.kelompok,
+              noPr: r.noPr,
+              partType: (r.partType ?? "-").trim() || "-",
+              partName: (r.partName ?? "-").trim() || "-",
+              supplier: r.supplier,
+              qty,
+              unit: r.unit,
+              catatanPr: r.catatanPr,
+              tanggalPakai: fromIsoDateStr(r.tanggalPakai),
+              hargaSatuan,
+              hargaRaw: r.hargaRaw,
+              total,
+              statusPembelian: "BELUM_PR",
+              perluDicek: r.perluDicek,
+              alasanDicek: r.alasan.length ? r.alasan.join("; ") : null,
+              statusImport: "NORMAL",
+            },
+          });
+        }
+
+        summary = {
+          mode: "APPEND",
+          totalSaved: resolvedRows.length,
+          updated: 0,
+          inserted: resolvedRows.length,
+          missingInRevision: 0,
+        };
+      } else if (existingComponents.length > 0 && d.importMode === "MERGE") {
         const existingRecords: ExistingComponentRecord[] =
           existingComponents.map((c) => ({
             id: c.id,

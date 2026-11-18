@@ -186,3 +186,56 @@ export function mergePrComponents(
     summary: { updated, inserted, missingInRevision },
   };
 }
+
+/**
+ * Mode APPEND untuk menambahkan komponen dari file Excel yang berbeda:
+ * - Mempertahankan seluruh komponen lama proyek 100% tanpa menandai HILANG.
+ * - Memasukkan semua baris dari file Excel baru sebagai komponen baru (NORMAL).
+ */
+export function appendPrComponents(
+  existing: ExistingComponentRecord[],
+  incoming: ParsedComponent[]
+): MergeImportResult {
+  const items: MergedComponentPlan[] = [];
+  const startUrutan = existing.reduce((max, c) => Math.max(max, c.urutan), 0);
+  let urutan = startUrutan;
+
+  for (const row of incoming) {
+    urutan++;
+    const pType = (row.partType ?? "-").trim() || "-";
+    const pName = (row.partName ?? "-").trim() || "-";
+
+    items.push({
+      action: "INSERT",
+      urutan,
+      kelompok: row.kelompok,
+      noPr: row.noPr,
+      partType: pType,
+      partName: pName,
+      supplier: row.supplier,
+      qty: row.qty ?? 1,
+      unit: row.unit,
+      catatanPr: row.catatanPr,
+      tanggalPakai: row.tanggalPakai,
+      hargaSatuan: row.hargaSatuan,
+      hargaRaw: row.hargaRaw,
+      total: row.total,
+      statusPembelian: "BELUM_PR",
+      estimasiTiba: null,
+      catatan: null,
+      perluDicek: row.perluDicek,
+      alasanDicek: row.alasan.length ? row.alasan.join("; ") : null,
+      statusImport: "NORMAL",
+    });
+  }
+
+  return {
+    items,
+    summary: {
+      updated: 0,
+      inserted: incoming.length,
+      missingInRevision: 0,
+    },
+  };
+}
+

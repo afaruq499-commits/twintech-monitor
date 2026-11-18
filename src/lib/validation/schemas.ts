@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  COMPONENT_IMPORT_STATUSES,
   PR_STATUSES,
   PROJECT_PRIORITIES,
   PROJECT_STATUSES,
@@ -83,6 +84,7 @@ export const componentUpdateSchema = z.object({
   unit: z.string().trim().max(50).optional().nullable(),
   hargaSatuan: z.coerce.number().nonnegative().optional().nullable(),
   statusPembelian: z.enum(PURCHASE_STATUSES).optional(),
+  statusImport: z.enum(COMPONENT_IMPORT_STATUSES).optional(),
   estimasiTiba: isoDateOptional,
   tanggalPakai: isoDateOptional,
   perluDicek: z.boolean().optional(),
@@ -109,6 +111,7 @@ export const componentCreateSchema = z.object({
 export const bulkComponentUpdateSchema = z.object({
   componentIds: z.array(z.string().min(1)).min(1, "Pilih minimal 1 komponen"),
   statusPembelian: z.enum(PURCHASE_STATUSES).optional(),
+  statusImport: z.enum(COMPONENT_IMPORT_STATUSES).optional(),
   estimasiTiba: isoDateOptional,
   kelompok: z.string().trim().min(1).max(200).optional(),
 });
@@ -126,7 +129,7 @@ export const prImportCommitSchema = z.object({
     })
     .optional()
     .nullable(),
-  importMode: z.enum(["REPLACE", "MERGE"]).default("MERGE"),
+  importMode: z.enum(["REPLACE", "MERGE", "APPEND"]).default("MERGE"),
   namaFile: z.string().trim().min(1),
   tanggalRevisi: isoDateOptional,
   header: z.record(z.string().nullable()).optional(),

@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  componentUpdateSchema,
+  prImportCommitSchema,
+} from "@/lib/validation/schemas";
+import {
+  appendPrComponents,
   applyDuplicateResolutions,
   detectDuplicates,
   mergePrComponents,
@@ -265,6 +270,98 @@ describe("Mode MERGE Import Ulang PR Revisi", () => {
     expect(oldRelay.action).toBe("MARK_MISSING");
     expect(oldRelay.statusImport).toBe("HILANG_DI_REVISI"); // Tidak dihapus otomatis!
     expect(oldRelay.statusPembelian).toBe("SUDAH_DIPESAN");
+  });
+
+  it("mode APPEND menambahkan komponen dari file Excel berbeda tanpa menandai HILANG komponen lama", () => {
+    const existing: ExistingComponentRecord[] = [
+      {
+        id: "c-1",
+        urutan: 1,
+        kelompok: "Panel Utama",
+        noPr: "PR-001",
+        partType: "MCB 1P 6A",
+        partName: "Schneider MCB",
+        supplier: "PT Jaya",
+        qty: 4,
+        unit: "pcs",
+        catatanPr: null,
+        tanggalPakai: null,
+        hargaSatuan: 50000,
+        hargaRaw: "50000",
+        total: 200000,
+        statusPembelian: "SUDAH_DIPESAN",
+        estimasiTiba: null,
+        perluDicek: false,
+        alasanDicek: null,
+        statusImport: "NORMAL",
+        catatan: null,
+      },
+    ];
+
+    const incomingFromDifferentExcel = [
+      {
+        tempId: "row-diff-1",
+        rowNumber: 2,
+        kelompok: "Pneumatic",
+        noPr: "PR-002",
+        partType: "SMC Cylinder CDQ2B20-30DZ",
+        partName: "Compact Cylinder",
+        supplier: "PT Pneumatic",
+        qty: 2,
+        unit: "pcs",
+        catatanPr: null,
+        tanggalPakai: null,
+        hargaSatuan: 350000,
+        hargaRaw: "350.000",
+        total: 700000,
+        perluDicek: false,
+        alasan: [],
+        state: "OK" as const,
+      },
+    ];
+
+    const result = appendPrComponents(existing, incomingFromDifferentExcel);
+
+    // Memastikan summary: 0 updated, 1 inserted, 0 missing
+    expect(result.summary).toEqual({
+      updated: 0,
+      inserted: 1,
+      missingInRevision: 0,
+    });
+
+    // Komponen baru mendapat urutan berlanjut dari komponen lama (urutan 2)
+    expect(result.items.length).toBe(1);
+    const newItem = result.items[0];
+    expect(newItem.action).toBe("INSERT");
+    expect(newItem.urutan).toBe(2);
+    expect(newItem.partType).toBe("SMC Cylinder CDQ2B20-30DZ");
+    expect(newItem.statusImport).toBe("NORMAL"); // Komponen dari excel berbeda masuk sebagai NORMAL
+  });
+
+  it("skema validasi mendukung mode APPEND dan pemulihan statusImport HILANG_DI_REVISI menjadi NORMAL", () => {
+    // 1. Validasi prImportCommitSchema dengan mode APPEND
+    const commitParsed = prImportCommitSchema.safeParse({
+      targetMode: "EXISTING_PROJECT",
+      projectId: "proj-123",
+      importMode: "APPEND",
+      namaFile: "PR_Tambahan_Mekanik.xlsx",
+      duplicateResolutions: {},
+      rows: [],
+    });
+    expect(commitParsed.success).toBe(true);
+
+    // 2. Validasi componentUpdateSchema dengan statusImport NORMAL
+    const updateNormalParsed = componentUpdateSchema.safeParse({
+      statusImport: "NORMAL",
+    });
+    expect(updateNormalParsed.success).toBe(true);
+    expect(updateNormalParsed.data?.statusImport).toBe("NORMAL");
+
+    // 3. Validasi statusImport BARU dan HILANG_DI_REVISI
+    const updateMissingParsed = componentUpdateSchema.safeParse({
+      statusImport: "HILANG_DI_REVISI",
+    });
+    expect(updateMissingParsed.success).toBe(true);
   });
 });
 

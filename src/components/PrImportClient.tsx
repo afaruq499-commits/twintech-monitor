@@ -63,7 +63,7 @@ export function PrImportClient({
   >(preselectedProjectId ? "EXISTING_PROJECT" : "NEW_PROJECT");
   const [selectedProjectId, setSelectedProjectId] =
     useState(preselectedProjectId);
-  const [importMode, setImportMode] = useState<"MERGE" | "REPLACE">("MERGE");
+  const [importMode, setImportMode] = useState<"MERGE" | "REPLACE" | "APPEND">("APPEND");
 
   // Data proyek baru (diisi otomatis dari footer PR)
   const [newProjKode, setNewProjKode] = useState("");
@@ -447,18 +447,35 @@ export function PrImportClient({
                   <select
                     value={importMode}
                     onChange={(e) =>
-                      setImportMode(e.target.value as "MERGE" | "REPLACE")
+                      setImportMode(e.target.value as "MERGE" | "REPLACE" | "APPEND")
                     }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold cursor-pointer"
                   >
+                    <option value="APPEND">
+                      Tambah Komponen dari Excel Berbeda (Append, komponen lama tetap utuh)
+                    </option>
                     <option value="MERGE">
-                      Mode MERGE Revisi (Pertahankan status, tandai BARU &
-                      HILANG)
+                      Mode MERGE Revisi (Pertahankan status, tandai BARU &amp; HILANG)
                     </option>
                     <option value="REPLACE">
                       Ganti Semua Komponen (Reset daftar komponen proyek)
                     </option>
                   </select>
+                  {importMode === "APPEND" && (
+                    <p className="text-xs text-blue-700 mt-1.5 font-medium">
+                      ✨ <strong>Mode Append:</strong> Aman untuk menggabungkan file Excel yang berbeda (misal: PR Elektrikal tambahan / Mekanik). Seluruh komponen lama proyek tetap utuh dan <u>TIDAK</u> akan ditandai Hilang.
+                    </p>
+                  )}
+                  {importMode === "MERGE" && (
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      <strong>Mode Revisi:</strong> Mencocokkan komponen. Komponen lama yang tidak tercantum di file revisi ini akan ditandai <em>&quot;Hilang di Revisi Baru&quot;</em>.
+                    </p>
+                  )}
+                  {importMode === "REPLACE" && (
+                    <p className="text-xs text-rose-600 mt-1.5 font-medium">
+                      ⚠️ <strong>Ganti Semua:</strong> Seluruh komponen lama pada proyek ini akan dihapus dan digantikan seluruhnya oleh baris Excel ini.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
