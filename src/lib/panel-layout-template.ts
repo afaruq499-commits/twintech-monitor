@@ -2118,15 +2118,142 @@ export function inferComponentVisual(
   };
 }
 
+export interface DetectedPrDuct {
+  horizontalHeightMm: number;
+  horizontalDepthMm: number;
+  verticalLeftWidthMm: number;
+  verticalRightWidthMm: number;
+  bottomHeightMm: number;
+  code: string;
+  tagHorizontal: string;
+  tagVertical: string;
+  tagBottom: string;
+  isCustomFromPr: boolean;
+}
+
+/**
+ * Deteksi otomatis profil ukuran kabel duct dari komponen PR aktif.
+ * Jika proyek mendefinisikan ducting (misal 30x30, 30x40, 30x60, 40x40, 40x60, 60x60 mm),
+ * ukuran layout duct akan menyesuaikan otomatis agar cukup menampung jalur kabel & komponen.
+ */
+export function detectPrDuctProfile(
+  components: PanelComponentInput[]
+): DetectedPrDuct {
+  const active = (components || []).filter(
+    (c) => c.statusImport !== "HILANG_DI_REVISI"
+  );
+  const ductComps = active.filter((c) => {
+    const text = `${c.partType} ${c.partName} ${c.kelompok || ""}`.toUpperCase();
+    return (
+      text.includes("DUCT") ||
+      text.includes("WIRING DUCT") ||
+      text.includes("KABEL DUCT")
+    );
+  });
+
+  // Default standar FR-EG-EP-006 (45x65 & 65x65)
+  if (ductComps.length === 0) {
+    return {
+      horizontalHeightMm: 45,
+      horizontalDepthMm: 65,
+      verticalLeftWidthMm: 45,
+      verticalRightWidthMm: 65,
+      bottomHeightMm: 65,
+      code: "45x65",
+      tagHorizontal: "DUCT 45x65",
+      tagVertical: "DUCT 45x65",
+      tagBottom: "DUCT 65x65",
+      isCustomFromPr: false,
+    };
+  }
+
+  // Parse ukuran dimensi (W x H) dari partType / partName
+  const sizes: { w: number; h: number; raw: string }[] = [];
+  for (const comp of ductComps) {
+    const text = `${comp.partType} ${comp.partName}`.toUpperCase();
+    const m = text.match(/(\d{2,3})\s*[Xx×]\s*(\d{2,3})/i);
+    if (m) {
+      const d1 = parseInt(m[1], 10);
+      const d2 = parseInt(m[2], 10);
+      sizes.push({
+        w: Math.min(d1, d2),
+        h: Math.max(d1, d2),
+        raw: `${d1}x${d2}`,
+      });
+    }
+  }
+
+  if (sizes.length === 0) {
+    return {
+      horizontalHeightMm: 40,
+      horizontalDepthMm: 60,
+      verticalLeftWidthMm: 40,
+      verticalRightWidthMm: 60,
+      bottomHeightMm: 60,
+      code: "40x60",
+      tagHorizontal: "DUCT 40x60",
+      tagVertical: "DUCT 40x60",
+      tagBottom: "DUCT 40x60",
+      isCustomFromPr: true,
+    };
+  }
+
+  // Urutkan dari ukuran penampang terkecil ke terbesar
+  sizes.sort((a, b) => a.w * a.h - b.w * b.h);
+  const primary = sizes[0];
+  const trunk = sizes.length > 1 ? sizes[sizes.length - 1] : sizes[0];
+
+  const horizH = primary.w;
+  const vertLeftW = primary.w;
+  const vertRightW = trunk.h > trunk.w ? trunk.h : trunk.w;
+  const bottomH = trunk.h > trunk.w ? trunk.h : trunk.w;
+
+  return {
+    horizontalHeightMm: horizH,
+    horizontalDepthMm: primary.h,
+    verticalLeftWidthMm: vertLeftW,
+    verticalRightWidthMm: vertRightW,
+    bottomHeightMm: bottomH,
+    code: `${primary.w}x${primary.h}`,
+    tagHorizontal: `DUCT ${primary.w}x${primary.h}`,
+    tagVertical: `DUCT ${vertLeftW}x${primary.h}`,
+    tagBottom: `DUCT ${bottomH}x${bottomH}`,
+    isCustomFromPr: true,
+  };
+}
+
 /**
  * Struktur dasar Panel Kontrol Utama standar FR-EG-EP-006 (Halaman 2: Assy Mounting Control Panel 600 × 800 mm).
  */
-export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
+export function createStandardSpmLayout(
+  extraWidthMm = 0,
+  ductConfig?: DetectedPrDuct
+): PanelLayoutData {
   const w = 600 + extraWidthMm;
   const h = 800;
-  const rightDuctX = 535 + extraWidthMm;
-  const innerSpan = 490 + extraWidthMm;
-  const railSpan = 476 + extraWidthMm;
+  const duct = ductConfig || {
+    horizontalHeightMm: 45,
+    horizontalDepthMm: 65,
+    verticalLeftWidthMm: 45,
+    verticalRightWidthMm: 65,
+    bottomHeightMm: 65,
+    code: "45x65",
+    tagHorizontal: "DUCT 45x65",
+    tagVertical: "DUCT 45x65",
+    tagBottom: "DUCT 65x65",
+    isCustomFromPr: false,
+  };
+
+  const leftDuctW = duct.verticalLeftWidthMm;
+  const rightDuctW = duct.verticalRightWidthMm;
+  const rightDuctX = w - rightDuctW;
+  const innerSpan = rightDuctX - leftDuctW;
+  const railSpan = innerSpan - 14;
+  const railX = leftDuctW + 7;
+
+  const topDuctH = duct.horizontalHeightMm;
+  const bottomDuctH = duct.bottomHeightMm;
+  const midDuctH = duct.horizontalHeightMm;
 
   return {
     enclosure: {
@@ -2136,90 +2263,90 @@ export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
       name: `Assy Mounting Control Panel (${w} × ${h} mm)`,
     },
     items: [
-      // Perimeter & Pembatas Duct sesuai FR-EG-EP-006 Hal. 2 (45x65 PM & 65x65 PM)
+      // Perimeter & Pembatas Duct (Menyesuaikan otomatis dengan ducting PR)
       {
         id: "duct-top",
         type: "DUCT_HORIZONTAL",
-        name: "Cable Duct Atas (45×65 PM)",
+        name: `Cable Duct Atas (${duct.tagHorizontal})`,
         category: "ACCESSORY",
-        profileSize: "45x65",
+        profileSize: duct.code,
         xMm: 0,
         yMm: 0,
         widthMm: rightDuctX,
-        heightMm: 45,
-        tagLabel: "DUCT 45x65",
+        heightMm: topDuctH,
+        tagLabel: duct.tagHorizontal,
       },
       {
         id: "duct-left",
         type: "DUCT_VERTICAL",
-        name: "Cable Duct Kiri (45×65 PM)",
+        name: `Cable Duct Kiri (${duct.tagVertical})`,
         category: "ACCESSORY",
-        profileSize: "45x65",
+        profileSize: duct.code,
         xMm: 0,
-        yMm: 45,
-        widthMm: 45,
-        heightMm: 690,
-        tagLabel: "DUCT 45x65",
+        yMm: topDuctH,
+        widthMm: leftDuctW,
+        heightMm: h - topDuctH - bottomDuctH,
+        tagLabel: duct.tagVertical,
       },
       {
         id: "duct-right",
         type: "DUCT_VERTICAL",
-        name: "Cable Duct Kanan (65×65 PM)",
+        name: `Cable Duct Kanan (${duct.tagVertical})`,
         category: "ACCESSORY",
-        profileSize: "65x65",
+        profileSize: duct.code,
         xMm: rightDuctX,
         yMm: 0,
-        widthMm: 65,
+        widthMm: rightDuctW,
         heightMm: h,
-        tagLabel: "DUCT 65x65",
+        tagLabel: duct.tagVertical,
       },
       {
         id: "duct-mid-1",
         type: "DUCT_HORIZONTAL",
-        name: "Cable Duct Tengah 1 (45×65 PM)",
+        name: `Cable Duct Tengah 1 (${duct.tagHorizontal})`,
         category: "ACCESSORY",
-        profileSize: "45x65",
-        xMm: 45,
+        profileSize: duct.code,
+        xMm: leftDuctW,
         yMm: 225,
         widthMm: innerSpan,
-        heightMm: 45,
-        tagLabel: "DUCT 45x65",
+        heightMm: midDuctH,
+        tagLabel: duct.tagHorizontal,
       },
       {
         id: "duct-mid-2",
         type: "DUCT_HORIZONTAL",
-        name: "Cable Duct Tengah 2 (45×65 PM)",
+        name: `Cable Duct Tengah 2 (${duct.tagHorizontal})`,
         category: "ACCESSORY",
-        profileSize: "45x65",
-        xMm: 45,
+        profileSize: duct.code,
+        xMm: leftDuctW,
         yMm: 427,
         widthMm: innerSpan,
-        heightMm: 45,
-        tagLabel: "DUCT 45x65",
+        heightMm: midDuctH,
+        tagLabel: duct.tagHorizontal,
       },
       {
         id: "duct-mid-3",
         type: "DUCT_HORIZONTAL",
-        name: "Cable Duct Tengah 3 (45×65 PM)",
+        name: `Cable Duct Tengah 3 (${duct.tagHorizontal})`,
         category: "ACCESSORY",
-        profileSize: "45x65",
-        xMm: 45,
+        profileSize: duct.code,
+        xMm: leftDuctW,
         yMm: 581,
         widthMm: innerSpan,
-        heightMm: 45,
-        tagLabel: "DUCT 45x65",
+        heightMm: midDuctH,
+        tagLabel: duct.tagHorizontal,
       },
       {
         id: "duct-bottom",
         type: "DUCT_HORIZONTAL",
-        name: "Cable Duct Bawah (65×65 PM)",
+        name: `Cable Duct Bawah (${duct.tagBottom})`,
         category: "ACCESSORY",
-        profileSize: "65x65",
+        profileSize: duct.code,
         xMm: 0,
-        yMm: 735,
+        yMm: h - bottomDuctH,
         widthMm: rightDuctX,
-        heightMm: 65,
-        tagLabel: "DUCT 65x65",
+        heightMm: bottomDuctH,
+        tagLabel: duct.tagBottom,
       },
 
       // 4 Baris DIN Rail TS35 terpasang di tengah masing-masing zona
@@ -2228,7 +2355,7 @@ export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
         type: "DIN_RAIL",
         name: "DIN Rail Baris 1 (MCCB, MCB, PSU 24V & Filter)",
         category: "ACCESSORY",
-        xMm: 52,
+        xMm: railX,
         yMm: 118,
         widthMm: railSpan,
         heightMm: 35,
@@ -2239,7 +2366,7 @@ export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
         type: "DIN_RAIL",
         name: "DIN Rail Baris 2 (PLC Rack, Filter PLC & Switch)",
         category: "ACCESSORY",
-        xMm: 52,
+        xMm: railX,
         yMm: 331,
         widthMm: railSpan,
         heightMm: 35,
@@ -2250,7 +2377,7 @@ export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
         type: "DIN_RAIL",
         name: "DIN Rail Baris 3 (Safety, Relay & Terminal 2-Step)",
         category: "ACCESSORY",
-        xMm: 52,
+        xMm: railX,
         yMm: 509,
         widthMm: railSpan,
         heightMm: 35,
@@ -2261,7 +2388,7 @@ export function createStandardSpmLayout(extraWidthMm = 0): PanelLayoutData {
         type: "DIN_RAIL",
         name: "DIN Rail Baris 4 (Terminal Daya & Kontrol Bawah)",
         category: "ACCESSORY",
-        xMm: 52,
+        xMm: railX,
         yMm: 663,
         widthMm: railSpan,
         heightMm: 35,
@@ -2567,7 +2694,12 @@ export function buildStandardPanelLayoutFromComponents(
     }
   }
 
-  // Hitung lebar total masing-masing baris agar panel melebar otomatis bila melebihi 472 mm
+  // -------------------------------------------------------------------------
+  // Perhitungan Tata Letak Adaptif: Kabel Duct & Jarak Baris Menyesuaikan Komponen PR
+  // -------------------------------------------------------------------------
+  const ductConfig = detectPrDuctProfile(components);
+
+  // Hitung lebar total masing-masing baris agar panel melebar otomatis bila melebihi kapasitas standar
   const calcGroupWidth = (list: QueuedMainUnit[], defaultGap = 6): number => {
     if (list.length === 0) return 0;
     return list.reduce((sum, u, idx) => {
@@ -2603,14 +2735,243 @@ export function buildStandardPanelLayoutFromComponents(
   const row3TotalW = calcGroupWidth(row3Items, 6);
   const row4TotalW = calcGroupWidth(row4Items, 6);
 
+  // Deteksi tinggi maksimum komponen pada setiap baris untuk menghitung clearance kabel duct yang cukup
+  const getRowMaxH = (list: QueuedMainUnit[], fallback: number): number => {
+    if (list.length === 0) return fallback;
+    return Math.max(...list.map((u) => u.visual.heightMm), fallback);
+  };
+
+  const r2AllHeights = [
+    ...row2RackBases.map((b) => b.visual.heightMm),
+    ...row2RackModules.map((m) => m.visual.heightMm),
+    ...row2OtherPlc.map((p) => p.visual.heightMm),
+    ...row2Filters.map((f) => f.visual.heightMm),
+    ...row2Switches.map((s) => s.visual.heightMm),
+  ];
+  const r2MaxH = r2AllHeights.length > 0 ? Math.max(...r2AllHeights, 90) : 90;
+  const r1MaxH = getRowMaxH(row1Items, 85);
+  const r3MaxH = getRowMaxH(row3Items, 85);
+  const r4MaxH = getRowMaxH(row4Items, 55);
+
+  // Clearance minimum setiap baris agar komponen tertinggi (misal PSU S8VK 240W 125mm)
+  // memiliki ruang bebas di atas dan di bawah rel DIN sehingga kabel duct tidak bertabrakan
+  const row1ClearanceReq = Math.max(160, r1MaxH + 34);
+  const row2ClearanceReq = Math.max(140, r2MaxH + 30);
+  const row3ClearanceReq = Math.max(120, r3MaxH + 28);
+  const row4ClearanceReq = Math.max(90, r4MaxH + 26);
+
+  const topDuctH = ductConfig.horizontalHeightMm;
+  const midDuctH = ductConfig.horizontalHeightMm;
+  const bottomDuctH = ductConfig.bottomHeightMm;
+  const leftDuctW = ductConfig.verticalLeftWidthMm;
+  const rightDuctW = ductConfig.verticalRightWidthMm;
+
+  const minTotalNeededH =
+    topDuctH +
+    row1ClearanceReq +
+    midDuctH +
+    row2ClearanceReq +
+    midDuctH +
+    row3ClearanceReq +
+    midDuctH +
+    row4ClearanceReq +
+    bottomDuctH;
+
+  // Ukuran plat dasar menyesuaikan agar cukup (minimal 600×800 mm standar FR-EG-EP-006)
+  const targetPlateH = Math.max(800, Math.ceil(minTotalNeededH / 50) * 50);
+
+  // Distribusikan sisa ketinggian plat secara proporsional agar penataan rapi & seimbang
+  const extraH = targetPlateH - minTotalNeededH;
+  const r1Clearance = row1ClearanceReq + Math.round(extraH * 0.35);
+  const r2Clearance = row2ClearanceReq + Math.round(extraH * 0.25);
+  const r3Clearance = row3ClearanceReq + Math.round(extraH * 0.20);
+  const r4Clearance =
+    row4ClearanceReq +
+    (extraH - Math.round(extraH * 0.35) - Math.round(extraH * 0.25) - Math.round(extraH * 0.20));
+
   const maxNeededRowW = Math.max(row1TotalW, row2TotalW, row3TotalW, row4TotalW);
-  const standardAvailRowW = 468; // x = 56 .. 524
+  const standardAvailRowW = 600 - leftDuctW - rightDuctW - 24;
   const extraWidthMm =
     maxNeededRowW > standardAvailRowW
-      ? Math.ceil((maxNeededRowW - standardAvailRowW) / 20) * 20
+      ? Math.ceil((maxNeededRowW - standardAvailRowW) / 50) * 50
       : 0;
 
-  const mainLayout = createStandardSpmLayout(extraWidthMm);
+  const targetPlateW = 600 + extraWidthMm;
+  const rightDuctX = targetPlateW - rightDuctW;
+  const innerSpan = rightDuctX - leftDuctW;
+  const railSpan = innerSpan - 14;
+  const railX = leftDuctW + 7;
+
+  // Hitung koordinat Y untuk setiap pembatas duct & garis tengah rel DIN
+  const r1ZoneTop = topDuctH;
+  const r1RailCenterY = r1ZoneTop + r1Clearance / 2;
+  const r1RailY = Math.round(r1RailCenterY - 17.5);
+  const ductMid1Y = r1ZoneTop + r1Clearance;
+
+  const r2ZoneTop = ductMid1Y + midDuctH;
+  const r2RailCenterY = r2ZoneTop + r2Clearance / 2;
+  const r2RailY = Math.round(r2RailCenterY - 17.5);
+  const ductMid2Y = r2ZoneTop + r2Clearance;
+
+  const r3ZoneTop = ductMid2Y + midDuctH;
+  const r3RailCenterY = r3ZoneTop + r3Clearance / 2;
+  const r3RailY = Math.round(r3RailCenterY - 17.5);
+  const ductMid3Y = r3ZoneTop + r3Clearance;
+
+  const r4ZoneTop = ductMid3Y + midDuctH;
+  const r4RailCenterY = r4ZoneTop + r4Clearance / 2;
+  const r4RailY = Math.round(r4RailCenterY - 17.5);
+  const ductBottomY = targetPlateH - bottomDuctH;
+
+  const mainLayout: PanelLayoutData = {
+    enclosure: {
+      widthMm: targetPlateW,
+      heightMm: targetPlateH,
+      depthMm: 200,
+      name: `Assy Mounting Control Panel (${targetPlateW} × ${targetPlateH} mm)`,
+    },
+    items: [
+      // Duct Atas
+      {
+        id: "duct-top",
+        type: "DUCT_HORIZONTAL",
+        name: `Cable Duct Atas (${ductConfig.tagHorizontal})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: 0,
+        yMm: 0,
+        widthMm: rightDuctX,
+        heightMm: topDuctH,
+        tagLabel: ductConfig.tagHorizontal,
+      },
+      // Duct Kiri
+      {
+        id: "duct-left",
+        type: "DUCT_VERTICAL",
+        name: `Cable Duct Kiri (${ductConfig.tagVertical})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: 0,
+        yMm: topDuctH,
+        widthMm: leftDuctW,
+        heightMm: targetPlateH - topDuctH - bottomDuctH,
+        tagLabel: ductConfig.tagVertical,
+      },
+      // Duct Kanan
+      {
+        id: "duct-right",
+        type: "DUCT_VERTICAL",
+        name: `Cable Duct Kanan (${ductConfig.tagVertical})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: rightDuctX,
+        yMm: 0,
+        widthMm: rightDuctW,
+        heightMm: targetPlateH,
+        tagLabel: ductConfig.tagVertical,
+      },
+      // Duct Tengah 1
+      {
+        id: "duct-mid-1",
+        type: "DUCT_HORIZONTAL",
+        name: `Cable Duct Tengah 1 (${ductConfig.tagHorizontal})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: leftDuctW,
+        yMm: ductMid1Y,
+        widthMm: innerSpan,
+        heightMm: midDuctH,
+        tagLabel: ductConfig.tagHorizontal,
+      },
+      // Duct Tengah 2
+      {
+        id: "duct-mid-2",
+        type: "DUCT_HORIZONTAL",
+        name: `Cable Duct Tengah 2 (${ductConfig.tagHorizontal})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: leftDuctW,
+        yMm: ductMid2Y,
+        widthMm: innerSpan,
+        heightMm: midDuctH,
+        tagLabel: ductConfig.tagHorizontal,
+      },
+      // Duct Tengah 3
+      {
+        id: "duct-mid-3",
+        type: "DUCT_HORIZONTAL",
+        name: `Cable Duct Tengah 3 (${ductConfig.tagHorizontal})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: leftDuctW,
+        yMm: ductMid3Y,
+        widthMm: innerSpan,
+        heightMm: midDuctH,
+        tagLabel: ductConfig.tagHorizontal,
+      },
+      // Duct Bawah
+      {
+        id: "duct-bottom",
+        type: "DUCT_HORIZONTAL",
+        name: `Cable Duct Bawah (${ductConfig.tagBottom})`,
+        category: "ACCESSORY",
+        profileSize: ductConfig.code,
+        xMm: 0,
+        yMm: ductBottomY,
+        widthMm: rightDuctX,
+        heightMm: bottomDuctH,
+        tagLabel: ductConfig.tagBottom,
+      },
+
+      // 4 Baris DIN Rail TS35
+      {
+        id: "rail-1",
+        type: "DIN_RAIL",
+        name: "DIN Rail Baris 1 (MCCB, MCB, PSU 24V & Filter)",
+        category: "ACCESSORY",
+        xMm: railX,
+        yMm: r1RailY,
+        widthMm: railSpan,
+        heightMm: 35,
+        tagLabel: "TS35 RAIL 1",
+      },
+      {
+        id: "rail-2",
+        type: "DIN_RAIL",
+        name: "DIN Rail Baris 2 (PLC Rack, Filter PLC & Switch)",
+        category: "ACCESSORY",
+        xMm: railX,
+        yMm: r2RailY,
+        widthMm: railSpan,
+        heightMm: 35,
+        tagLabel: "TS35 RAIL 2",
+      },
+      {
+        id: "rail-3",
+        type: "DIN_RAIL",
+        name: "DIN Rail Baris 3 (Safety, Relay & Terminal 2-Step)",
+        category: "ACCESSORY",
+        xMm: railX,
+        yMm: r3RailY,
+        widthMm: railSpan,
+        heightMm: 35,
+        tagLabel: "TS35 RAIL 3",
+      },
+      {
+        id: "rail-4",
+        type: "DIN_RAIL",
+        name: "DIN Rail Baris 4 (Terminal Daya & Kontrol Bawah)",
+        category: "ACCESSORY",
+        xMm: railX,
+        yMm: r4RailY,
+        widthMm: railSpan,
+        heightMm: 35,
+        tagLabel: "TS35 RAIL 4",
+      },
+    ],
+  };
+
+  const startComponentX = leftDuctW + 11;
 
   const placeHorizontalSequence = (
     itemsList: QueuedMainUnit[],
@@ -2685,11 +3046,11 @@ export function buildStandardPanelLayoutFromComponents(
     return cursorX;
   };
 
-  // Zona 1 (y = 45..225, rail center = 135.5)
-  placeHorizontalSequence(row1Items, 56, 135.5, 45, 225, 8, "auto-r1");
+  // Zona 1 (MCCB, MCB, PSU 24V, Filter 3P)
+  placeHorizontalSequence(row1Items, startComponentX, r1RailCenterY, r1ZoneTop, ductMid1Y, 8, "auto-r1");
 
-  // Zona 2 (y = 270..427, rail center = 348.5)
-  let r2CursorX = 56;
+  // Zona 2 (PLC Rack, Modul IO, Filter PLC, Hub Switch)
+  let r2CursorX = startComponentX;
   if (row2RackBases.length > 0) {
     const base = row2RackBases[0];
     const baseW = Math.max(base.visual.widthMm, rackModulesW + 10);
@@ -2703,17 +3064,16 @@ export function buildStandardPanelLayoutFromComponents(
       category: base.visual.category,
       specificModel: base.visual.specificModel,
       xMm: r2CursorX,
-      yMm: Math.round(348.5 - base.visual.heightMm / 2),
+      yMm: Math.round(r2RailCenterY - base.visual.heightMm / 2),
       widthMm: baseW,
       heightMm: base.visual.heightMm,
       tagLabel: base.visual.defaultTag,
     });
     if (row2RackModules.length > 0) {
-      placeHorizontalSequence(row2RackModules, r2CursorX + 5, 348.5, 270, 427, 1, "auto-r2-mod");
+      placeHorizontalSequence(row2RackModules, r2CursorX + 5, r2RailCenterY, r2ZoneTop, ductMid2Y, 1, "auto-r2-mod");
     }
     r2CursorX += baseW + 12;
 
-    // Jika ada Base Rack ke-2 (jarang)
     for (let bi = 1; bi < row2RackBases.length; bi++) {
       const extraBase = row2RackBases[bi];
       mainLayout.items.push({
@@ -2726,7 +3086,7 @@ export function buildStandardPanelLayoutFromComponents(
         category: extraBase.visual.category,
         specificModel: extraBase.visual.specificModel,
         xMm: r2CursorX,
-        yMm: Math.round(348.5 - extraBase.visual.heightMm / 2),
+        yMm: Math.round(r2RailCenterY - extraBase.visual.heightMm / 2),
         widthMm: extraBase.visual.widthMm,
         heightMm: extraBase.visual.heightMm,
         tagLabel: extraBase.visual.defaultTag,
@@ -2735,19 +3095,19 @@ export function buildStandardPanelLayoutFromComponents(
     }
   } else if (row2RackModules.length > 0) {
     r2CursorX =
-      placeHorizontalSequence(row2RackModules, r2CursorX, 348.5, 270, 427, 1, "auto-r2-mod") + 10;
+      placeHorizontalSequence(row2RackModules, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 1, "auto-r2-mod") + 10;
   }
 
   if (row2OtherPlc.length > 0) {
     r2CursorX =
-      placeHorizontalSequence(row2OtherPlc, r2CursorX, 348.5, 270, 427, 4, "auto-r2-plc") + 10;
+      placeHorizontalSequence(row2OtherPlc, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 4, "auto-r2-plc") + 10;
   }
   if (row2Filters.length > 0) {
     r2CursorX =
-      placeHorizontalSequence(row2Filters, r2CursorX, 348.5, 270, 427, 6, "auto-r2-flt") + 10;
+      placeHorizontalSequence(row2Filters, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 6, "auto-r2-flt") + 10;
   }
   if (row2Switches.length > 0) {
-    placeHorizontalSequence(row2Switches, r2CursorX, 348.5, 270, 427, 6, "auto-r2-sw");
+    placeHorizontalSequence(row2Switches, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 6, "auto-r2-sw");
   }
 
   // Jika masih ada Socket Relay yang tidak berpasangan (tanpa item Relay di PR), taruh di Baris 3
@@ -2764,11 +3124,11 @@ export function buildStandardPanelLayoutFromComponents(
   }
   row3Items.sort((a, b) => a.subOrder - b.subOrder);
 
-  // Zona 3 (y = 472..581, rail center = 526.5)
-  placeHorizontalSequence(row3Items, 56, 526.5, 472, 581, 6, "auto-r3");
+  // Zona 3 (Safety, Relay, Contactor, 2-Step Terminal)
+  placeHorizontalSequence(row3Items, startComponentX, r3RailCenterY, r3ZoneTop, ductMid3Y, 6, "auto-r3");
 
-  // Zona 4 (y = 626..735, rail center = 680.5)
-  placeHorizontalSequence(row4Items, 56, 680.5, 626, 735, 6, "auto-r4");
+  // Zona 4 (Terminal Blok Daya & Distribusi)
+  placeHorizontalSequence(row4Items, startComponentX, r4RailCenterY, r4ZoneTop, ductBottomY, 6, "auto-r4");
 
   // -------------------------------------------------------------------------
   // BAGIAN 2: PANEL OPERATOR / HMI FRONT DOOR (FR-EG-EP-006 Hal. 3: 430 × 440 mm)

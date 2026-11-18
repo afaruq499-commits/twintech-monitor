@@ -949,27 +949,101 @@ export function generateOuterPanelDxf(
 
   addText("7_TITLE_BLOCK", sideX + D / 2 - 60, -65, 6.0, "TAMPAK SAMPING (SIDE VIEW)", 0, 7);
 
-  // ==================== KOP ETIKET / TITLE BLOCK ====================
-  const tbX = 0;
-  const tbY = -120;
-  const tbWidth = Math.max(W + D + 120, 700);
-  const tbHeight = 35;
+  // ==================== KOP ETIKET / TITLE BLOCK (STANDAR TWINTECH PRECISION) ====================
+  const tbWidth = 220;
+  const tbHeight = 65;
+  const totalW = sideX + D;
+  const tbX = Math.max(totalW - tbWidth, 0);
+  const tbY = -tbHeight - 20;
+
   addRect("7_TITLE_BLOCK", tbX, tbY, tbX + tbWidth, tbY + tbHeight, 7);
 
-  const row2 = tbY + 14;
+  const row1 = tbY + 45;
+  const row2 = tbY + 25;
+  addLine("7_TITLE_BLOCK", tbX, row1, tbX + tbWidth, row1, 7);
   addLine("7_TITLE_BLOCK", tbX, row2, tbX + tbWidth, row2, 7);
 
-  addText("7_TITLE_BLOCK", tbX + 8, tbY + 22, 6.5, "PT. TWINTECH PRECISION", 0, 7);
-  addText("7_TITLE_BLOCK", tbX + 8, tbY + 5, 4.5, "BOX ENCLOSURE 2D - FRONT & SIDE VIEW", 0, 7);
+  addText("7_TITLE_BLOCK", tbX + 8, tbY + 51, 6.5, "Twintech Precision", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 8,
+    tbY + 47,
+    3.0,
+    "pcb dies, precision part, jig and checking fixture",
+    0,
+    7
+  );
 
-  const colW = tbWidth / 5;
-  for (let i = 1; i < 5; i++) {
+  addText("7_TITLE_BLOCK", tbX + 8, tbY + 37, 3.5, "Project Name :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 8,
+    tbY + 30,
+    5.0,
+    (metadata.nama || "PROJECT AUTOMATION").substring(0, 35),
+    0,
+    7
+  );
+
+  addText("7_TITLE_BLOCK", tbX + 130, tbY + 37, 3.5, "Part Name :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 130,
+    tbY + 30,
+    5.0,
+    (metadata.partName || "BOX ENCLOSURE 2D").substring(0, 20),
+    0,
+    7
+  );
+
+  const colW = tbWidth / 4;
+  for (let i = 1; i < 4; i++) {
     addLine("7_TITLE_BLOCK", tbX + i * colW, tbY, tbX + i * colW, row2, 7);
   }
-  addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 7, 3.8, `Job: ${metadata.kode || "-"}`, 0, 7);
-  addText("7_TITLE_BLOCK", tbX + 2 * colW + 4, tbY + 7, 3.8, `Drawn: ${metadata.drawnBy || metadata.pic || "Faruk"}`, 0, 7);
-  addText("7_TITLE_BLOCK", tbX + 3 * colW + 4, tbY + 7, 3.8, `Date: ${metadata.dateStr || new Date().toLocaleDateString("id-ID")}`, 0, 7);
-  addText("7_TITLE_BLOCK", tbX + 4 * colW + 4, tbY + 7, 3.8, `Dim: ${W}×${H}×${D} mm`, 0, 7);
+
+  addText("7_TITLE_BLOCK", tbX + 4, tbY + 16, 2.8, "Material :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 4,
+    tbY + 8,
+    3.8,
+    (metadata.material || "SPCC t=1.5mm").substring(0, 15),
+    0,
+    7
+  );
+
+  addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 16, 2.8, "Drawn By :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + colW + 4,
+    tbY + 8,
+    4.0,
+    metadata.drawnBy || metadata.pic || "DEDI",
+    0,
+    7
+  );
+
+  addText("7_TITLE_BLOCK", tbX + 2 * colW + 4, tbY + 16, 2.8, "Checked By :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 2 * colW + 4,
+    tbY + 8,
+    4.0,
+    metadata.checkedBy || "IVAN",
+    0,
+    7
+  );
+
+  addText("7_TITLE_BLOCK", tbX + 3 * colW + 4, tbY + 16, 2.8, "Date :", 0, 7);
+  addText(
+    "7_TITLE_BLOCK",
+    tbX + 3 * colW + 4,
+    tbY + 8,
+    3.5,
+    metadata.dateStr || "18/11/2026",
+    0,
+    7
+  );
 
   add(0, "ENDSEC");
   add(0, "EOF");

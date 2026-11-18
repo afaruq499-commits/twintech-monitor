@@ -45,5 +45,6 @@ next-env.d.ts
 deploy-siap-kirim/
 cookie.txt
 scratch*
+public/uploads/
 
 

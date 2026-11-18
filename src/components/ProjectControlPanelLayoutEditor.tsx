@@ -1358,7 +1358,7 @@ export function ProjectControlPanelLayoutEditor({
   const handleResetToStandard = () => {
     if (
       !confirm(
-        "Susun ulang seluruh panel (Panel Utama 600×800, Pintu OP/HMI 430×440, Mounting OP 350×300) otomatis dari daftar PR sesuai standar FR-EG-EP-006?"
+        "Susun ulang seluruh panel (Panel Utama & Pintu OP/HMI) otomatis dari daftar PR sesuai standar FR-EG-EP-006 (kabel duct & dimensi plat menyesuaikan agar cukup)?"
       )
     ) {
       return;
@@ -1372,11 +1372,7 @@ export function ProjectControlPanelLayoutEditor({
     clearSelection();
 
     const activeTarget =
-      activePanelMode === "MAIN"
-        ? generated.main
-        : activePanelMode === "HMI"
-          ? generated.hmi
-          : generated.opMounting;
+      activePanelMode === "HMI" ? generated.hmi : generated.main;
     setTimeout(
       () =>
         handleFitToScreen(
@@ -1550,10 +1546,50 @@ export function ProjectControlPanelLayoutEditor({
 
   // Unduh Gambar 2D Layout (SVG ke PNG)
   const handleExportPng = () => {
+    if (activePanelMode === "OUTER") {
+      const outerSvg = document.querySelector("#outer-panel-2d-canvas") as SVGSVGElement | null;
+      if (outerSvg) {
+        try {
+          const serializer = new XMLSerializer();
+          let source = serializer.serializeToString(outerSvg);
+          if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+          }
+          const img = new Image();
+          img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const scale = 2;
+            const ow = outerPanelData.enclosure.widthMm;
+            const oh = outerPanelData.enclosure.heightMm;
+            const od = outerPanelData.enclosure.depthMm;
+            const totalSvgW = 140 + ow + 160 + od + 140;
+            const totalSvgH = 130 + oh + 170;
+            canvas.width = totalSvgW * scale;
+            canvas.height = totalSvgH * scale;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const pngUrl = canvas.toDataURL("image/png");
+            const a = document.createElement("a");
+            a.href = pngUrl;
+            a.download = `Layout_Panel_Luar_Box_${ow}x${oh}x${od}mm.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+          return;
+        } catch (e) {
+          console.error("Gagal export PNG outer:", e);
+        }
+      }
+    }
+
     if (!canvasRef.current) return;
     try {
       const isHmi = activePanelMode === "HMI";
-      const isOpMounting = activePanelMode === "OP_MOUNTING";
       const svgEl = canvasRef.current;
       const svgString = new XMLSerializer().serializeToString(svgEl);
       const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
@@ -1576,9 +1612,7 @@ export function ProjectControlPanelLayoutEditor({
           a.href = pngUrl;
           a.download = isHmi
             ? `Layout_OP_Door_HMI_${layoutData.enclosure.widthMm}x${layoutData.enclosure.heightMm}mm.png`
-            : isOpMounting
-              ? `Layout_Mounting_OP_${layoutData.enclosure.widthMm}x${layoutData.enclosure.heightMm}mm.png`
-              : `Layout_Panel_Utama_${layoutData.enclosure.widthMm}x${layoutData.enclosure.heightMm}mm.png`;
+            : `Layout_Panel_Utama_${layoutData.enclosure.widthMm}x${layoutData.enclosure.heightMm}mm.png`;
           a.click();
         }
         URL.revokeObjectURL(blobURL);
@@ -1608,13 +1642,14 @@ export function ProjectControlPanelLayoutEditor({
         approvedBy: "IVAN",
         partName:
           activePanelMode === "OUTER"
-            ? "BOX ENCLOSURE 2D"
+            ? "BOX ENCLOSURE 2D (PANEL LUAR)"
             : activePanelMode === "HMI"
               ? "DUMMY OP PANEL"
-              : activePanelMode === "OP_MOUNTING"
-                ? "OP MOUNTING PLATE"
-                : "PANEL MOUNTING PLATE",
-        material: "SPCC t=2.0mm",
+              : "PANEL MOUNTING PLATE",
+        material:
+          activePanelMode === "OUTER"
+            ? "SPCC t=1.5mm / Powder Coating RAL 7035"
+            : "SPCC t=2.0mm",
         dateStr: `${d}/${m}/${y}`,
       };
 
@@ -1622,7 +1657,7 @@ export function ProjectControlPanelLayoutEditor({
 
       if (activePanelMode === "OUTER") {
         const dxf = generateOuterPanelDxf(outerPanelData, meta);
-        const filename = `${cleanKode}_BOX_ENCLOSURE_${outerPanelData.enclosure.widthMm}x${outerPanelData.enclosure.heightMm}x${outerPanelData.enclosure.depthMm}mm_CAD.dxf`;
+        const filename = `${cleanKode}_BOX_LUAR_CAD.dxf`;
         downloadDxfFile(filename, dxf);
         return;
       }
@@ -1932,17 +1967,13 @@ export function ProjectControlPanelLayoutEditor({
                   ? "bg-blue-600"
                   : activePanelMode === "OUTER"
                     ? "bg-indigo-700"
-                    : activePanelMode === "HMI"
-                      ? "bg-violet-600"
-                      : "bg-teal-600"
+                    : "bg-violet-600"
               } text-white flex items-center justify-center shadow-sm`}
             >
               {activePanelMode === "OUTER" ? (
                 <Box className="w-5 h-5" />
               ) : activePanelMode === "HMI" ? (
                 <Monitor className="w-5 h-5" />
-              ) : activePanelMode === "OP_MOUNTING" ? (
-                <Boxes className="w-5 h-5" />
               ) : (
                 <Layers className="w-5 h-5" />
               )}
@@ -1953,27 +1984,21 @@ export function ProjectControlPanelLayoutEditor({
                   ? "Layout 2D Panel Kontrol Utama (Panel Dalam)"
                   : activePanelMode === "OUTER"
                     ? "Layout 2D Box Enclosure (Panel Luar)"
-                    : activePanelMode === "HMI"
-                      ? "Layout 2D Pintu Panel OP / HMI"
-                      : "Layout 2D Mounting OP Panel"}
+                    : "Layout 2D Pintu Panel OP / HMI"}
                 <span
                   className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                     activePanelMode === "MAIN"
                       ? "bg-blue-100 text-blue-700"
                       : activePanelMode === "OUTER"
                         ? "bg-indigo-100 text-indigo-700"
-                        : activePanelMode === "HMI"
-                          ? "bg-violet-100 text-violet-700"
-                          : "bg-teal-100 text-teal-700"
+                        : "bg-violet-100 text-violet-700"
                   }`}
                 >
                   {activePanelMode === "MAIN"
-                    ? "Mounting Plate 600×800"
+                    ? `Mounting Plate ${mainLayoutData.enclosure.widthMm}×${mainLayoutData.enclosure.heightMm}`
                     : activePanelMode === "OUTER"
                       ? `Box ${outerPanelData.enclosure.widthMm}×${outerPanelData.enclosure.heightMm}×${outerPanelData.enclosure.depthMm}`
-                      : activePanelMode === "HMI"
-                        ? "OP Door 430×440"
-                        : "OP Plate 350×300"}
+                      : `OP Door ${hmiLayoutData.enclosure.widthMm}×${hmiLayoutData.enclosure.heightMm}`}
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -1995,14 +2020,12 @@ export function ProjectControlPanelLayoutEditor({
                   ? "Standar FR-EG-EP-006 Panel Utama: MCCB, Noise Filter, Power Supply, MCB, PLC iQ-R/FX5U, Hub Switch, Relay & Terminal."
                   : activePanelMode === "OUTER"
                     ? "Standar 2D Box Enclosure: Tampak Depan (Lock Door & LOTO Switch) & Tampak Samping (Cooling Fan Louvre & Kedalaman Box)."
-                    : activePanelMode === "HMI"
-                      ? "Standar FR-EG-EP-006 Pintu OP: Touchscreen HMI, E-Stop, Matriks Tombol 2×5, Pilot Lamp, Key Switch, Tower Lamp & Fan."
-                      : "Standar FR-EG-EP-006 Mounting OP Plate (350×300): Cable Duct 32×32 keliling, DIN Rail vertikal tengah & Terminal Blok OP."}
+                    : "Standar FR-EG-EP-006 Pintu OP: Touchscreen HMI, E-Stop, Matriks Tombol 2×5, Pilot Lamp, Key Switch, Tower Lamp & Fan."}
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher: Panel Dalam vs Panel Luar (Box 2D) vs Pintu OP/HMI vs Mounting OP */}
+          {/* Mode Switcher: Panel Dalam vs Panel Luar (Box 2D) vs Pintu OP/HMI */}
           <div className="flex flex-wrap items-center p-1 bg-slate-200/80 rounded-xl gap-1">
             <button
               type="button"
@@ -2072,34 +2095,6 @@ export function ProjectControlPanelLayoutEditor({
                 }`}
               >
                 {hmiLayoutData.items.filter((i) => i.type === "COMPONENT").length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActivePanelMode("OP_MOUNTING");
-                clearSelection();
-                setTimeout(() => {
-                  handleFitToScreen(
-                    opMountingLayoutData.enclosure.widthMm,
-                    opMountingLayoutData.enclosure.heightMm
-                  );
-                }, 40);
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
-                activePanelMode === "OP_MOUNTING"
-                  ? "bg-teal-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>Mounting OP</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                  activePanelMode === "OP_MOUNTING" ? "bg-teal-500 text-white" : "bg-slate-300 text-slate-700"
-                }`}
-              >
-                {opMountingLayoutData.items.filter((i) => i.type === "COMPONENT").length}
               </span>
             </button>
           </div>
@@ -2238,6 +2233,7 @@ export function ProjectControlPanelLayoutEditor({
             projectNama={projectNama}
             projectClient={projectClient}
             projectPic={projectPic}
+            onRequestPdf={() => setCadDrawingModalOpen(true)}
           />
         </div>
       ) : (
@@ -5967,15 +5963,24 @@ export function ProjectControlPanelLayoutEditor({
         isOpen={cadDrawingModalOpen}
         onClose={() => setCadDrawingModalOpen(false)}
         mode={
-          activePanelMode === "HMI"
-            ? "HMI"
-            : activePanelMode === "OP_MOUNTING"
-              ? "OP_MOUNTING"
+          activePanelMode === "OUTER"
+            ? "OUTER"
+            : activePanelMode === "HMI"
+              ? "HMI"
               : "MAIN"
         }
-        plateWidth={layoutData.enclosure.widthMm}
-        plateHeight={layoutData.enclosure.heightMm}
+        plateWidth={
+          activePanelMode === "OUTER"
+            ? outerPanelData.enclosure.widthMm
+            : layoutData.enclosure.widthMm
+        }
+        plateHeight={
+          activePanelMode === "OUTER"
+            ? outerPanelData.enclosure.heightMm
+            : layoutData.enclosure.heightMm
+        }
         items={layoutData.items}
+        outerPanel={outerPanelData}
         project={{
           kode: projectKode || "26-TBD-0513",
           nama: projectNama || "PROJECT AUTOMATION",

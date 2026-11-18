@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Download,
   FileCode2,
+  Printer,
   Sliders,
   CheckCircle2,
   AlertCircle,
@@ -37,6 +38,7 @@ export interface ProjectOuterPanel2DViewerProps {
   projectNama?: string | null;
   projectClient?: string | null;
   projectPic?: string | null;
+  onRequestPdf?: () => void;
 }
 
 export function ProjectOuterPanel2DViewer({
@@ -49,6 +51,7 @@ export function ProjectOuterPanel2DViewer({
   projectNama,
   projectClient,
   projectPic,
+  onRequestPdf,
 }: ProjectOuterPanel2DViewerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -219,15 +222,21 @@ export function ProjectOuterPanel2DViewer({
   // Unduh DXF AutoCAD
   const handleExportDxf = () => {
     try {
+      const cleanKode = (projectKode || "PANEL").replace(/[^a-zA-Z0-9_-]/g, "_");
       const metadata: DxfProjectMetadata = {
         kode: projectKode || "TWINTECH-PANEL",
         nama: projectNama || "PANEL ENCLOSURE 2D",
         client: projectClient,
         pic: projectPic || "Faruk",
+        drawnBy: projectPic || "Faruk",
+        checkedBy: "IVAN",
+        approvedBy: "IVAN",
+        partName: "BOX ENCLOSURE 2D",
         material: "SPCC t=1.5mm / Powder Coating RAL 7035",
+        dateStr: new Date().toLocaleDateString("id-ID"),
       };
       const dxfContent = generateOuterPanelDxf(outerPanel, metadata);
-      const filename = `${projectKode || "PANEL"}_BOX_LUAR_${widthMm}x${heightMm}x${depthMm}mm.dxf`;
+      const filename = `${cleanKode}_BOX_LUAR_CAD.dxf`;
       downloadDxfFile(filename, dxfContent);
     } catch (err) {
       console.error("Gagal export DXF:", err);
@@ -262,7 +271,7 @@ export function ProjectOuterPanel2DViewer({
         const pngUrl = canvas.toDataURL("image/png");
         const a = document.createElement("a");
         a.href = pngUrl;
-        a.download = `Panel_Luar_2D_${widthMm}x${heightMm}x${depthMm}mm.png`;
+        a.download = `Layout_Panel_Luar_Box_${widthMm}x${heightMm}x${depthMm}mm.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -369,6 +378,17 @@ export function ProjectOuterPanel2DViewer({
             <FileCode2 className="w-3.5 h-3.5" />
             <span>Export DXF</span>
           </button>
+          {onRequestPdf && (
+            <button
+              type="button"
+              onClick={onRequestPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              title="Buka lembar gambar kerja teknik resmi Twintech Precision (Kop gambar, toleransi & dimensi) untuk dicetak / PDF"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Gambar Kerja (PDF)</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={handleExportPng}
@@ -602,6 +622,7 @@ export function ProjectOuterPanel2DViewer({
           }}
         >
           <svg
+            id="outer-panel-2d-canvas"
             ref={svgRef}
             width={totalSvgWidth}
             height={totalSvgHeight}

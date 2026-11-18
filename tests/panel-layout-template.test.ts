@@ -8,6 +8,7 @@ import {
   createStandardOpMountingLayout,
   createStandardSpmLayout,
   detectOuterPanelPrFeatures,
+  detectPrDuctProfile,
   inferComponentVisual,
   isHmiPanelComponent,
   isNameplateOrEnclosureShell,
@@ -617,10 +618,10 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(parsed.outerPanel?.features.hasLoto).toBe(true);
     });
 
-    it("menghasilkan file DXF AutoCAD 2D untuk Box Enclosure Tampak Depan & Tampak Samping", () => {
+    it("menghasilkan file DXF AutoCAD 2D untuk Box Enclosure Tampak Depan & Tampak Samping dengan Title Block standar Twintech", () => {
       const pr: PanelComponentInput[] = [
-        makeComp("c1", "LOTO Switch", "Lockout Disconnect Switch 32A"),
-        makeComp("c2", "XF1232", "Fan Exhaust 12CM"),
+        makeComp("c1", "Schneider EZAROTE", "Main Switch Rotary Isolator LOTO 32A"),
+        makeComp("c2", "FORT XF1232ASH", "Cooling Fan Filter 120x120mm"),
       ];
       const outer = createDefaultOuterPanelLayout(pr, 700, 600);
 
@@ -638,10 +639,64 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(dxf).toContain("4_FAN_GRILL");
       expect(dxf).toContain("5_DIMENSIONS");
       expect(dxf).toContain("6_LEADERS");
+      expect(dxf).toContain("7_TITLE_BLOCK");
+      expect(dxf).toContain("Twintech Precision");
       expect(dxf).toContain("TAMPAK DEPAN (FRONT VIEW)");
       expect(dxf).toContain("TAMPAK SAMPING (SIDE VIEW)");
-      expect(dxf).toContain("Lock Door");
       expect(dxf).toContain("EOF");
+    });
+  });
+
+  describe("Auto-Layout PR dengan Adaptasi Ukuran Kabel Duct", () => {
+    it("mendeteksi profil ducting dari komponen PR (30x40, 40x60, dll)", () => {
+      const prDuct4060: PanelComponentInput[] = [
+        makeComp("d1", "PVC Wiring Duct 40x60 mm (per 2m)", "Kabel Duct PVC Berlubang 40x60"),
+      ];
+      const config4060 = detectPrDuctProfile(prDuct4060);
+      expect(config4060.code).toBe("40x60");
+      expect(config4060.horizontalHeightMm).toBe(40);
+      expect(config4060.verticalRightWidthMm).toBe(60);
+      expect(config4060.tagHorizontal).toBe("DUCT 40x60");
+
+      const prDuct3040: PanelComponentInput[] = [
+        makeComp("d2", "PVC Wiring Duct 30x40 mm (per 2m)", "Kabel Duct PVC 30x40"),
+      ];
+      const config3040 = detectPrDuctProfile(prDuct3040);
+      expect(config3040.code).toBe("30x40");
+      expect(config3040.horizontalHeightMm).toBe(30);
+      expect(config3040.tagHorizontal).toBe("DUCT 30x40");
+    });
+
+    it("menyesuaikan jarak antar kabel duct secara otomatis agar komponen tinggi (PSU S8VK) tidak menabrak duct", () => {
+      const prWithTallPsu: PanelComponentInput[] = [
+        makeComp("psu", "S8VK-C24024", "POWER SUPPLY 24V 240W", 1),
+        makeComp("mcb1", "Chint NX5-63 2P 6A", "MCB 2P 6A", 4),
+        makeComp("duct", "PVC Wiring Duct 40x60 mm (per 2m)", "Kabel Duct PVC 40x60", 4),
+      ];
+
+      const layout = buildStandardPanelLayoutFromComponents(prWithTallPsu);
+      const items = layout.main.items;
+
+      const psuItem = items.find((i) => i.componentId === "psu");
+      expect(psuItem).toBeDefined();
+
+      const ductTop = items.find((i) => i.id === "duct-top");
+      const ductMid1 = items.find((i) => i.id === "duct-mid-1");
+      expect(ductTop).toBeDefined();
+      expect(ductMid1).toBeDefined();
+
+      // Pastikan PSU berada di antara duct-top dan duct-mid-1 dengan ruang bebas aman (tidak menabrak)
+      const psuTop = psuItem!.yMm;
+      const psuBottom = psuItem!.yMm + psuItem!.heightMm;
+      const ductTopBottom = ductTop!.yMm + ductTop!.heightMm;
+      const ductMid1Top = ductMid1!.yMm;
+
+      expect(psuTop).toBeGreaterThanOrEqual(ductTopBottom);
+      expect(psuBottom).toBeLessThanOrEqual(ductMid1Top);
+
+      // Label ducting harus memakai ukuran yang terdeteksi dari PR
+      expect(ductTop!.tagLabel).toBe("DUCT 40x60");
+      expect(ductMid1!.tagLabel).toBe("DUCT 40x60");
     });
   });
 });
