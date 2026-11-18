@@ -4,8 +4,10 @@ import {
   buildStandardPanelLayoutFromComponents,
   classifyHmiPrComponent,
   classifyPrComponent,
+  createDefaultOuterPanelLayout,
   createStandardOpMountingLayout,
   createStandardSpmLayout,
+  detectOuterPanelPrFeatures,
   inferComponentVisual,
   isHmiPanelComponent,
   isNameplateOrEnclosureShell,
@@ -18,6 +20,7 @@ import {
   type PanelComponentInput,
   type PanelLayoutItem,
 } from "../src/lib/panel-layout-template";
+import { generateOuterPanelDxf } from "../src/lib/export/panel-dxf-generator";
 import {
   DEFAULT_PR_CATALOG,
   FR_EG_EP_006_PDF_COMPONENTS,
@@ -557,5 +560,88 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(visual.specificModel).toBe(expected[item.noUrut].specificModel);
       expect(visual.defaultTag).toBe(expected[item.noUrut].defaultTag);
     }
+  });
+
+  describe("Outer Panel (Box Enclosure 2D Depan & Samping)", () => {
+    it("mendeteksi otomatis LOTO dan Fan dari part list PR", () => {
+      const prWithFeatures: PanelComponentInput[] = [
+        makeComp("c1", "VCF02", "Main Rotary Switch Disconnect LOTO 3P 32A"),
+        makeComp("c2", "FORT XF1232ASH", "Cooling Fan Filter Panel 120x120mm"),
+      ];
+
+      const detected = detectOuterPanelPrFeatures(prWithFeatures);
+      expect(detected.hasLoto).toBe(true);
+      expect(detected.hasFan).toBe(true);
+      expect(detected.fanSizeMm).toBe(120);
+
+      const prWithoutFeatures: PanelComponentInput[] = [
+        makeComp("c3", "FX5U-32MT/ES", "PLC CPU"),
+        makeComp("c4", "S8VK-C24024", "Power Supply 24V"),
+      ];
+
+      const detectedEmpty = detectOuterPanelPrFeatures(prWithoutFeatures);
+      expect(detectedEmpty.hasLoto).toBe(false);
+      expect(detectedEmpty.hasFan).toBe(false);
+    });
+
+    it("membuat default outer panel dengan Lock Door selalu aktif dan ukuran enclosure yang tepat", () => {
+      const pr: PanelComponentInput[] = [
+        makeComp("c1", "LOTO Switch", "Lockout Disconnect Switch 32A"),
+        makeComp("c2", "XF1232", "Fan Exhaust 12CM"),
+      ];
+
+      const outer = createDefaultOuterPanelLayout(pr, 600, 800);
+      expect(outer.enclosure.widthMm).toBe(700);
+      expect(outer.enclosure.heightMm).toBe(900);
+      expect(outer.enclosure.depthMm).toBe(265);
+      expect(outer.features.hasLockDoor).toBe(true);
+      expect(outer.features.hasLoto).toBe(true);
+      expect(outer.features.hasFan).toBe(true);
+      expect(outer.features.fanSizeMm).toBe(120);
+    });
+
+    it("melakukan round-trip serialization dan parsing outer panel di JSON payload", () => {
+      const pr: PanelComponentInput[] = [
+        makeComp("c1", "LOTO Switch", "Lockout Disconnect Switch 32A"),
+      ];
+      const initial = buildStandardPanelLayoutFromComponents(pr);
+      expect(initial.outerPanel).toBeDefined();
+      expect(initial.outerPanel?.features.hasLoto).toBe(true);
+
+      const serialized = serializeDualPanelLayoutPayload(initial);
+      const parsed = parseDualPanelLayoutJson(serialized, pr);
+
+      expect(parsed.outerPanel).toBeDefined();
+      expect(parsed.outerPanel?.enclosure.widthMm).toBe(initial.outerPanel?.enclosure.widthMm);
+      expect(parsed.outerPanel?.features.hasLockDoor).toBe(true);
+      expect(parsed.outerPanel?.features.hasLoto).toBe(true);
+    });
+
+    it("menghasilkan file DXF AutoCAD 2D untuk Box Enclosure Tampak Depan & Tampak Samping", () => {
+      const pr: PanelComponentInput[] = [
+        makeComp("c1", "LOTO Switch", "Lockout Disconnect Switch 32A"),
+        makeComp("c2", "XF1232", "Fan Exhaust 12CM"),
+      ];
+      const outer = createDefaultOuterPanelLayout(pr, 700, 600);
+
+      const dxf = generateOuterPanelDxf(outer, {
+        kode: "26-TBD-0513",
+        nama: "FUNCTION TESTER",
+        pic: "Faruk",
+      });
+
+      expect(dxf).toContain("SECTION");
+      expect(dxf).toContain("0_BORDER");
+      expect(dxf).toContain("1_DOOR");
+      expect(dxf).toContain("2_LOCK_DOOR");
+      expect(dxf).toContain("3_LOTO");
+      expect(dxf).toContain("4_FAN_GRILL");
+      expect(dxf).toContain("5_DIMENSIONS");
+      expect(dxf).toContain("6_LEADERS");
+      expect(dxf).toContain("TAMPAK DEPAN (FRONT VIEW)");
+      expect(dxf).toContain("TAMPAK SAMPING (SIDE VIEW)");
+      expect(dxf).toContain("Lock Door");
+      expect(dxf).toContain("EOF");
+    });
   });
 });

@@ -9,7 +9,7 @@
  * - Dimensi koordinat baseline (X dan Y)
  */
 
-import type { PanelLayoutItem } from "@/lib/panel-layout-template";
+import type { PanelLayoutItem, OuterPanelLayoutData } from "@/lib/panel-layout-template";
 
 export interface DxfProjectMetadata {
   kode: string; // e.g. "26-TBI-1023" atau "26-TBD-0513"
@@ -698,6 +698,279 @@ export function generatePanelLayoutDxf(
   addText("7_TITLE_BLOCK", tbX + 4 * colW + 4, tbY + 7, 4.0, "1:1 (NTS)", 0, 7);
 
   // ==================== 4. END OF DXF ====================
+  add(0, "ENDSEC");
+  add(0, "EOF");
+
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Generator DXF AutoCAD 2D untuk Panel Luar (Box Enclosure Tampak Depan & Tampak Samping).
+ */
+export function generateOuterPanelDxf(
+  outerPanel: OuterPanelLayoutData,
+  metadata: DxfProjectMetadata
+): string {
+  const { widthMm: W, heightMm: H, depthMm: D } = outerPanel.enclosure;
+  const {
+    hasLockDoor = true,
+    lockDoorX = 55,
+    lockDoorY = Math.round(H * 0.55),
+    lockDoorLabel = "LOCK DOOR (HANDLE KUNCI)",
+    hasLoto = false,
+    lotoX = 110,
+    lotoY = 110,
+    lotoLabel = "LOTO MAIN SWITCH",
+    hasFan = false,
+    fanSizeMm = 120,
+    fanY = 100,
+    fanLabel = `FAN FILTER ${fanSizeMm}×${fanSizeMm} mm`,
+  } = outerPanel.features;
+
+  const lines: string[] = [];
+
+  function add(tag: number | string, val: string | number) {
+    lines.push(typeof tag === "number" ? tag.toString() : tag);
+    lines.push(val.toString());
+  }
+
+  function addLine(
+    layer: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color?: number
+  ) {
+    add(0, "LINE");
+    add(8, layer);
+    if (color !== undefined) add(62, color);
+    add(10, fmtCoord(x1));
+    add(20, fmtCoord(y1));
+    add(30, "0.0");
+    add(11, fmtCoord(x2));
+    add(21, fmtCoord(y2));
+    add(31, "0.0");
+  }
+
+  function addRect(
+    layer: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color?: number
+  ) {
+    addLine(layer, x1, y1, x2, y1, color);
+    addLine(layer, x2, y1, x2, y2, color);
+    addLine(layer, x2, y2, x1, y2, color);
+    addLine(layer, x1, y2, x1, y1, color);
+  }
+
+  function addCircle(
+    layer: string,
+    cx: number,
+    cy: number,
+    radius: number,
+    color?: number
+  ) {
+    add(0, "CIRCLE");
+    add(8, layer);
+    if (color !== undefined) add(62, color);
+    add(10, fmtCoord(cx));
+    add(20, fmtCoord(cy));
+    add(30, "0.0");
+    add(40, fmtCoord(radius));
+  }
+
+  function addText(
+    layer: string,
+    x: number,
+    y: number,
+    height: number,
+    text: string,
+    rotation = 0,
+    color?: number
+  ) {
+    add(0, "TEXT");
+    add(8, layer);
+    if (color !== undefined) add(62, color);
+    add(10, fmtCoord(x));
+    add(20, fmtCoord(y));
+    add(30, "0.0");
+    add(40, height);
+    add(1, text);
+    if (rotation !== 0) add(50, rotation.toString());
+  }
+
+  // Header & Layers
+  add(0, "SECTION");
+  add(2, "HEADER");
+  add(9, "$ACADVER");
+  add(1, "AC1009");
+  add(9, "$INSUNITS");
+  add(70, 4); // mm
+  add(0, "ENDSEC");
+
+  add(0, "SECTION");
+  add(2, "TABLES");
+  add(0, "TABLE");
+  add(2, "LAYER");
+  add(70, 8);
+
+  const layers = [
+    { name: "0_BORDER", color: 7 },
+    { name: "1_DOOR", color: 3 },
+    { name: "2_LOCK_DOOR", color: 4 },
+    { name: "3_LOTO", color: 1 },
+    { name: "4_FAN_GRILL", color: 6 },
+    { name: "5_DIMENSIONS", color: 2 },
+    { name: "6_LEADERS", color: 4 },
+    { name: "7_TITLE_BLOCK", color: 7 },
+  ];
+  for (const l of layers) {
+    add(0, "LAYER");
+    add(2, l.name);
+    add(70, 0);
+    add(62, l.color);
+    add(6, "CONTINUOUS");
+  }
+  add(0, "ENDTAB");
+  add(0, "ENDSEC");
+
+  add(0, "SECTION");
+  add(2, "ENTITIES");
+
+  // ==================== TAMPAK DEPAN (FRONT VIEW) ====================
+  // 1. Box Enclosure Utama
+  addRect("0_BORDER", 0, 0, W, H, 7);
+
+  // 2. Door Bevel Seam
+  const doorMargin = 16;
+  addRect("1_DOOR", doorMargin, doorMargin, W - doorMargin, H - doorMargin, 3);
+
+  // 3. Lock Door Handle (pada sisi kiri pintu)
+  if (hasLockDoor) {
+    const lcx = Math.max(30, Math.min(W - 30, lockDoorX));
+    const lcy = H - lockDoorY; // Dari bawah
+    // Plate handle
+    addRect("2_LOCK_DOOR", lcx - 12, lcy - 48, lcx + 12, lcy + 48, 4);
+    // Lever handle
+    addRect("2_LOCK_DOOR", lcx - 6, lcy - 36, lcx + 6, lcy + 22, 4);
+    // Keyhole circle
+    addCircle("2_LOCK_DOOR", lcx, lcy + 32, 4, 4);
+    // Leader Line
+    addLine("6_LEADERS", lcx + 12, lcy + 10, lcx + 60, lcy + 70, 4);
+    addLine("6_LEADERS", lcx + 60, lcy + 70, lcx + 140, lcy + 70, 4);
+    addText("6_LEADERS", lcx + 65, lcy + 73, 4.0, lockDoorLabel, 0, 4);
+  }
+
+  // 4. LOTO Switch (kiri atas)
+  if (hasLoto) {
+    const lotox = Math.max(40, Math.min(W - 40, lotoX));
+    const lotoy = H - lotoY;
+    // Escutcheon plate persegi
+    addRect("3_LOTO", lotox - 35, lotoy - 35, lotox + 35, lotoy + 35, 1);
+    // Dial ring
+    addCircle("3_LOTO", lotox, lotoy, 26, 1);
+    // Rotary knob
+    addRect("3_LOTO", lotox - 7, lotoy - 20, lotox + 7, lotoy + 20, 1);
+    // Padlock lockout ring
+    addCircle("3_LOTO", lotox - 18, lotoy + 18, 4, 1);
+    // Leader line
+    addLine("6_LEADERS", lotox + 25, lotoy + 25, lotox + 70, lotoy + 65, 4);
+    addLine("6_LEADERS", lotox + 70, lotoy + 65, lotox + 160, lotoy + 65, 4);
+    addText("6_LEADERS", lotox + 75, lotoy + 68, 4.0, lotoLabel, 0, 4);
+  }
+
+  // 5. Dimensi Tampak Depan
+  const dimY = -30;
+  addLine("5_DIMENSIONS", 0, 0, 0, dimY - 5, 2);
+  addLine("5_DIMENSIONS", W, 0, W, dimY - 5, 2);
+  addLine("5_DIMENSIONS", 0, dimY, W, dimY, 2);
+  addText("5_DIMENSIONS", W / 2 - 15, dimY + 4, 5.0, `${W}`, 0, 2);
+
+  const dimX = -30;
+  addLine("5_DIMENSIONS", 0, 0, dimX - 5, 0, 2);
+  addLine("5_DIMENSIONS", 0, H, dimX - 5, H, 2);
+  addLine("5_DIMENSIONS", dimX, 0, dimX, H, 2);
+  addText("5_DIMENSIONS", dimX - 16, H / 2 - 8, 5.0, `${H}`, 90, 2);
+
+  addText("7_TITLE_BLOCK", W / 2 - 60, -65, 6.0, "TAMPAK DEPAN (FRONT VIEW)", 0, 7);
+
+  // ==================== TAMPAK SAMPING (SIDE VIEW) ====================
+  const sideX = W + 120;
+  // 1. Box Samping (Width = D, Height = H)
+  addRect("0_BORDER", sideX, 0, sideX + D, H, 7);
+
+  // 2. Door Thickness edge
+  addLine("1_DOOR", sideX - 8, 8, sideX - 8, H - 8, 3);
+  addLine("1_DOOR", sideX - 8, 8, sideX, 8, 3);
+  addLine("1_DOOR", sideX - 8, H - 8, sideX, H - 8, 3);
+
+  // 3. Siluet Lock Door protrusion pada tampak samping
+  if (hasLockDoor) {
+    const lcy = H - lockDoorY;
+    addRect("2_LOCK_DOOR", sideX - 18, lcy - 40, sideX - 8, lcy + 40, 4);
+  }
+
+  // 4. Siluet LOTO Switch protrusion pada tampak samping
+  if (hasLoto) {
+    const lotoy = H - lotoY;
+    addRect("3_LOTO", sideX - 24, lotoy - 20, sideX - 8, lotoy + 20, 1);
+  }
+
+  // 5. Cooling Fan Louvre pada tampak samping
+  if (hasFan) {
+    const fSize = fanSizeMm;
+    const fy = H - fanY - fSize;
+    const fx = sideX + Math.max(10, (D - fSize) / 2);
+    // Outer grill
+    addRect("4_FAN_GRILL", fx, fy, fx + fSize, fy + fSize, 6);
+    // Inner frame
+    addRect("4_FAN_GRILL", fx + 8, fy + 8, fx + fSize - 8, fy + fSize - 8, 6);
+    // Louvre slats
+    const slatStep = (fSize - 16) / 7;
+    for (let i = 1; i < 7; i++) {
+      const sy = fy + 8 + i * slatStep;
+      addLine("4_FAN_GRILL", fx + 10, sy, fx + fSize - 10, sy, 6);
+    }
+    // Leader line
+    addLine("6_LEADERS", fx + fSize / 2, fy + fSize, fx + fSize / 2 + 30, fy + fSize + 40, 4);
+    addLine("6_LEADERS", fx + fSize / 2 + 30, fy + fSize + 40, fx + fSize / 2 + 120, fy + fSize + 40, 4);
+    addText("6_LEADERS", fx + fSize / 2 + 35, fy + fSize + 43, 4.0, fanLabel, 0, 4);
+  }
+
+  // 6. Dimensi Tebal/Kedalaman (Side Bottom)
+  addLine("5_DIMENSIONS", sideX, 0, sideX, dimY - 5, 2);
+  addLine("5_DIMENSIONS", sideX + D, 0, sideX + D, dimY - 5, 2);
+  addLine("5_DIMENSIONS", sideX, dimY, sideX + D, dimY, 2);
+  addText("5_DIMENSIONS", sideX + D / 2 - 12, dimY + 4, 5.0, `${D}`, 0, 2);
+
+  addText("7_TITLE_BLOCK", sideX + D / 2 - 60, -65, 6.0, "TAMPAK SAMPING (SIDE VIEW)", 0, 7);
+
+  // ==================== KOP ETIKET / TITLE BLOCK ====================
+  const tbX = 0;
+  const tbY = -120;
+  const tbWidth = Math.max(W + D + 120, 700);
+  const tbHeight = 35;
+  addRect("7_TITLE_BLOCK", tbX, tbY, tbX + tbWidth, tbY + tbHeight, 7);
+
+  const row2 = tbY + 14;
+  addLine("7_TITLE_BLOCK", tbX, row2, tbX + tbWidth, row2, 7);
+
+  addText("7_TITLE_BLOCK", tbX + 8, tbY + 22, 6.5, "PT. TWINTECH PRECISION", 0, 7);
+  addText("7_TITLE_BLOCK", tbX + 8, tbY + 5, 4.5, "BOX ENCLOSURE 2D - FRONT & SIDE VIEW", 0, 7);
+
+  const colW = tbWidth / 5;
+  for (let i = 1; i < 5; i++) {
+    addLine("7_TITLE_BLOCK", tbX + i * colW, tbY, tbX + i * colW, row2, 7);
+  }
+  addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 7, 3.8, `Job: ${metadata.kode || "-"}`, 0, 7);
+  addText("7_TITLE_BLOCK", tbX + 2 * colW + 4, tbY + 7, 3.8, `Drawn: ${metadata.drawnBy || metadata.pic || "Faruk"}`, 0, 7);
+  addText("7_TITLE_BLOCK", tbX + 3 * colW + 4, tbY + 7, 3.8, `Date: ${metadata.dateStr || new Date().toLocaleDateString("id-ID")}`, 0, 7);
+  addText("7_TITLE_BLOCK", tbX + 4 * colW + 4, tbY + 7, 3.8, `Dim: ${W}×${H}×${D} mm`, 0, 7);
+
   add(0, "ENDSEC");
   add(0, "EOF");
 
