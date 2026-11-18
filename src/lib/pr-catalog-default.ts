@@ -866,11 +866,11 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     kategori: "Proteksi Daya",
     nama: "Main Switch Rotary Isolator (LOTO)",
     merek: "Schneider",
-    tipeModel: "VCF1 / EZAROTE",
-    spesifikasi: "Main Isolator Switch 32A dengan gembok LOTO",
-    estimasiHarga: 480000,
+    tipeModel: "EZAROTE",
+    spesifikasi: "Extended Rotary Operating Handle EZC100 (LOTO Padlockable)",
+    estimasiHarga: 850000,
     defaultUnit: "pcs",
-    fungsi: "Saklar isolasi perawatan mekanik panel",
+    fungsi: "Saklar isolasi putar perawatan & proteksi mekanik panel (LOTO)",
   },
   {
     noUrut: 79,
@@ -1118,7 +1118,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 101,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 30x30",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 30x30 mm (per 2m)",
     spesifikasi: "Saluran kerapihan kabel panel kecil",
     estimasiHarga: 28000,
@@ -1129,7 +1129,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 102,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 40x60 / 65x65",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 40x60 mm (per 2m)",
     spesifikasi: "Saluran kabel utama main panel",
     estimasiHarga: 45000,
@@ -1977,7 +1977,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 179,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 30x40",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 30x40 mm (per 2m)",
     spesifikasi: "Wiring duct slotted PVC abu-abu 30x40mm panjang 2 meter",
     estimasiHarga: 32000,
@@ -1988,7 +1988,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 180,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 30x60",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 30x60 mm (per 2m)",
     spesifikasi: "Wiring duct slotted PVC abu-abu 30x60mm panjang 2 meter",
     estimasiHarga: 38000,
@@ -1999,7 +1999,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 181,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 40x40",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 40x40 mm (per 2m)",
     spesifikasi: "Wiring duct slotted PVC abu-abu 40x40mm panjang 2 meter standar mounting plate",
     estimasiHarga: 36000,
@@ -2010,7 +2010,7 @@ export const DEFAULT_PR_CATALOG: DefaultCatalogItem[] = [
     noUrut: 182,
     kategori: "Panel & Aksesoris",
     nama: "Kabel Duct PVC Berlubang 60x60",
-    merek: "Bebas / KSS",
+    merek: "-",
     tipeModel: "PVC Wiring Duct 60x60 mm (per 2m)",
     spesifikasi: "Wiring duct slotted PVC abu-abu kapasitas besar 60x60mm panjang 2 meter",
     estimasiHarga: 62000,
@@ -2991,6 +2991,7 @@ export function formatCatalogItemForPr(item: CatalogItemFields) {
   const model = item.tipeModel.trim();
   const skipBrand =
     !brand ||
+    brand === "-" ||
     brand.toLowerCase() === "bebas" ||
     model.toLowerCase().includes(brand.toLowerCase());
 

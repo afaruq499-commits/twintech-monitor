@@ -115,7 +115,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-30x30",
     label: "Ducting 30×30",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 30x30 mm (per 2m)",
+    partType: "PVC Wiring Duct 30x30 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 30x30",
     supplier: "",
     defaultQty: 0,
@@ -127,7 +127,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-30x40",
     label: "Ducting 30×40",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 30x40 mm (per 2m)",
+    partType: "PVC Wiring Duct 30x40 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 30x40",
     supplier: "",
     defaultQty: 0,
@@ -139,7 +139,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-30x60",
     label: "Ducting 30×60",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 30x60 mm (per 2m)",
+    partType: "PVC Wiring Duct 30x60 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 30x60",
     supplier: "",
     defaultQty: 0,
@@ -151,7 +151,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-40x40",
     label: "Ducting 40×40",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 40x40 mm (per 2m)",
+    partType: "PVC Wiring Duct 40x40 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 40x40",
     supplier: "",
     defaultQty: 0,
@@ -163,7 +163,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-40x60",
     label: "Ducting 40×60",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 40x60 mm (per 2m)",
+    partType: "PVC Wiring Duct 40x60 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 40x60 / 65x65",
     supplier: "",
     defaultQty: 0,
@@ -175,7 +175,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "ducting-60x60",
     label: "Ducting 60×60",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / KSS PVC Wiring Duct 60x60 mm (per 2m)",
+    partType: "PVC Wiring Duct 60x60 mm (per 2m)",
     partName: "Kabel Duct PVC Berlubang 60x60",
     supplier: "",
     defaultQty: 0,
@@ -380,8 +380,13 @@ export function mergeMandatoryPrRows<T extends MandatoryMergeRowInput>(
     const matched = row.mandatoryKey ?? matchMandatoryKey(row.partType, row.partName);
     if (matched && !claimedKeys.has(matched)) {
       claimedKeys.add(matched);
+      const spec = MANDATORY_PR_COMPONENTS.find((s) => s.key === matched);
+      const cleanPartType = spec
+        ? spec.partType
+        : (row.partType || "").replace(/^Bebas\s*\/\s*KSS\s*/i, "");
       return {
         ...row,
+        partType: cleanPartType || row.partType,
         mandatoryKey: matched,
       };
     }

@@ -67,6 +67,38 @@ export async function getCatalogComponents(): Promise<CatalogComponentDTO[]> {
         })),
       });
     }
+
+    // Sinkronkan pembaruan data katalog jika ada revisi model atau harga dari DEFAULT_PR_CATALOG
+    try {
+      await prisma.catalogComponent.updateMany({
+        where: {
+          OR: [
+            { tipeModel: "VCF1 / EZAROTE" },
+            { tipeModel: { contains: "VCF1" } },
+          ],
+        },
+        data: {
+          merek: "Schneider",
+          tipeModel: "EZAROTE",
+          nama: "Main Switch Rotary Isolator (LOTO)",
+          spesifikasi: "Extended Rotary Operating Handle EZC100 (LOTO Padlockable)",
+          estimasiHarga: 850000,
+          fungsi: "Saklar isolasi putar perawatan & proteksi mekanik panel (LOTO)",
+        },
+      });
+
+      await prisma.catalogComponent.updateMany({
+        where: {
+          merek: { in: ["Bebas / KSS", "Bebas / FORT", "Bebas"] },
+          tipeModel: { contains: "Wiring Duct" },
+        },
+        data: {
+          merek: "-",
+        },
+      });
+    } catch {
+      // Ignored jika terjadi transient error
+    }
   }
 
   const rows = await prisma.catalogComponent.findMany({
