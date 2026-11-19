@@ -51,11 +51,6 @@ import {
   parseFileChecklistJson,
   type FileChecklistState,
 } from "@/lib/project-checklist";
-import {
-  MANDATORY_PR_COMPONENTS,
-  type MandatoryPrKey,
-  matchMandatoryKey,
-} from "@/lib/pr-mandatory";
 import { ELECTRICAL_CHECKLIST_CATEGORIES } from "@/lib/electrical-checklist";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectHeroHeader } from "./ProjectHeroHeader";
@@ -260,16 +255,7 @@ export function ProjectDetailClient({
   const [bulkStatus, setBulkStatus] = useState<PurchaseStatus>("SUDAH_DATANG");
   const [bulkEta, setBulkEta] = useState("");
   const [busyComp, setBusyComp] = useState(false);
-  const [showMandatoryPanel, setShowMandatoryPanel] = useState(false);
   const [showElectricalChecklist, setShowElectricalChecklist] = useState(false);
-  const [mandatoryDraftQty, setMandatoryDraftQty] = useState<
-    Record<string, string>
-  >({});
-  const [mandatoryDraftPrice, setMandatoryDraftPrice] = useState<
-    Record<string, string>
-  >({});
-  const [mandatorySavingKey, setMandatorySavingKey] =
-    useState<MandatoryPrKey | null>(null);
 
   // Modal Tambah Komponen Manual
   const [addCompOpen, setAddCompOpen] = useState(false);
@@ -314,17 +300,6 @@ export function ProjectDetailClient({
   const missingRevisionComps = project.components.filter(
     (c) => c.statusImport === "HILANG_DI_REVISI"
   );
-
-  // Peta komponen wajib PR yang saat ini aktif (qty > 0) pada proyek ini
-  const mandatoryCompByKey = new Map<MandatoryPrKey, ComponentDTO>();
-  const mandatoryKeyByCompId = new Map<string, MandatoryPrKey>();
-  for (const c of activeComps) {
-    const mKey = matchMandatoryKey(c.partType, c.partName);
-    if (mKey && !mandatoryCompByKey.has(mKey)) {
-      mandatoryCompByKey.set(mKey, c);
-      mandatoryKeyByCompId.set(c.id, mKey);
-    }
-  }
 
   // Status kelengkapan 13 Kategori Part Elektrikal Mesin & Panel (agar tidak ada part yang terlupa)
   const electricalChecklistStatus = useMemo(() => {
@@ -489,107 +464,7 @@ export function ProjectDetailClient({
     }
   }
 
-  async function handleCommitMandatoryQty(
-    key: MandatoryPrKey,
-    rawVal?: string,
-    rawPriceVal?: string
-  ) {
-    const spec = MANDATORY_PR_COMPONENTS.find((s) => s.key === key);
-    if (!spec) return;
-
-    const existing = mandatoryCompByKey.get(key);
-    const valStr =
-      rawVal ??
-      mandatoryDraftQty[key] ??
-      (existing ? String(existing.qty) : "0");
-    const parsedQty = Number(valStr);
-    const nextQty =
-      Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 0;
-
-    const priceStr =
-      rawPriceVal ??
-      mandatoryDraftPrice[key] ??
-      (existing?.hargaSatuan !== null && existing?.hargaSatuan !== undefined
-        ? String(existing.hargaSatuan)
-        : String(spec.hargaSatuan));
-    const trimmedPrice = priceStr.trim();
-    const parsedPrice = trimmedPrice !== "" ? Number(trimmedPrice) : null;
-    const nextPrice =
-      parsedPrice !== null && Number.isFinite(parsedPrice) && parsedPrice >= 0
-        ? parsedPrice
-        : null;
-
-    setMandatorySavingKey(key);
-    try {
-      if (nextQty > 0) {
-        if (existing) {
-          const patchPayload: {
-            qty?: number;
-            hargaSatuan?: number | null;
-            partType?: string;
-          } = {};
-          if (existing.qty !== nextQty) patchPayload.qty = nextQty;
-          if ((existing.hargaSatuan ?? null) !== nextPrice) {
-            patchPayload.hargaSatuan = nextPrice;
-          }
-          if (existing.partType !== spec.partType) {
-            patchPayload.partType = spec.partType;
-          }
-          if (Object.keys(patchPayload).length > 0) {
-            await fetch(`/api/components/${existing.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(patchPayload),
-            });
-          }
-        } else {
-          await fetch("/api/components", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId: project.id,
-              kelompok: spec.kelompok,
-              partType: spec.partType,
-              partName: spec.partName,
-              supplier: spec.supplier,
-              qty: nextQty,
-              unit: spec.unit,
-              hargaSatuan: nextPrice,
-              catatanPr: spec.catatanPr,
-              statusPembelian: "BELUM_PR",
-            }),
-          });
-        }
-      } else if (existing) {
-        // Qty = 0 berarti dikeluarkan dari daftar PR aktif proyek ini
-        await fetch(`/api/components/${existing.id}`, {
-          method: "DELETE",
-        });
-      }
-
-      setMandatoryDraftQty((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      setMandatoryDraftPrice((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      router.refresh();
-    } finally {
-      setMandatorySavingKey(null);
-    }
-  }
-
   async function handleDeleteComponent(id: string, name: string) {
-    if (mandatoryKeyByCompId.has(id)) {
-      window.alert(
-        `"${name}" adalah Komponen Wajib PR yang tidak bisa dihapus langsung. Ubah nilainya menjadi 0 pada bagian Komponen Wajib PR jika tidak masuk PR.`
-      );
-      return;
-    }
     if (!window.confirm(`Hapus komponen "${name}"?`)) return;
     await fetch(`/api/components/${id}`, { method: "DELETE" });
     router.refresh();
@@ -1271,171 +1146,6 @@ export function ProjectDetailClient({
             </div>
           )}
 
-          {/* Kartu Komponen Wajib PR (tidak bisa dihapus, hanya value Qty diubah; 0 = tidak masuk PR) */}
-          <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-xs">
-            <button
-              type="button"
-              onClick={() => setShowMandatoryPanel((v) => !v)}
-              className="w-full flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-amber-50/80 hover:bg-amber-100/70 text-left transition cursor-pointer"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-700" />
-                <span className="font-extrabold text-sm text-amber-950">
-                  Komponen Wajib PR ({mandatoryCompByKey.size}/
-                  {MANDATORY_PR_COMPONENTS.length} Masuk PR)
-                </span>
-                <span className="text-xs text-amber-800 font-medium">
-                  Kabel 0.34 / 0.75 / 2.5 / 6, Kabel Core 0.34 &amp; 0.75, Ducting
-                  (30x30 – 60x60), DIN Rail, Tag Panel, Skun Y, Kabel Bakar • Qty (0 = Tidak masuk PR) &amp; Harga bisa
-                  diubah
-                </span>
-              </div>
-              <span className="text-xs font-extrabold text-amber-800">
-                {showMandatoryPanel ? "Sembunyikan ▲" : "Atur Qty Wajib ▼"}
-              </span>
-            </button>
-
-            {showMandatoryPanel && (
-              <div className="p-4 border-t border-amber-200 overflow-x-auto">
-                <p className="text-xs text-slate-600 mb-3">
-                  Komponen di bawah ini tidak dapat dihapus. Ketik{" "}
-                  <strong>Qty</strong> dan/atau <strong>Harga (Rp)</strong> lalu tekan{" "}
-                  <strong>Enter</strong> atau klik <strong>Terapkan</strong> (isi{" "}
-                  <strong>0</strong> pada Qty jika tidak masuk PR).
-                </p>
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
-                    <tr>
-                      <th className="text-left p-2">Komponen Wajib</th>
-                      <th className="text-left p-2">Part Type (Terkunci)</th>
-                      <th className="text-center p-2">Unit</th>
-                      <th className="text-right p-2 w-36">Harga (Rp)</th>
-                      <th className="text-center p-2">Status PR</th>
-                      <th className="text-center p-2 w-48">Qty (0 = Tdk Masuk)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {MANDATORY_PR_COMPONENTS.map((spec) => {
-                      const existing = mandatoryCompByKey.get(spec.key);
-                      const savedQty = existing ? existing.qty : 0;
-                      const savedPrice =
-                        existing?.hargaSatuan !== null && existing?.hargaSatuan !== undefined
-                          ? existing.hargaSatuan
-                          : spec.hargaSatuan;
-                      const draftVal =
-                        mandatoryDraftQty[spec.key] ?? String(savedQty);
-                      const draftPriceVal =
-                        mandatoryDraftPrice[spec.key] ??
-                        (savedPrice !== null && savedPrice !== undefined ? String(savedPrice) : "");
-                      const parsedDraftPrice =
-                        draftPriceVal.trim() !== "" ? Number(draftPriceVal) : null;
-                      const isDirty =
-                        Number(draftVal) !== savedQty ||
-                        (parsedDraftPrice !== null && Number.isFinite(parsedDraftPrice)
-                          ? parsedDraftPrice !== (savedPrice ?? null)
-                          : (savedPrice ?? null) !== null);
-                      const isSaving = mandatorySavingKey === spec.key;
-
-                      return (
-                        <tr key={spec.key} className="hover:bg-slate-50">
-                          <td className="p-2 font-bold text-slate-900">
-                            {spec.label}
-                          </td>
-                          <td className="p-2 text-slate-700">
-                            <div>{spec.partType}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {spec.partName}
-                            </div>
-                          </td>
-                          <td className="p-2 text-center text-slate-600 font-semibold">
-                            {existing?.unit ?? spec.unit}
-                          </td>
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              disabled={isSaving}
-                              value={draftPriceVal}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onChange={(e) =>
-                                setMandatoryDraftPrice((prev) => ({
-                                  ...prev,
-                                  [spec.key]: e.target.value,
-                                }))
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  void handleCommitMandatoryQty(
-                                    spec.key,
-                                    draftVal,
-                                    e.currentTarget.value
-                                  );
-                                }
-                              }}
-                              aria-label={`Harga ${spec.label}`}
-                              className="w-28 px-2 py-1 rounded-lg border border-slate-300 text-right font-mono"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            {savedQty > 0 ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
-                                Masuk PR ({savedQty})
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold text-[11px]">
-                                0 = Tidak masuk PR
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-2">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <input
-                                type="number"
-                                min={0}
-                                step="any"
-                                disabled={isSaving}
-                                value={draftVal}
-                                onFocus={(e) => e.currentTarget.select()}
-                                onChange={(e) =>
-                                  setMandatoryDraftQty((prev) => ({
-                                    ...prev,
-                                    [spec.key]: e.target.value,
-                                  }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    void handleCommitMandatoryQty(
-                                      spec.key,
-                                      e.currentTarget.value
-                                    );
-                                  }
-                                }}
-                                className="w-20 px-2 py-1 rounded-lg border border-slate-300 text-center font-bold"
-                              />
-                              <button
-                                type="button"
-                                disabled={isSaving || !isDirty}
-                                onClick={() =>
-                                  void handleCommitMandatoryQty(spec.key)
-                                }
-                                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] disabled:opacity-40 cursor-pointer"
-                              >
-                                {isSaving ? "..." : "Terapkan"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
           {/* Banner Peringatan & Aksi Cepat jika ada komponen Hilang di Revisi Baru */}
           {missingRevisionComps.length > 0 && (
             <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
@@ -1581,7 +1291,6 @@ export function ProjectDetailClient({
                           const isMissingRev =
                             c.statusImport === "HILANG_DI_REVISI";
                           const isNewRev = c.statusImport === "BARU";
-                          const isMandatoryComp = mandatoryKeyByCompId.has(c.id);
 
                           return (
                             <tr
@@ -1617,14 +1326,6 @@ export function ProjectDetailClient({
                                   >
                                     {c.partType}
                                   </span>
-                                  {isMandatoryComp && (
-                                    <span
-                                      title="Komponen wajib PR tidak bisa dihapus. Atur Qty ke 0 pada panel Komponen Wajib PR jika tidak masuk PR."
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-bold"
-                                    >
-                                      <Lock className="w-2.5 h-2.5" /> Wajib PR
-                                    </span>
-                                  )}
                                   {c.perluDicek && (
                                     <span
                                       title={c.alasanDicek ?? "Perlu dicek"}
@@ -1827,25 +1528,16 @@ export function ProjectDetailClient({
                                 />
                               </td>
                               <td className="p-2.5 text-center">
-                                {isMandatoryComp ? (
-                                  <span
-                                    title="Komponen wajib PR tidak dapat dihapus langsung. Ubah Qty menjadi 0 pada panel Komponen Wajib PR jika tidak masuk PR."
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold"
-                                  >
-                                    <Lock className="w-3 h-3" /> Wajib
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteComponent(c.id, c.partType)
-                                    }
-                                    className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
-                                    title="Hapus Komponen"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteComponent(c.id, c.partType)
+                                  }
+                                  className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
+                                  title="Hapus Komponen"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </td>
                             </tr>
                           );

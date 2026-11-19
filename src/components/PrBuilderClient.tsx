@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BookmarkPlus,
   Check,
+  CheckSquare,
   ChevronDown,
   ChevronUp,
   ClipboardList,
@@ -16,12 +17,12 @@ import {
   FileText,
   FolderOpen,
   Layers,
-  Lock,
   Plus,
   RefreshCw,
   Save,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   CatalogAutocompleteInput,
@@ -43,14 +44,8 @@ import {
   formatCatalogItemForPr,
   type PdfPresetComponent,
 } from "@/lib/pr-catalog-default";
-import {
-  MANDATORY_PR_GROUP,
-  type MandatoryPrKey,
-  type MandatoryPrSpec,
-  buildPrSubmissionItems,
-  matchMandatoryKey,
-  mergeMandatoryPrRows,
-} from "@/lib/pr-mandatory";
+import { buildPrSubmissionItems } from "@/lib/pr-mandatory";
+import { ELECTRICAL_CHECKLIST_CATEGORIES } from "@/lib/electrical-checklist";
 
 interface ProjectSummaryOption {
   id: string;
@@ -74,7 +69,6 @@ interface PrDraftRow {
   tanggalPakai: string;
   hargaSatuan: string; // string untuk input angka nyaman, kosong = null
   fromCatalogId?: string | null;
-  mandatoryKey?: MandatoryPrKey | null;
   statusPembelian?: string | null;
 }
 
@@ -99,36 +93,23 @@ function nextTempId() {
   return `pr-row-${Date.now()}-${rowCounter}`;
 }
 
-function createMandatoryDraftRow(
-  spec: MandatoryPrSpec,
-  index: number,
-  catalogList: CatalogComponentDTO[]
+function makeBlankRow(
+  kelompok: string = DEFAULT_GROUPS[0],
+  noPr: string = "1"
 ): PrDraftRow {
-  const matchedCat = catalogList.find((c) => {
-    const f = formatCatalogItemForPr(c);
-    return (
-      f.partType.toLowerCase() === spec.partType.toLowerCase() &&
-      f.partName.toLowerCase() === spec.partName.toLowerCase()
-    );
-  });
-  const prFields = matchedCat ? formatCatalogItemForPr(matchedCat) : null;
   return {
     tempId: nextTempId(),
-    kelompok: spec.kelompok,
-    noPr: String(index),
-    partType: spec.partType,
-    partName: spec.partName,
-    supplier: spec.supplier,
-    qty: spec.defaultQty,
-    unit: prFields?.unit ?? spec.unit,
-    catatanPr: spec.catatanPr,
+    kelompok,
+    noPr,
+    partType: "",
+    partName: "",
+    supplier: "",
+    qty: 1,
+    unit: "pcs",
+    catatanPr: "",
     tanggalPakai: "",
-    hargaSatuan:
-      prFields?.hargaSatuan !== null && prFields?.hargaSatuan !== undefined
-        ? String(prFields.hargaSatuan)
-        : String(spec.hargaSatuan),
-    fromCatalogId: matchedCat?.id ?? null,
-    mandatoryKey: spec.key,
+    hargaSatuan: "",
+    statusPembelian: null,
   };
 }
 
@@ -200,11 +181,10 @@ export function PrBuilderClient({
   const [newGroupInput, setNewGroupInput] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
 
-  const [items, setItems] = useState<PrDraftRow[]>(() =>
-    mergeMandatoryPrRows([], (spec, idx) =>
-      createMandatoryDraftRow(spec, idx, initialCatalog)
-    )
-  );
+  const [items, setItems] = useState<PrDraftRow[]>(() => [
+    makeBlankRow(DEFAULT_GROUPS[0], "1"),
+  ]);
+  const [showElectricalChecklist, setShowElectricalChecklist] = useState(false);
   const [loadingProjectItems, setLoadingProjectItems] = useState(false);
 
   // Filter Pemilih Katalog Cepat
@@ -316,18 +296,35 @@ export function PrBuilderClient({
     }, 0);
   }, [items]);
 
-  const { activePrCount, excludedMandatoryCount } = useMemo(() => {
-    let active = 0;
-    let excluded = 0;
-    for (const r of items) {
-      if (r.mandatoryKey) {
-        if ((Number(r.qty) || 0) > 0) active += 1;
-        else excluded += 1;
-      } else if (r.partType.trim() !== "" || r.partName.trim() !== "") {
-        active += 1;
-      }
-    }
-    return { activePrCount: active, excludedMandatoryCount: excluded };
+  // Status kelengkapan 13 Kategori Part Elektrikal Mesin & Panel
+  const electricalChecklistStatus = useMemo(() => {
+    return ELECTRICAL_CHECKLIST_CATEGORIES.map((cat) => {
+      const matchedComps = items.filter(
+        (r) =>
+          (r.partType.trim() !== "" || r.partName.trim() !== "") &&
+          cat.matcher({
+            partType: r.partType,
+            partName: r.partName,
+            kelompok: r.kelompok,
+          })
+      );
+      return {
+        ...cat,
+        isFulfilled: matchedComps.length > 0,
+        count: matchedComps.length,
+        items: matchedComps,
+      };
+    });
+  }, [items]);
+
+  const electricalFulfilledCount = useMemo(() => {
+    return electricalChecklistStatus.filter((c) => c.isFulfilled).length;
+  }, [electricalChecklistStatus]);
+
+  const activePrCount = useMemo(() => {
+    return items.filter(
+      (r) => r.partType.trim() !== "" || r.partName.trim() !== ""
+    ).length;
   }, [items]);
 
   async function loadExistingProjectComponents(
@@ -399,31 +396,24 @@ export function PrBuilderClient({
       );
 
       if (loaded.length > 0) {
-        const merged = mergeMandatoryPrRows(loaded, (spec, idx) =>
-          createMandatoryDraftRow(spec, idx, catalog)
-        );
         const distinctGroups = Array.from(
-          new Set([...merged.map((l) => l.kelompok), ...DEFAULT_GROUPS])
+          new Set([...loaded.map((l) => l.kelompok), ...DEFAULT_GROUPS])
         );
         setGroups(distinctGroups);
         setActiveGroup(loaded[0].kelompok || DEFAULT_GROUPS[0]);
-        setItems(merged);
+        setItems(loaded);
         if (!silentIfEmpty) {
           setSuccessMsg(
-            `Berhasil memuat ${loaded.length} komponen dari proyek + komponen wajib PR siap diedit.`
+            `Berhasil memuat ${loaded.length} komponen dari proyek.`
           );
         }
       } else {
         setGroups(DEFAULT_GROUPS);
         setActiveGroup(DEFAULT_GROUPS[0]);
-        setItems(
-          mergeMandatoryPrRows([], (spec, idx) =>
-            createMandatoryDraftRow(spec, idx, catalog)
-          )
-        );
+        setItems([makeBlankRow(DEFAULT_GROUPS[0], "1")]);
         if (!silentIfEmpty) {
           setSuccessMsg(
-            "Proyek ini belum memiliki komponen PR. Komponen wajib PR sudah disiapkan (Qty 0 = tidak masuk PR)."
+            "Proyek ini belum memiliki komponen PR. Silakan pilih komponen dari katalog atau tambah baris manual."
           );
         }
       }
@@ -439,21 +429,8 @@ export function PrBuilderClient({
     setErrorMsg(null);
     const prFields = formatCatalogItemForPr(cat);
     const addQty = Math.max(1, Number(quickQtyMap[cat.id] ?? 1) || 1);
-    const matchedMandatory = matchMandatoryKey(prFields.partType, prFields.partName);
 
     setItems((prev) => {
-      // Jika item katalog cocok dengan komponen wajib PR, tambahkan ke baris wajib tersebut
-      if (matchedMandatory) {
-        const mandIdx = prev.findIndex(
-          (r) => r.mandatoryKey === matchedMandatory
-        );
-        if (mandIdx >= 0) {
-          return prev.map((r, i) =>
-            i === mandIdx ? { ...r, qty: (Number(r.qty) || 0) + addQty } : r
-          );
-        }
-      }
-
       // Cek apakah komponen yang persis sama sudah ada di kelompok aktif -> tambahkan Qty
       const existingIdx = prev.findIndex(
         (r) =>
@@ -589,33 +566,6 @@ export function PrBuilderClient({
     setItems((prev) =>
       prev.map((r) => {
         if (r.tempId !== tempId) return r;
-        // Komponen wajib PR: Qty, Harga Satuan, Supplier, Catatan PR, dan Tanggal Pakai boleh diubah; identitas komponen tetap terkunci
-        if (r.mandatoryKey) {
-          const nextRow = { ...r };
-          let changed = false;
-          if (patch.qty !== undefined) {
-            const nextQty = Number(patch.qty);
-            nextRow.qty = Number.isFinite(nextQty) && nextQty >= 0 ? nextQty : 0;
-            changed = true;
-          }
-          if (patch.hargaSatuan !== undefined) {
-            nextRow.hargaSatuan = patch.hargaSatuan;
-            changed = true;
-          }
-          if (patch.supplier !== undefined) {
-            nextRow.supplier = patch.supplier;
-            changed = true;
-          }
-          if (patch.catatanPr !== undefined) {
-            nextRow.catatanPr = patch.catatanPr;
-            changed = true;
-          }
-          if (patch.tanggalPakai !== undefined) {
-            nextRow.tanggalPakai = patch.tanggalPakai;
-            changed = true;
-          }
-          return changed ? nextRow : r;
-        }
         return { ...r, ...patch };
       })
     );
@@ -638,9 +588,7 @@ export function PrBuilderClient({
   }
 
   function removeRow(tempId: string) {
-    setItems((prev) =>
-      prev.filter((r) => r.tempId !== tempId || Boolean(r.mandatoryKey))
-    );
+    setItems((prev) => prev.filter((r) => r.tempId !== tempId));
   }
 
   function renumberAllRows() {
@@ -656,7 +604,7 @@ export function PrBuilderClient({
     if (!defaultSupplier.trim()) return;
     setItems((prev) =>
       prev.map((r) =>
-        r.mandatoryKey || r.supplier.trim()
+        r.supplier.trim()
           ? r
           : { ...r, supplier: defaultSupplier.trim() }
       )
@@ -1585,9 +1533,7 @@ export function PrBuilderClient({
                 <span className="text-xs font-extrabold text-slate-500 uppercase mr-1 flex items-center gap-1">
                   <Layers className="w-3.5 h-3.5" /> Masuk ke Kelompok:
                 </span>
-                {allDisplayGroups
-                  .filter((g) => g !== MANDATORY_PR_GROUP)
-                  .map((g) => {
+                {allDisplayGroups.map((g) => {
                     const countInG = items.filter((i) => i.kelompok === g).length;
                     const active = activeGroup === g;
                     return (
@@ -1809,20 +1755,30 @@ export function PrBuilderClient({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-extrabold text-slate-900">
-                  Daftar Komponen di Dokumen PR ({activePrCount} Masuk PR
-                  {excludedMandatoryCount > 0
-                    ? ` • ${excludedMandatoryCount} Wajib Qty 0`
-                    : ""}
-                  )
+                  Daftar Komponen di Dokumen PR ({activePrCount} Komponen)
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600">
-                  Anda juga bisa langsung mengetik komponen sendiri lewat tombol{" "}
-                  <strong>+ Ketik Baris Manual</strong>. Komponen wajib tidak
-                  dapat dihapus &amp; hanya nilai <strong>Qty</strong> yang bisa
-                  diubah (<strong>0 = tidak masuk PR</strong>).
+                  Komponen dapat diketik langsung, dipilih dari katalog, atau ditambahkan lewat tombol{" "}
+                  <strong>+ Ketik Baris Manual</strong>. Gunakan tombol{" "}
+                  <strong>Ceklis Part Elektrikal</strong> sebagai panduan kelengkapan.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowElectricalChecklist((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
+                    showElectricalChecklist
+                      ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                      : "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                  }`}
+                  title="Buka panduan ceklis 13 kategori part elektrikal & wiring mesin/panel"
+                >
+                  <CheckSquare className="w-4 h-4 text-amber-600" />
+                  <span>
+                    Ceklis Part Elektrikal ({electricalFulfilledCount}/{ELECTRICAL_CHECKLIST_CATEGORIES.length})
+                  </span>
+                </button>
                 {items.length > 0 && (
                   <button
                     type="button"
@@ -1843,6 +1799,138 @@ export function PrBuilderClient({
               </div>
             </div>
 
+            {/* Panel Interaktif Ceklis Part Elektrikal (13 Kategori) */}
+            {showElectricalChecklist && (
+              <div className="bg-amber-50/50 rounded-2xl border-2 border-amber-300 p-4 sm:p-5 shadow-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-200">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CheckSquare className="w-5 h-5 text-amber-600" />
+                      <h3 className="font-extrabold text-base text-slate-900">
+                        Ceklis Kelengkapan Part Elektrikal Mesin &amp; Panel
+                      </h3>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                          electricalFulfilledCount ===
+                          ELECTRICAL_CHECKLIST_CATEGORIES.length
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                            : "bg-amber-100 text-amber-800 border-amber-300"
+                        }`}
+                      >
+                        {electricalFulfilledCount} /{" "}
+                        {ELECTRICAL_CHECKLIST_CATEGORIES.length} Kategori Terpenuhi
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Panduan 13 kelompok part elektrikal agar tidak ada komponen penting yang terlupa saat menyusun PR.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowElectricalChecklist(false)}
+                      className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      title="Tutup Ceklis"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {electricalChecklistStatus.map((cat) => (
+                    <div
+                      key={cat.id}
+                      className={`p-3 rounded-xl border transition flex flex-col justify-between ${
+                        cat.isFulfilled
+                          ? "bg-white border-emerald-300 shadow-2xs"
+                          : "bg-white border-amber-200 hover:border-amber-300"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2">
+                            <div
+                              className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
+                                cat.isFulfilled
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-slate-50 border-2 border-amber-400 text-transparent"
+                              }`}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 leading-snug">
+                                {cat.nama}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                {cat.deskripsi}
+                              </div>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 border ${
+                              cat.isFulfilled
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : "bg-amber-100 text-amber-800 border-amber-300"
+                            }`}
+                          >
+                            {cat.isFulfilled ? `${cat.count} item` : "Belum Ada"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {cat.isFulfilled ? (
+                        <div className="mt-2 pt-2 border-t border-emerald-100 text-[11px] text-emerald-900 truncate">
+                          <span className="font-semibold">Masuk PR:</span>{" "}
+                          {cat.items
+                            .map((i) => i.partType || i.partName)
+                            .slice(0, 2)
+                            .join(", ")}
+                          {cat.items.length > 2
+                            ? ` (+${cat.items.length - 2} lainnya)`
+                            : ""}
+                        </div>
+                      ) : (
+                        <div className="mt-2 pt-2 border-t border-amber-100 flex items-center justify-between text-[11px]">
+                          <span className="text-amber-900 truncate text-[10px]" title={cat.contohPart}>
+                            Misal: {cat.contohPart}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newRow: PrDraftRow = {
+                                tempId: nextTempId(),
+                                kelompok: activeGroup || DEFAULT_GROUPS[0],
+                                noPr: String(items.length + 1),
+                                partType: cat.contohPart.split("/")[0].trim(),
+                                partName: cat.nama,
+                                supplier: "",
+                                qty: 1,
+                                unit: "pcs",
+                                catatanPr: "",
+                                tanggalPakai: "",
+                                hargaSatuan: "",
+                                statusPembelian: null,
+                              };
+                              setItems((prev) => [...prev, newRow]);
+                              setLastAddedRowId(newRow.tempId);
+                            }}
+                            className="text-[10px] font-bold text-blue-700 hover:text-blue-900 hover:underline shrink-0 ml-1 cursor-pointer"
+                            title={`Tambah ${cat.nama} ke daftar PR`}
+                          >
+                            + Tambah ke PR
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {items.length === 0 ? (
               <div className="rounded-2xl border-2 border-dashed border-slate-200 p-10 text-center space-y-3">
                 <p className="text-base font-bold text-slate-700">
@@ -1850,7 +1938,7 @@ export function PrBuilderClient({
                 </p>
                 <p className="text-sm text-slate-500">
                   Klik tombol <strong>+ Masuk PR</strong> pada katalog komponen
-                  di atas, atau klik tombol di bawah untuk mengetik baris
+                  di atas, gunakan <strong>Ceklis Part Elektrikal</strong>, atau klik tombol di bawah untuk mengetik baris
                   komponen secara langsung.
                 </p>
                 <button
@@ -1867,11 +1955,6 @@ export function PrBuilderClient({
                   const groupRows = items.filter((r) => r.kelompok === grpName);
                   if (groupRows.length === 0) return null;
 
-                  const isMandatoryGroup = grpName === MANDATORY_PR_GROUP;
-                  const activeInGroup = groupRows.filter((r) =>
-                    r.mandatoryKey ? (Number(r.qty) || 0) > 0 : true
-                  ).length;
-
                   const groupSubtotal = groupRows.reduce((s, r) => {
                     const p =
                       r.hargaSatuan.trim() !== "" ? Number(r.hargaSatuan) : NaN;
@@ -1886,39 +1969,26 @@ export function PrBuilderClient({
                       key={grpName}
                       className="rounded-2xl border border-slate-200 overflow-visible"
                     >
-                      <div
-                        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-white rounded-t-2xl ${
-                          isMandatoryGroup ? "bg-slate-800" : "bg-slate-900"
-                        }`}
-                      >
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-white rounded-t-2xl bg-slate-900">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-extrabold text-sm sm:text-base">
                             Kelompok: {grpName}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-200 text-xs font-bold">
-                            {isMandatoryGroup
-                              ? `${activeInGroup} masuk PR / ${groupRows.length} wajib`
-                              : `${groupRows.length} komponen`}
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 text-xs font-bold">
+                            {groupRows.length} komponen
                           </span>
-                          {isMandatoryGroup && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[11px] font-bold">
-                              <Lock className="w-3 h-3" /> Tidak bisa dihapus • Qty (0 = tidak masuk PR), Supplier &amp; Harga bisa diubah
-                            </span>
-                          )}
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-xs sm:text-sm font-bold text-amber-300">
                             Subtotal: {formatRupiah(groupSubtotal)}
                           </span>
-                          {!isMandatoryGroup && (
-                            <button
-                              type="button"
-                              onClick={() => addManualBlankRow(grpName)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" /> Tambah Baris
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => addManualBlankRow(grpName)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Tambah Baris
+                          </button>
                         </div>
                       </div>
 
@@ -1953,7 +2023,6 @@ export function PrBuilderClient({
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {groupRows.map((row) => {
-                              const isMandatory = Boolean(row.mandatoryKey);
                               const unitPrice =
                                 row.hargaSatuan.trim() !== ""
                                   ? Number(row.hargaSatuan)
@@ -1978,117 +2047,86 @@ export function PrBuilderClient({
                               return (
                                 <tr
                                   key={row.tempId}
-                                  className={`align-top ${
-                                    isMandatory
-                                      ? row.qty > 0
-                                        ? "bg-emerald-50/40 hover:bg-emerald-50/70"
-                                        : "bg-slate-50/70 hover:bg-slate-100/70"
-                                      : "hover:bg-slate-50/80"
-                                  }`}
+                                  className="align-top hover:bg-slate-50/80"
                                 >
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="w-12 px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-center font-mono text-slate-600">
-                                        {row.noPr}
-                                      </div>
-                                    ) : (
-                                      <input
-                                        type="text"
-                                        value={row.noPr}
-                                        onChange={(e) =>
-                                          updateRow(row.tempId, {
-                                            noPr: e.target.value,
-                                          })
-                                        }
-                                        className="w-12 px-2 py-1.5 rounded-lg border border-slate-300 text-center font-mono"
-                                      />
-                                    )}
+                                    <input
+                                      type="text"
+                                      value={row.noPr}
+                                      onChange={(e) =>
+                                        updateRow(row.tempId, {
+                                          noPr: e.target.value,
+                                        })
+                                      }
+                                      className="w-12 px-2 py-1.5 rounded-lg border border-slate-300 text-center font-mono"
+                                    />
                                   </td>
 
                                   {/* PART TYPE + Floating Autocomplete Portal */}
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="space-y-1">
-                                        <div className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 font-semibold text-slate-700 select-text">
-                                          {row.partType}
-                                        </div>
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-extrabold">
-                                          <Lock className="w-2.5 h-2.5" /> Komponen Wajib PR (Terkunci)
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <CatalogAutocompleteInput
-                                          value={row.partType}
-                                          autoFocus={lastAddedRowId === row.tempId}
-                                          preferField="partType"
-                                          catalog={catalog}
-                                          onChange={(val) =>
-                                            updateRow(row.tempId, {
-                                              partType: val,
-                                            })
+                                    <CatalogAutocompleteInput
+                                      value={row.partType}
+                                      autoFocus={lastAddedRowId === row.tempId}
+                                      preferField="partType"
+                                      catalog={catalog}
+                                      onChange={(val) =>
+                                        updateRow(row.tempId, {
+                                          partType: val,
+                                        })
+                                      }
+                                      onSelectCatalogItem={(sug) =>
+                                        applyCatalogSuggestionToRow(
+                                          row.tempId,
+                                          sug
+                                        )
+                                      }
+                                      placeholder="Ketik tipe / merk / nama (mis. P, IDEC, FX5U...)"
+                                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                    />
+                                    {!exactInCatalog &&
+                                      row.partType.trim() !== "" &&
+                                      row.partName.trim() !== "" && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            quickSaveRowToCatalog(row)
                                           }
-                                          onSelectCatalogItem={(sug) =>
-                                            applyCatalogSuggestionToRow(
-                                              row.tempId,
-                                              sug
-                                            )
-                                          }
-                                          placeholder="Ketik tipe / merk / nama (mis. P, IDEC, FX5U...)"
-                                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                        />
-                                          {!exactInCatalog &&
-                                            row.partType.trim() !== "" &&
-                                            row.partName.trim() !== "" && (
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  quickSaveRowToCatalog(row)
-                                                }
-                                                className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
-                                                title="Simpan komponen custom ini ke Master Katalog agar ke depan tinggal klik"
-                                              >
-                                                <BookmarkPlus className="w-3.5 h-3.5" />
-                                                Simpan ke Katalog
-                                              </button>
-                                            )}
-                                          {isExcludedFromPrExport(
-                                            row.statusPembelian
-                                          ) && (
-                                            <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                                              Sudah Ada / Datang (tidak ikut Export PR)
-                                            </span>
-                                          )}
-                                        </>
+                                          className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                                          title="Simpan komponen custom ini ke Master Katalog agar ke depan tinggal klik"
+                                        >
+                                          <BookmarkPlus className="w-3.5 h-3.5" />
+                                          Simpan ke Katalog
+                                        </button>
                                       )}
+                                    {isExcludedFromPrExport(
+                                      row.statusPembelian
+                                    ) && (
+                                      <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                        Sudah Ada / Datang (tidak ikut Export PR)
+                                      </span>
+                                    )}
                                   </td>
 
                                   {/* PARTS NAME + Floating Autocomplete Portal */}
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-700">
-                                        {row.partName}
-                                      </div>
-                                    ) : (
-                                      <CatalogAutocompleteInput
-                                        value={row.partName}
-                                        preferField="partName"
-                                        catalog={catalog}
-                                        onChange={(val) =>
-                                          updateRow(row.tempId, {
-                                            partName: val,
-                                          })
-                                        }
-                                        onSelectCatalogItem={(sug) =>
-                                          applyCatalogSuggestionToRow(
-                                            row.tempId,
-                                            sug
-                                          )
-                                        }
-                                        placeholder="Ketik nama / jenis (mis. PLC, MCB, Push Button...)"
-                                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                      />
-                                    )}
+                                    <CatalogAutocompleteInput
+                                      value={row.partName}
+                                      preferField="partName"
+                                      catalog={catalog}
+                                      onChange={(val) =>
+                                        updateRow(row.tempId, {
+                                          partName: val,
+                                        })
+                                      }
+                                      onSelectCatalogItem={(sug) =>
+                                        applyCatalogSuggestionToRow(
+                                          row.tempId,
+                                          sug
+                                        )
+                                      }
+                                      placeholder="Ketik nama / jenis (mis. PLC, MCB, Push Button...)"
+                                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                                    />
                                   </td>
 
                                   {/* SUPPLIER */}
@@ -2108,77 +2146,33 @@ export function PrBuilderClient({
 
                                   {/* QTY */}
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="flex flex-col items-center">
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step="any"
-                                          value={row.qty}
-                                          onFocus={(e) => e.currentTarget.select()}
-                                          onChange={(e) => {
-                                            const val = Number(e.target.value);
-                                            updateRow(row.tempId, {
-                                              qty:
-                                                Number.isFinite(val) && val >= 0
-                                                  ? val
-                                                  : 0,
-                                            });
-                                          }}
-                                          aria-label={`Qty ${row.partName}`}
-                                          className={`w-20 px-2 py-1.5 rounded-lg border text-center font-extrabold focus:outline-none focus:ring-2 ${
-                                            row.qty > 0
-                                              ? "border-emerald-500 bg-white text-emerald-800 focus:ring-emerald-600"
-                                              : "border-amber-300 bg-amber-50/70 text-slate-600 focus:ring-amber-500"
-                                          }`}
-                                        />
-                                        <span
-                                          className={`mt-1 text-[10px] font-bold whitespace-nowrap ${
-                                            row.qty > 0
-                                              ? "text-emerald-700"
-                                              : "text-slate-500"
-                                          }`}
-                                        >
-                                          {row.qty > 0
-                                            ? "Masuk PR"
-                                            : "0 = Tdk masuk"}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <input
-                                        type="number"
-                                        min={0.1}
-                                        step="any"
-                                        value={row.qty}
-                                        onChange={(e) =>
-                                          updateRow(row.tempId, {
-                                            qty: Number(e.target.value) || 0,
-                                          })
-                                        }
-                                        className="w-18 px-2 py-1.5 rounded-lg border border-slate-300 text-center font-bold"
-                                      />
-                                    )}
+                                    <input
+                                      type="number"
+                                      min={0.1}
+                                      step="any"
+                                      value={row.qty}
+                                      onChange={(e) =>
+                                        updateRow(row.tempId, {
+                                          qty: Number(e.target.value) || 0,
+                                        })
+                                      }
+                                      className="w-18 px-2 py-1.5 rounded-lg border border-slate-300 text-center font-bold"
+                                    />
                                   </td>
 
                                   {/* UNIT */}
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="w-18 px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-center text-slate-600">
-                                        {row.unit}
-                                      </div>
-                                    ) : (
-                                      <input
-                                        type="text"
-                                        list="pr-unit-list"
-                                        value={row.unit}
-                                        onChange={(e) =>
-                                          updateRow(row.tempId, {
-                                            unit: e.target.value,
-                                          })
-                                        }
-                                        className="w-18 px-2 py-1.5 rounded-lg border border-slate-300 text-center"
-                                      />
-                                    )}
+                                    <input
+                                      type="text"
+                                      list="pr-unit-list"
+                                      value={row.unit}
+                                      onChange={(e) =>
+                                        updateRow(row.tempId, {
+                                          unit: e.target.value,
+                                        })
+                                      }
+                                      className="w-18 px-2 py-1.5 rounded-lg border border-slate-300 text-center"
+                                    />
                                   </td>
 
                                   {/* HARGA SATUAN */}
@@ -2202,13 +2196,7 @@ export function PrBuilderClient({
 
                                   {/* TOTAL */}
                                   <td className="p-2 text-right font-extrabold text-slate-900 whitespace-nowrap pt-3.5">
-                                    {isMandatory && row.qty <= 0 ? (
-                                      <span className="text-xs font-semibold text-slate-400">
-                                        Tidak masuk PR
-                                      </span>
-                                    ) : (
-                                      formatRupiah(rowTotal)
-                                    )}
+                                    {formatRupiah(rowTotal)}
                                   </td>
 
                                   {/* NOTE & DATE OF USE */}
@@ -2239,50 +2227,33 @@ export function PrBuilderClient({
 
                                   {/* PINDAH KELOMPOK */}
                                   <td className="p-2">
-                                    {isMandatory ? (
-                                      <div className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-500">
-                                        {row.kelompok}
-                                      </div>
-                                    ) : (
-                                      <select
-                                        value={row.kelompok}
-                                        onChange={(e) =>
-                                          updateRow(row.tempId, {
-                                            kelompok: e.target.value,
-                                          })
-                                        }
-                                        className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold"
-                                      >
-                                        {allDisplayGroups
-                                          .filter((g) => g !== MANDATORY_PR_GROUP)
-                                          .map((g) => (
-                                            <option key={g} value={g}>
-                                              {g}
-                                            </option>
-                                          ))}
-                                      </select>
-                                    )}
+                                    <select
+                                      value={row.kelompok}
+                                      onChange={(e) =>
+                                        updateRow(row.tempId, {
+                                          kelompok: e.target.value,
+                                        })
+                                      }
+                                      className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold"
+                                    >
+                                      {allDisplayGroups.map((g) => (
+                                        <option key={g} value={g}>
+                                          {g}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </td>
 
                                   {/* HAPUS */}
                                   <td className="p-2 text-center pt-3">
-                                    {isMandatory ? (
-                                      <span
-                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold"
-                                        title="Komponen wajib tidak dapat dihapus. Isi Qty = 0 jika tidak masuk PR."
-                                      >
-                                        <Lock className="w-3 h-3" /> Wajib
-                                      </span>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => removeRow(row.tempId)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
-                                        title="Hapus baris"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeRow(row.tempId)}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                                      title="Hapus baris"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -2311,11 +2282,6 @@ export function PrBuilderClient({
               </div>
               <div className="text-lg sm:text-2xl font-extrabold flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>{activePrCount} Komponen Masuk PR</span>
-                {excludedMandatoryCount > 0 && (
-                  <span className="text-xs sm:text-sm font-semibold text-slate-300 bg-slate-800 px-2.5 py-1 rounded-lg">
-                    {excludedMandatoryCount} komponen wajib Qty 0 (tidak masuk PR)
-                  </span>
-                )}
                 <span className="text-slate-500">•</span>
                 <span className="text-amber-300">
                   Estimasi Total: {formatRupiah(grandTotal)}
@@ -2323,7 +2289,7 @@ export function PrBuilderClient({
               </div>
               {activePrCount === 0 && (
                 <div className="text-xs text-amber-300 font-semibold">
-                  Pilih komponen dari katalog / tambah baris manual atau isi Qty &gt; 0 pada komponen wajib agar PR dapat disimpan/di-export.
+                  Pilih komponen dari katalog atau tambah baris manual agar PR dapat disimpan/di-export.
                 </div>
               )}
               {targetMode === "EXISTING_PROJECT" && (

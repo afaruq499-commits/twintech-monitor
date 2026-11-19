@@ -457,7 +457,7 @@ export function buildPrSubmissionItems<T extends MandatoryMergeRowInput>(
     return {
       items: null,
       error:
-        "Belum ada komponen yang masuk PR. Tambahkan komponen atau isi Qty > 0 pada komponen wajib.",
+        "Belum ada komponen yang masuk PR. Tambahkan komponen pada tabel PR.",
     };
   }
 
