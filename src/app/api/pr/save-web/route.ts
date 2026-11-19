@@ -321,6 +321,7 @@ export async function POST(request: Request) {
         }
 
         let preservedCount = 0;
+        const componentsToCreate = [];
         for (let i = 0; i < d.items.length; i++) {
           const item = d.items[i];
           const k = makeMatchKey(item.partType, item.partName);
@@ -332,30 +333,34 @@ export async function POST(request: Request) {
               ? Math.round(item.qty * item.hargaSatuan)
               : null;
 
-          await tx.component.create({
-            data: {
-              projectId: targetProjectId,
-              urutan: i + 1,
-              kelompok: item.kelompok,
-              noPr: item.noPr ?? String(i + 1),
-              partType: item.partType,
-              partName: item.partName,
-              supplier: item.supplier ?? null,
-              qty: item.qty,
-              unit: item.unit || "pcs",
-              catatanPr: item.catatanPr ?? null,
-              tanggalPakai: fromIsoDateStr(item.tanggalPakai),
-              hargaSatuan: item.hargaSatuan,
-              hargaRaw:
-                item.hargaSatuan !== null ? String(item.hargaSatuan) : null,
-              total,
-              statusPembelian: matchedPrev?.statusPembelian ?? "BELUM_PR",
-              estimasiTiba: matchedPrev?.estimasiTiba ?? null,
-              catatan: matchedPrev?.catatan ?? null,
-              perluDicek: false,
-              alasanDicek: null,
-              statusImport: "NORMAL",
-            },
+          componentsToCreate.push({
+            projectId: targetProjectId,
+            urutan: i + 1,
+            kelompok: item.kelompok,
+            noPr: item.noPr ?? String(i + 1),
+            partType: item.partType,
+            partName: item.partName,
+            supplier: item.supplier ?? null,
+            qty: item.qty,
+            unit: item.unit || "pcs",
+            catatanPr: item.catatanPr ?? null,
+            tanggalPakai: fromIsoDateStr(item.tanggalPakai),
+            hargaSatuan: item.hargaSatuan,
+            hargaRaw:
+              item.hargaSatuan !== null ? String(item.hargaSatuan) : null,
+            total,
+            statusPembelian: matchedPrev?.statusPembelian ?? "BELUM_PR",
+            estimasiTiba: matchedPrev?.estimasiTiba ?? null,
+            catatan: matchedPrev?.catatan ?? null,
+            perluDicek: false,
+            alasanDicek: null,
+            statusImport: "NORMAL",
+          });
+        }
+
+        if (componentsToCreate.length > 0) {
+          await tx.component.createMany({
+            data: componentsToCreate,
           });
         }
 
@@ -383,21 +388,37 @@ export async function POST(request: Request) {
         },
       });
 
-      await syncAutoPanelLayoutForProject(tx, targetProjectId);
-
       return { projectId: targetProjectId, summary };
+    },
+    {
+      maxWait: 15000, // 15 detik waktu tunggu antrian pool koneksi DB
+      timeout: 60000, // 60 detik batas timeout transaksi interaktif
     });
+
+    // Sinkronkan layout panel 2D di luar transaksi agar tidak membebani batas waktu transaksi DB
+    try {
+      await syncAutoPanelLayoutForProject(prisma, result.projectId);
+    } catch (layoutErr) {
+      console.warn("Auto-sync panel layout non-critical warning:", layoutErr);
+    }
 
     return NextResponse.json(result);
   } catch (err) {
     console.error("POST /api/pr/save-web error:", err);
+    let errorMsg = "Gagal menyimpan daftar komponen PR.";
+    if (err instanceof Error) {
+      if (
+        err.message.includes("Transaction already closed") ||
+        err.message.includes("timeout")
+      ) {
+        errorMsg =
+          "Waktu penyimpanan ke database habis karena latensi server cloud. Silakan coba klik simpan sekali lagi.";
+      } else {
+        errorMsg = err.message;
+      }
+    }
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Gagal menyimpan daftar komponen PR.",
-      },
+      { error: errorMsg },
       { status: 500 }
     );
   }

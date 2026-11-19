@@ -213,6 +213,10 @@ export async function POST(request: Request) {
         laneIds: createdLaneIds,
         firstLaneId: createdLaneIds[0] || null,
       };
+    },
+    {
+      maxWait: 15000,
+      timeout: 60000,
     });
 
     return NextResponse.json({ ok: true, ...result }, { status: 201 });

@@ -209,34 +209,37 @@ export async function POST(request: Request) {
           });
         }
 
-        for (let i = 0; i < resolvedRows.length; i++) {
-          const r = resolvedRows[i];
+        const componentsToCreate = resolvedRows.map((r, i) => {
           const hargaSatuan = r.hargaSatuan;
           const qty = r.qty ?? 1;
           const total =
             r.total ?? (hargaSatuan !== null ? hargaSatuan * qty : null);
 
-          await tx.component.create({
-            data: {
-              projectId: targetProjectId,
-              urutan: i + 1,
-              kelompok: r.kelompok,
-              noPr: r.noPr,
-              partType: (r.partType ?? "-").trim() || "-",
-              partName: (r.partName ?? "-").trim() || "-",
-              supplier: r.supplier,
-              qty,
-              unit: r.unit,
-              catatanPr: r.catatanPr,
-              tanggalPakai: fromIsoDateStr(r.tanggalPakai),
-              hargaSatuan,
-              hargaRaw: r.hargaRaw,
-              total,
-              statusPembelian: "BELUM_PR",
-              perluDicek: r.perluDicek,
-              alasanDicek: r.alasan.length ? r.alasan.join("; ") : null,
-              statusImport: "NORMAL",
-            },
+          return {
+            projectId: targetProjectId,
+            urutan: i + 1,
+            kelompok: r.kelompok,
+            noPr: r.noPr,
+            partType: (r.partType ?? "-").trim() || "-",
+            partName: (r.partName ?? "-").trim() || "-",
+            supplier: r.supplier,
+            qty,
+            unit: r.unit,
+            catatanPr: r.catatanPr,
+            tanggalPakai: fromIsoDateStr(r.tanggalPakai),
+            hargaSatuan,
+            hargaRaw: r.hargaRaw,
+            total,
+            statusPembelian: "BELUM_PR",
+            perluDicek: r.perluDicek,
+            alasanDicek: r.alasan.length ? r.alasan.join("; ") : null,
+            statusImport: "NORMAL",
+          };
+        });
+
+        if (componentsToCreate.length > 0) {
+          await tx.component.createMany({
+            data: componentsToCreate,
           });
         }
 
@@ -260,21 +263,37 @@ export async function POST(request: Request) {
         },
       });
 
-      await syncAutoPanelLayoutForProject(tx, targetProjectId);
-
       return { projectId: targetProjectId, summary };
+    },
+    {
+      maxWait: 15000, // 15 detik waktu tunggu antrian pool koneksi DB
+      timeout: 60000, // 60 detik batas timeout transaksi interaktif
     });
+
+    // Sinkronkan layout panel 2D di luar transaksi agar tidak membebani batas waktu transaksi DB
+    try {
+      await syncAutoPanelLayoutForProject(prisma, result.projectId);
+    } catch (layoutErr) {
+      console.warn("Auto-sync panel layout non-critical warning:", layoutErr);
+    }
 
     return NextResponse.json(result);
   } catch (err) {
     console.error("POST /api/pr/commit error:", err);
+    let errorMsg = "Gagal menyimpan hasil import PR ke database.";
+    if (err instanceof Error) {
+      if (
+        err.message.includes("Transaction already closed") ||
+        err.message.includes("timeout")
+      ) {
+        errorMsg =
+          "Waktu penyimpanan ke database habis karena kendala latensi server cloud. Silakan coba klik simpan sekali lagi.";
+      } else {
+        errorMsg = err.message;
+      }
+    }
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Gagal menyimpan hasil import PR ke database.",
-      },
+      { error: errorMsg },
       { status: 500 }
     );
   }
