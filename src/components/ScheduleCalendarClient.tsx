@@ -425,30 +425,31 @@ export function ScheduleCalendarClient({
   return (
     <div className="space-y-5">
       {/* Header & Aksi */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">
-            Jadwal & Kalender Lintas Proyek
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            Jadwal &amp; Kalender Lintas Proyek
           </h1>
-          <p className="text-sm text-slate-600">
-            Seret agenda (drag & drop) untuk memindahkan tanggal — aturan
-            bentrok 1 pekerjaan utama/hari divalidasi otomatis.
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Agenda pekerjaan per tanggal lintas proyek. Drag &amp; drop untuk memindahkan tanggal secara responsif.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/jadwal/buat"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-[#161822] border border-slate-200/80 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition"
           >
-            <CalendarPlus className="w-4 h-4" /> Buat Schedule Proyek
+            <CalendarPlus className="w-3.5 h-3.5 text-blue-600" />
+            <span>Buat Schedule</span>
           </Link>
 
           <Link
             href="/import-schedule"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 border border-teal-300 hover:bg-teal-100 text-teal-800 text-xs font-bold"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-[#161822] border border-slate-200/80 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition"
           >
-            <Upload className="w-4 h-4 text-teal-600" /> Import Schedule
+            <Upload className="w-3.5 h-3.5 text-[#F05232]" />
+            <span>Import</span>
           </Link>
 
           <button
@@ -462,27 +463,31 @@ export function ScheduleCalendarClient({
                 catatan: "",
               })
             }
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-neutral-800 dark:hover:bg-slate-100 text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" /> Jadwalkan Pekerjaan
+            <Plus className="w-4 h-4" />
+            <span>Jadwalkan</span>
           </button>
 
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-semibold cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-[#161822] border border-slate-200/80 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs">
             <input
               type="checkbox"
               checked={includeExportDates}
               onChange={(e) => setIncludeExportDates(e.target.checked)}
+              className="rounded"
             />
-            Tanggal di Excel
+            <span>Tanggal di Excel</span>
           </label>
 
           <a
             href={`/api/export/jadwal${
               includeExportDates ? "?includeDates=1" : ""
             }`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] text-slate-700 dark:text-slate-200 text-xs font-bold transition"
+            title="Export Excel Semua Lane"
           >
-            <Download className="w-4 h-4" /> Export Semua Lane
+            <Download className="w-3.5 h-3.5" />
+            <span>Export</span>
           </a>
         </div>
       </div>
@@ -538,14 +543,14 @@ export function ScheduleCalendarClient({
       )}
 
       {/* Filter Warna Proyek */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-3.5 flex flex-wrap items-center gap-2">
+      <div className="bg-white dark:bg-[#161822] rounded-2xl border border-slate-200/70 dark:border-white/[0.08] p-3 flex flex-wrap items-center gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <button
           type="button"
           onClick={() => setProjectFilter("ALL")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
             projectFilter === "ALL"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700"
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+              : "bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-white/[0.1]"
           }`}
         >
           Semua Proyek
@@ -555,10 +560,10 @@ export function ScheduleCalendarClient({
             key={p.id}
             type="button"
             onClick={() => setProjectFilter(p.id)}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all duration-150 cursor-pointer ${
               projectFilter === p.id
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900 shadow-xs"
+                : "border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#1a1c26] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.06]"
             }`}
           >
             <span
