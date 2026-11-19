@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
   CalendarPlus,
   Check,
+  CheckSquare,
   ChevronDown,
   ClipboardList,
   Cpu,
@@ -20,6 +21,7 @@ import {
   Search,
   Trash2,
   Workflow,
+  X,
 } from "lucide-react";
 import {
   ARRIVED_PURCHASE_STATUSES,
@@ -54,6 +56,7 @@ import {
   type MandatoryPrKey,
   matchMandatoryKey,
 } from "@/lib/pr-mandatory";
+import { ELECTRICAL_CHECKLIST_CATEGORIES } from "@/lib/electrical-checklist";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectHeroHeader } from "./ProjectHeroHeader";
 import { ProjectFlowchartPngViewer } from "./ProjectFlowchartPngViewer";
@@ -258,6 +261,7 @@ export function ProjectDetailClient({
   const [bulkEta, setBulkEta] = useState("");
   const [busyComp, setBusyComp] = useState(false);
   const [showMandatoryPanel, setShowMandatoryPanel] = useState(false);
+  const [showElectricalChecklist, setShowElectricalChecklist] = useState(false);
   const [mandatoryDraftQty, setMandatoryDraftQty] = useState<
     Record<string, string>
   >({});
@@ -321,6 +325,23 @@ export function ProjectDetailClient({
       mandatoryKeyByCompId.set(c.id, mKey);
     }
   }
+
+  // Status kelengkapan 13 Kategori Part Elektrikal Mesin & Panel (agar tidak ada part yang terlupa)
+  const electricalChecklistStatus = useMemo(() => {
+    return ELECTRICAL_CHECKLIST_CATEGORIES.map((cat) => {
+      const matchedComps = activeComps.filter((c) => cat.matcher(c));
+      return {
+        ...cat,
+        isFulfilled: matchedComps.length > 0,
+        count: matchedComps.length,
+        items: matchedComps,
+      };
+    });
+  }, [activeComps]);
+
+  const electricalFulfilledCount = useMemo(() => {
+    return electricalChecklistStatus.filter((c) => c.isFulfilled).length;
+  }, [electricalChecklistStatus]);
 
   const totalSchedCells = project.lanes.reduce(
     (sum, l) =>
@@ -502,10 +523,17 @@ export function ProjectDetailClient({
     try {
       if (nextQty > 0) {
         if (existing) {
-          const patchPayload: { qty?: number; hargaSatuan?: number | null } = {};
+          const patchPayload: {
+            qty?: number;
+            hargaSatuan?: number | null;
+            partType?: string;
+          } = {};
           if (existing.qty !== nextQty) patchPayload.qty = nextQty;
           if ((existing.hargaSatuan ?? null) !== nextPrice) {
             patchPayload.hargaSatuan = nextPrice;
+          }
+          if (existing.partType !== spec.partType) {
+            patchPayload.partType = spec.partType;
           }
           if (Object.keys(patchPayload).length > 0) {
             await fetch(`/api/components/${existing.id}`, {
@@ -966,6 +994,26 @@ export function ProjectDetailClient({
                 >
                   <ClipboardList className="w-3.5 h-3.5" /> Susun PR dari Katalog
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowElectricalChecklist((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer transition shadow-2xs ${
+                    showElectricalChecklist
+                      ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+                  title="Ceklis kelengkapan part elektrikal mesin & panel agar tidak ada part penting yang terlupa saat menyusun PR"
+                >
+                  <CheckSquare
+                    className={`w-3.5 h-3.5 ${
+                      showElectricalChecklist ? "text-white" : "text-amber-600"
+                    }`}
+                  />
+                  <span>
+                    Ceklis Part Elektrikal ({electricalFulfilledCount}/
+                    {ELECTRICAL_CHECKLIST_CATEGORIES.length})
+                  </span>
+                </button>
                 <Link
                   href={`/import-pr?projectId=${project.id}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition"
@@ -1090,6 +1138,138 @@ export function ProjectDetailClient({
               );
             })()}
           </div>
+
+          {/* Panel Ceklis Part Elektrikal Mesin & Panel (Panduan Kelengkapan agar Tidak Ada Part Penting yang Terlupa) */}
+          {showElectricalChecklist && (
+            <div className="bg-white rounded-2xl border-2 border-amber-300 p-4 sm:p-5 shadow-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-100">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CheckSquare className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-extrabold text-base text-slate-900">
+                      Ceklis Kelengkapan Part Elektrikal Mesin &amp; Panel
+                    </h3>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                        electricalFulfilledCount ===
+                        ELECTRICAL_CHECKLIST_CATEGORIES.length
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : "bg-amber-50 text-amber-800 border-amber-300"
+                      }`}
+                    >
+                      {electricalFulfilledCount} /{" "}
+                      {ELECTRICAL_CHECKLIST_CATEGORIES.length} Kategori Terpenuhi
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Gunakan panduan ceklis ini agar tidak ada part elektrikal penting yang terlupa sebelum PR diajukan.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href={`/buat-pr?projectId=${project.id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
+                    title="Buka katalog lengkap dan paket standar FR-EG-EP-006"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    Susun di Katalog
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowElectricalChecklist(false)}
+                    className="p-1.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    title="Tutup Ceklis"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid 13 Kategori Elektrikal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {electricalChecklistStatus.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className={`p-3 rounded-xl border transition flex flex-col justify-between ${
+                      cat.isFulfilled
+                        ? "bg-emerald-50/50 border-emerald-200 hover:border-emerald-300"
+                        : "bg-amber-50/30 border-amber-200 hover:border-amber-300"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
+                              cat.isFulfilled
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white border-2 border-amber-400 text-transparent"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 leading-snug">
+                              {cat.nama}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                              {cat.deskripsi}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 border ${
+                            cat.isFulfilled
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                              : "bg-amber-100 text-amber-800 border-amber-300"
+                          }`}
+                        >
+                          {cat.isFulfilled ? `${cat.count} item` : "Belum Ada"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {cat.isFulfilled ? (
+                      <div className="mt-2 pt-2 border-t border-emerald-200/60 text-[11px] text-emerald-900 truncate">
+                        <span className="font-semibold">Terdaftar:</span>{" "}
+                        {cat.items
+                          .map((i) => i.partType)
+                          .slice(0, 2)
+                          .join(", ")}
+                        {cat.items.length > 2
+                          ? ` (+${cat.items.length - 2} lainnya)`
+                          : ""}
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-amber-900 truncate text-[10px]" title={cat.contohPart}>
+                          Misal: {cat.contohPart}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewComp((prev) => ({
+                              ...prev,
+                              partType: cat.contohPart.split("/")[0].trim(),
+                              partName: cat.nama,
+                              kelompok: "Panel Utama",
+                            }));
+                            setAddCompOpen(true);
+                          }}
+                          className="text-[10px] font-bold text-blue-700 hover:text-blue-900 hover:underline shrink-0 ml-1 cursor-pointer"
+                          title={`Tambah ${cat.nama} ke PR`}
+                        >
+                          + Tambah
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Kartu Komponen Wajib PR (tidak bisa dihapus, hanya value Qty diubah; 0 = tidak masuk PR) */}
           <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-xs">

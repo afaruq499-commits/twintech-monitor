@@ -101,7 +101,7 @@ describe("PLC Address Excel Importer", () => {
         },
         options: {
           system: "MITSUBISHI_FX5U_OCTAL",
-        },
+        } as any,
       },
       {
         nama: "Test Proyek Mesin",

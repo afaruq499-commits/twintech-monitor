@@ -43,7 +43,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-034",
     label: "Kabel 0.34 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Federal / Supreme NYAF 0.34 mm² (AWG 22 - Rol 100M)",
+    partType: "NYAF 0.34 mm² (AWG 22 - Rol 100M)",
     partName: "Kabel Fleksibel Kontrol NYAF 0.34 mm²",
     supplier: "",
     defaultQty: 0,
@@ -55,7 +55,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-075",
     label: "Kabel 0.75 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Federal / Supreme NYAF 0.75 mm² (AWG 18 - Rol 100M)",
+    partType: "NYAF 0.75 mm² (AWG 18 - Rol 100M)",
     partName: "Kabel Fleksibel Kontrol NYAF 0.75 mm²",
     supplier: "",
     defaultQty: 0,
@@ -67,7 +67,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-25",
     label: "Kabel 2.5 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Federal / Supreme NYAF 2.5 mm² (AWG 14 - Rol 100M)",
+    partType: "NYAF 2.5 mm² (AWG 14 - Rol 100M)",
     partName: "Kabel Fleksibel Power NYAF 2.5 mm²",
     supplier: "",
     defaultQty: 0,
@@ -79,7 +79,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-6",
     label: "Kabel 6 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Federal / Supreme NYAF 6 mm² (AWG 10 - Rol 100M)",
+    partType: "NYAF 6 mm² (AWG 10 - Rol 100M)",
     partName: "Kabel Fleksibel Power NYAF 6 mm²",
     supplier: "",
     defaultQty: 0,
@@ -91,7 +91,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-core-034",
     label: "Kabel Core 0.34 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Lapp / Belden / LiYCY Kabel Core 0.34 mm² (Multicore)",
+    partType: "LiYCY Kabel Core 0.34 mm² (Multicore)",
     partName: "Kabel Core Sinyal 0.34 mm² (Multicore Shielded)",
     supplier: "",
     defaultQty: 0,
@@ -103,7 +103,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-core-075",
     label: "Kabel Core 0.75 mm²",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Federal / Lapp / NYYHY Kabel Core 0.75 mm² (Multicore)",
+    partType: "NYYHY Kabel Core 0.75 mm² (Multicore)",
     partName: "Kabel Core Kontrol 0.75 mm² (Multicore)",
     supplier: "",
     defaultQty: 0,
@@ -187,7 +187,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "din-rail",
     label: "DIN Rail",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Bebas / FORT Din Rail 35x7.5mm Slotted",
+    partType: "Din Rail 35x7.5mm Slotted",
     partName: "Aluminium Din Rail 35mm (1 Meter)",
     supplier: "",
     defaultQty: 0,
@@ -199,7 +199,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "tag-panel",
     label: "Tag Panel",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "Custom / IDEC Tag Panel Acrylic / Legend Plate",
+    partType: "Tag Panel Acrylic / Legend Plate",
     partName: "Tag Panel (Nameplate & Label Tombol Panel)",
     supplier: "",
     defaultQty: 0,
@@ -223,7 +223,7 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
     key: "kabel-bakar",
     label: "Kabel Bakar",
     kelompok: MANDATORY_PR_GROUP,
-    partType: "KSS / Sumitomo Kabel Bakar / Heat Shrink Set",
+    partType: "Kabel Bakar / Heat Shrink Set",
     partName: "Kabel Bakar / Heat Shrink Tube (Selongsong Bakar)",
     supplier: "",
     defaultQty: 0,
@@ -233,6 +233,19 @@ export const MANDATORY_PR_COMPONENTS: MandatoryPrSpec[] = [
   },
 ];
 
+// Alias nama partType lama (sebelum merek dihapus) agar data tersimpan di database tetap cocok
+const LEGACY_PART_TYPE_ALIASES: Record<string, MandatoryPrKey> = {
+  "federal / supreme nyaf 0.34 mm² (awg 22 - rol 100m)": "kabel-034",
+  "federal / supreme nyaf 0.75 mm² (awg 18 - rol 100m)": "kabel-075",
+  "federal / supreme nyaf 2.5 mm² (awg 14 - rol 100m)": "kabel-25",
+  "federal / supreme nyaf 6 mm² (awg 10 - rol 100m)": "kabel-6",
+  "lapp / belden / liycy kabel core 0.34 mm² (multicore)": "kabel-core-034",
+  "federal / lapp / nyyhy kabel core 0.75 mm² (multicore)": "kabel-core-075",
+  "bebas / fort din rail 35x7.5mm slotted": "din-rail",
+  "custom / idec tag panel acrylic / legend plate": "tag-panel",
+  "kss / sumitomo kabel bakar / heat shrink set": "kabel-bakar",
+};
+
 const EXACT_SPEC_MAP = new Map<string, MandatoryPrKey>(
   MANDATORY_PR_COMPONENTS.map((s) => [
     `${s.partType.trim().toLowerCase()}||${s.partName.trim().toLowerCase()}`,
@@ -240,9 +253,12 @@ const EXACT_SPEC_MAP = new Map<string, MandatoryPrKey>(
   ])
 );
 
-const PART_TYPE_MAP = new Map<string, MandatoryPrKey>(
-  MANDATORY_PR_COMPONENTS.map((s) => [s.partType.trim().toLowerCase(), s.key])
-);
+const PART_TYPE_MAP = new Map<string, MandatoryPrKey>([
+  ...MANDATORY_PR_COMPONENTS.map(
+    (s): [string, MandatoryPrKey] => [s.partType.trim().toLowerCase(), s.key]
+  ),
+  ...Object.entries(LEGACY_PART_TYPE_ALIASES),
+]);
 
 /**
  * Mencocokkan partType & partName terhadap daftar komponen wajib PR.
