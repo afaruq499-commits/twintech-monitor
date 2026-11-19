@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
   CalendarPlus,
   CheckCircle2,
+  ChevronDown,
   GitFork,
   Plus,
+  Search,
   Trash2,
   User,
+  Wrench,
+  X,
 } from "lucide-react";
 import {
   PROJECT_COLOR_PALETTE,
@@ -39,6 +43,8 @@ interface ExistingProjectOption {
   deadline: string | null;
   pic: string | null;
   bolehParalel: boolean;
+  tipeProyek?: string;
+  status?: string;
 }
 
 interface SubWorkDraft {
@@ -78,6 +84,40 @@ export function CreateProjectScheduleClient({
   );
   const [existingProjectId, setExistingProjectId] = useState(
     preselectedProj?.id ?? existingProjects[0]?.id ?? ""
+  );
+
+  // Search & Combobox untuk Proyek Existing
+  const [projectSearch, setProjectSearch] = useState("");
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        projectDropdownRef.current &&
+        !projectDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsProjectDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredExistingProjects = useMemo(() => {
+    if (!projectSearch.trim()) return existingProjects;
+    const q = projectSearch.toLowerCase();
+    return existingProjects.filter((p) => {
+      const matchKode = (p.kode ?? "").toLowerCase().includes(q);
+      const matchNama = (p.nama ?? "").toLowerCase().includes(q);
+      const matchClient = (p.client ?? "").toLowerCase().includes(q);
+      return matchKode || matchNama || matchClient;
+    });
+  }, [existingProjects, projectSearch]);
+
+  const selectedExistingProject = useMemo(
+    () => existingProjects.find((p) => p.id === existingProjectId),
+    [existingProjects, existingProjectId]
   );
 
   // Field Proyek Baru
@@ -149,9 +189,13 @@ export function CreateProjectScheduleClient({
     setExistingProjectId(id);
     const found = existingProjects.find((p) => p.id === id);
     if (found) {
-      if (found.deadline && !deadline) setDeadline(found.deadline);
-      if (found.pic && !picUtama) setPicUtama(found.pic);
+      if (found.deadline) setDeadline(found.deadline);
+      if (found.pic) setPicUtama(found.pic);
       setProyekParalel(found.bolehParalel);
+      if (found.tipeProyek && found.tipeProyek !== tipeProyek) {
+        setTipeProyek(found.tipeProyek as ProjectType);
+        applyTemplateByTipe(found.tipeProyek as ProjectType);
+      }
     }
   }
 
@@ -503,23 +547,150 @@ export function CreateProjectScheduleClient({
             </div>
           </div>
         ) : (
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1">
-              Pilih Proyek *
-            </label>
-            <select
-              required
-              value={existingProjectId}
-              onChange={(e) => handleSelectExistingProject(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-base font-bold"
-            >
-              {existingProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.kode ? `[${p.kode}] ` : ""}
-                  {p.nama} — {p.client}
-                </option>
-              ))}
-            </select>
+          <div className="relative" ref={projectDropdownRef}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-bold text-slate-800">
+                Pilih Proyek *
+              </label>
+              {selectedExistingProject && (
+                <span className="text-xs text-slate-500">
+                  Terpilih:{" "}
+                  <span className="font-bold text-slate-800">
+                    {selectedExistingProject.nama}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {/* Input Pencarian Proyek (Bisa Ngetik Langsung) */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={
+                  isProjectDropdownOpen
+                    ? projectSearch
+                    : selectedExistingProject
+                    ? `${selectedExistingProject.kode ? `[${selectedExistingProject.kode}] ` : ""}${selectedExistingProject.nama} — ${selectedExistingProject.client}`
+                    : projectSearch
+                }
+                onChange={(e) => {
+                  setProjectSearch(e.target.value);
+                  if (!isProjectDropdownOpen) setIsProjectDropdownOpen(true);
+                }}
+                onFocus={() => {
+                  setIsProjectDropdownOpen(true);
+                  setProjectSearch("");
+                }}
+                placeholder="Ketik untuk mencari kode, nama proyek, atau customer..."
+                className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-slate-300 bg-white text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 shadow-2xs transition"
+              />
+              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-0.5">
+                {projectSearch && isProjectDropdownOpen && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProjectSearch("");
+                    }}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                    title="Hapus pencarian"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsProjectDropdownOpen((prev) => !prev)}
+                  className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                  title="Buka / tutup daftar proyek"
+                >
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isProjectDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Dropdown Menu dengan Scroll jika Item Over */}
+            {isProjectDropdownOpen && (
+              <div className="absolute z-30 mt-1.5 w-full bg-white rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+                <div className="p-2.5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500 font-semibold">
+                  <span>Ditemukan {filteredExistingProjects.length} proyek</span>
+                  <span>Ketik kata kunci atau klik salah satu</span>
+                </div>
+                <div className="max-h-64 sm:max-h-72 overflow-y-auto divide-y divide-slate-100 scrollbar-thin scrollbar-thumb-slate-300">
+                  {filteredExistingProjects.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-slate-500">
+                      <AlertCircle className="w-6 h-6 mx-auto mb-2 text-slate-400" />
+                      Tidak ada proyek yang sesuai dengan &quot;{projectSearch}&quot;.
+                    </div>
+                  ) : (
+                    filteredExistingProjects.map((p) => {
+                      const isSelected = p.id === existingProjectId;
+                      const isAfterSales = p.tipeProyek === "AFTER_SALES";
+                      const isCompleted = p.status === "SELESAI";
+
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            handleSelectExistingProject(p.id);
+                            setIsProjectDropdownOpen(false);
+                            setProjectSearch("");
+                          }}
+                          className={`w-full px-4 py-3 text-left flex items-start justify-between gap-3 transition cursor-pointer ${
+                            isSelected
+                              ? "bg-blue-50/90 hover:bg-blue-100/80 text-blue-950"
+                              : isAfterSales
+                              ? "bg-amber-50/20 hover:bg-amber-50/60"
+                              : "hover:bg-slate-50 text-slate-800"
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-xs font-mono font-extrabold ${
+                                  isAfterSales
+                                    ? "bg-amber-100 text-amber-900 border border-amber-300/80"
+                                    : "bg-slate-100 text-slate-800 border border-slate-200"
+                                }`}
+                              >
+                                {p.kode || "[-]"}
+                              </span>
+                              <span className="font-bold text-sm text-slate-900">
+                                {p.nama}
+                              </span>
+                              {isAfterSales && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-amber-800 border border-amber-500/30">
+                                  <Wrench className="w-2.5 h-2.5" /> After Sales
+                                </span>
+                              )}
+                              {isCompleted && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Selesai
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium truncate">
+                              Client: <strong className="text-slate-700 font-semibold">{p.client}</strong>
+                              {p.deadline ? ` • Deadline: ${p.deadline}` : ""}
+                              {p.pic ? ` • PIC: ${p.pic}` : ""}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-1" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

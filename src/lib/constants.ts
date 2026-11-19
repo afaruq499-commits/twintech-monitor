@@ -31,6 +31,7 @@ export const PROJECT_STATUSES = [
   "PROGRAMMING",
   "COMMISSIONING",
   "SELESAI",
+  "EXPIRED",
 ] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
@@ -41,6 +42,7 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   PROGRAMMING: "Programming",
   COMMISSIONING: "Commissioning",
   SELESAI: "Selesai",
+  EXPIRED: "Expired",
 };
 
 export const PR_STATUSES = [

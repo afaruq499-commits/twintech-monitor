@@ -10,7 +10,15 @@ export default async function ScheduleCalendarPage() {
   const todayIso = todayIsoLocal();
 
   const lanes = await prisma.lane.findMany({
-    where: { project: { status: { not: "SELESAI" } } },
+    where: {
+      project: {
+        status: { not: "EXPIRED" },
+        OR: [
+          { status: { not: "SELESAI" } },
+          { tipeProyek: "AFTER_SALES" },
+        ],
+      },
+    },
     orderBy: [{ projectId: "asc" }, { urutan: "asc" }],
     include: {
       project: true,

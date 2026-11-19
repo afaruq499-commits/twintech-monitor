@@ -6,8 +6,15 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function BuatScheduleProyekPage() {
+  // Proyek aktif + Proyek After Sales (meski sudah selesai), kecuali berstatus "EXPIRED"
   const projects = await prisma.project.findMany({
-    where: { status: { not: "SELESAI" } },
+    where: {
+      status: { not: "EXPIRED" },
+      OR: [
+        { status: { not: "SELESAI" } },
+        { tipeProyek: "AFTER_SALES" },
+      ],
+    },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
@@ -17,6 +24,8 @@ export default async function BuatScheduleProyekPage() {
       deadline: true,
       pic: true,
       bolehParalel: true,
+      tipeProyek: true,
+      status: true,
     },
   });
 
@@ -28,6 +37,8 @@ export default async function BuatScheduleProyekPage() {
     deadline: toIsoDateStr(p.deadline),
     pic: p.pic,
     bolehParalel: p.bolehParalel,
+    tipeProyek: p.tipeProyek,
+    status: p.status,
   }));
 
   return (

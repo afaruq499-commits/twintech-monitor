@@ -19,7 +19,15 @@ export async function GET(request: Request) {
       ? { id: laneId }
       : projectId
         ? { projectId }
-        : { project: { status: { not: "SELESAI" } } };
+        : {
+            project: {
+              status: { not: "EXPIRED" },
+              OR: [
+                { status: { not: "SELESAI" } },
+                { tipeProyek: "AFTER_SALES" },
+              ],
+            },
+          };
 
     const [lanes, settings] = await Promise.all([
       prisma.lane.findMany({
