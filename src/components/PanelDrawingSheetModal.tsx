@@ -483,8 +483,11 @@ export function PanelDrawingSheetModal({
                     const sx = fx + sw + sgap;
                     const sy = plateBottomY;
 
+                    const effectiveLockDoorY = feat.hasLoto
+                      ? (feat.lockDoorY ?? Math.round(outerH * 0.58))
+                      : Math.round(outerH * 0.5);
                     const lcx = fx + (feat.lockDoorX ?? 55) * s;
-                    const lcy = fy - sh + (feat.lockDoorY ?? Math.round(outerH * 0.55)) * s;
+                    const lcy = fy - sh + effectiveLockDoorY * s;
 
                     const lotox = fx + (feat.lotoX ?? 110) * s;
                     const lotoy = fy - sh + (feat.lotoY ?? 110) * s;

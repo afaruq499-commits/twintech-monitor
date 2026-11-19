@@ -124,8 +124,13 @@ export function ProjectOuterPanel2DViewer({
   const sideY = marginY;
 
   // Posisi Lock Door (Handle Kunci)
+  // Geser otomatis: Saat LOTO Switch OFF, Lock Door center vertikal ke tengah (heightMm / 2).
+  // Saat LOTO Switch ON, Lock Door bergeser ke bawah (heightMm * 0.58) agar ergonomis & memberi ruang LOTO di kiri atas.
   const lockDoorX = frontX + (features.lockDoorX ?? 55);
-  const lockDoorY = frontY + (features.lockDoorY ?? Math.round(heightMm * 0.55));
+  const effectiveLockDoorY = features.hasLoto
+    ? (features.lockDoorY ?? Math.round(heightMm * 0.58))
+    : Math.round(heightMm * 0.5);
+  const lockDoorY = frontY + effectiveLockDoorY;
 
   // Posisi LOTO Switch
   const lotoX = frontX + (features.lotoX ?? 110);
@@ -509,7 +514,15 @@ export function ProjectOuterPanel2DViewer({
             <input
               type="checkbox"
               checked={features.hasLoto}
-              onChange={(e) => updateFeatures({ hasLoto: e.target.checked })}
+              onChange={(e) => {
+                const nextHasLoto = e.target.checked;
+                updateFeatures({
+                  hasLoto: nextHasLoto,
+                  lockDoorY: nextHasLoto
+                    ? Math.round(heightMm * 0.58)
+                    : Math.round(heightMm * 0.5),
+                });
+              }}
               className="sr-only peer"
             />
             <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-amber-500" />
@@ -733,8 +746,14 @@ export function ProjectOuterPanel2DViewer({
               />
 
               {/* --- ELEMEN: LOCK DOOR (HANDLE KUNCI PINTU PANEL) --- */}
-              {/* Posisi di sisi kiri pintu panel sesuai gambar referensi */}
-              <g id="lock-door" transform={`translate(${lockDoorX}, ${lockDoorY})`}>
+              {/* Posisi di sisi kiri pintu panel sesuai gambar referensi: Otomatis center saat LOTO off */}
+              <g
+                id="lock-door"
+                transform={`translate(${lockDoorX}, ${lockDoorY})`}
+                style={{
+                  transition: "transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
+              >
                 {/* Housing Handle Recessed */}
                 <rect
                   x={-14}
@@ -772,6 +791,9 @@ export function ProjectOuterPanel2DViewer({
                 stroke="#38bdf8"
                 strokeWidth={1.8}
                 markerStart="url(#arrowPointer)"
+                style={{
+                  transition: "d 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
               />
               <text
                 x={lockDoorX + 85}
@@ -780,6 +802,9 @@ export function ProjectOuterPanel2DViewer({
                 fontSize={12}
                 fontWeight="bold"
                 fontFamily="monospace"
+                style={{
+                  transition: "y 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
               >
                 LOCK DOOR
               </text>
@@ -789,6 +814,9 @@ export function ProjectOuterPanel2DViewer({
                 fill="#94a3b8"
                 fontSize={10}
                 fontFamily="sans-serif"
+                style={{
+                  transition: "y 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
               >
                 Kunci Pintu Panel
               </text>
@@ -1042,7 +1070,7 @@ export function ProjectOuterPanel2DViewer({
                 strokeWidth={1.5}
               />
 
-              {/* Tonjolan Siluet Lock Door di Sisi Depan Pintu */}
+              {/* Tonjolan Siluet Lock Door di Sisi Depan Pintu (Otomatis center bila LOTO off) */}
               <rect
                 x={sideX - 18}
                 y={lockDoorY - 40}
@@ -1052,6 +1080,9 @@ export function ProjectOuterPanel2DViewer({
                 fill="#1e293b"
                 stroke="#cbd5e1"
                 strokeWidth={1.5}
+                style={{
+                  transition: "y 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
               />
 
               {/* Tonjolan Siluet Rotary LOTO Switch (Jika Aktif) */}

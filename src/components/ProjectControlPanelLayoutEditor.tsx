@@ -859,6 +859,7 @@ export function ProjectControlPanelLayoutEditor({
   const [customDinRailLength, setCustomDinRailLength] = useState<number>(layoutData.enclosure.widthMm - 160);
   const [showRuler, setShowRuler] = useState<boolean>(true);
   const [smartSnapEnabled, setSmartSnapEnabled] = useState<boolean>(true);
+  const [showHmiSideView, setShowHmiSideView] = useState<boolean>(true);
   const [activeGuides, setActiveGuides] = useState<MagneticGuide[]>([]);
 
   const toggleCategory = (catKey: string) => {
@@ -876,8 +877,10 @@ export function ProjectControlPanelLayoutEditor({
   const handleFitToScreen = useCallback(
     (targetWidthMm?: number, targetHeightMm?: number) => {
       const container = containerRef.current;
-      const w = targetWidthMm ?? layoutData.enclosure.widthMm;
-      const h = targetHeightMm ?? layoutData.enclosure.heightMm;
+      const isHmiDual = activePanelMode === "HMI" && showHmiSideView;
+      const hmiExtraW = isHmiDual ? (layoutData.enclosure.depthMm || 180) + 120 : 0;
+      const w = (targetWidthMm ?? layoutData.enclosure.widthMm) + hmiExtraW;
+      const h = (targetHeightMm ?? layoutData.enclosure.heightMm) + (isHmiDual ? 45 : 0);
       if (!container || !w || !h) return;
 
       const rect = container.getBoundingClientRect();
@@ -894,7 +897,15 @@ export function ProjectControlPanelLayoutEditor({
       const clamped = Math.max(0.3, Math.min(3.5, Number(bestScale.toFixed(2))));
       setZoom(clamped);
     },
-    [layoutData.enclosure.widthMm, layoutData.enclosure.heightMm, hasSelection, setZoom]
+    [
+      layoutData.enclosure.widthMm,
+      layoutData.enclosure.heightMm,
+      layoutData.enclosure.depthMm,
+      activePanelMode,
+      showHmiSideView,
+      hasSelection,
+      setZoom,
+    ]
   );
 
   // Zoom dengan Ctrl + Mouse Wheel di area canvas
@@ -2965,29 +2976,59 @@ export function ProjectControlPanelLayoutEditor({
             }
           }}
         >
-          {/* Petunjuk Penggunaan Cepat */}
-          <div className="absolute top-3 left-3 z-10 bg-slate-800/90 text-slate-300 text-[11px] px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-2 backdrop-blur-xs shadow-md">
-            <Info className="w-3.5 h-3.5 text-blue-400" />
-            <span>
-              Klik part untuk ubah posisi/hapus • <strong>Ctrl + Klik Kiri</strong> untuk pilih beberapa item • <strong>Ctrl + Scroll Mouse</strong> untuk zoom
-            </span>
+          {/* Petunjuk Penggunaan Cepat & Kontrol HMI Side View */}
+          <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
+            <div className="bg-slate-800/90 text-slate-300 text-[11px] px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-2 backdrop-blur-xs shadow-md">
+              <Info className="w-3.5 h-3.5 text-blue-400" />
+              <span>
+                Klik part untuk ubah posisi/hapus • <strong>Ctrl + Klik Kiri</strong> untuk pilih beberapa item • <strong>Ctrl + Scroll Mouse</strong> untuk zoom
+              </span>
+            </div>
+
+            {activePanelMode === "HMI" && (
+              <button
+                type="button"
+                onClick={() => setShowHmiSideView((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer border ${
+                  showHmiSideView
+                    ? "bg-blue-600 border-blue-500 text-white"
+                    : "bg-slate-800/90 border-slate-700 text-slate-300 hover:text-white"
+                }`}
+                title="Tampilkan / Sembunyikan Gambar DWG Sisi Samping (Side View) untuk Panel HMI"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Tampak Samping DWG: {showHmiSideView ? "Aktif" : "Nonaktif"}</span>
+              </button>
+            )}
           </div>
 
           {/* SVG Canvas Gambar 2D Panel */}
-          <div
-            style={{
-              width: layoutData.enclosure.widthMm * zoom,
-              height: layoutData.enclosure.heightMm * zoom,
-              position: "relative",
-            }}
-            className="transition-transform duration-75 shadow-2xl shrink-0"
-          >
-            <svg
-              ref={canvasRef}
-              viewBox={`0 0 ${layoutData.enclosure.widthMm} ${layoutData.enclosure.heightMm}`}
-              className="w-full h-full block rounded-lg overflow-visible"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+          {(() => {
+            const isHmiDual = activePanelMode === "HMI" && showHmiSideView;
+            const hmiDepthMm = layoutData.enclosure.depthMm || 180;
+            const hmiGap = 90;
+            const totalSvgWidth = isHmiDual
+              ? layoutData.enclosure.widthMm + hmiGap + hmiDepthMm + 30
+              : layoutData.enclosure.widthMm;
+            const totalSvgHeight = isHmiDual
+              ? layoutData.enclosure.heightMm + 45
+              : layoutData.enclosure.heightMm;
+
+            return (
+              <div
+                style={{
+                  width: totalSvgWidth * zoom,
+                  height: totalSvgHeight * zoom,
+                  position: "relative",
+                }}
+                className="transition-transform duration-75 shadow-2xl shrink-0"
+              >
+                <svg
+                  ref={canvasRef}
+                  viewBox={`0 0 ${totalSvgWidth} ${totalSvgHeight}`}
+                  className="w-full h-full block rounded-lg overflow-visible"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
               <defs>
                 {/* Pattern Grid Millimeter (Garis bantu 20mm & 100mm) */}
                 <pattern id="grid-20" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -5261,8 +5302,210 @@ export function ProjectControlPanelLayoutEditor({
                 <circle cx="0" cy="0" r="8" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
                 <path d="M -4 0 L 0 0 L 0 -4 M -2 2 L 2 -2" stroke="#ffffff" strokeWidth="1.5" />
               </g>
+
+              {/* ============================================================== */}
+              {/* GAMBAR DWG SISI SAMPING (SIDE VIEW) UNTUK HMI LAYOUT          */}
+              {/* ============================================================== */}
+              {isHmiDual && (() => {
+                const sideX = layoutData.enclosure.widthMm + hmiGap;
+                const h = layoutData.enclosure.heightMm;
+
+                const hmiItems = layoutData.items.filter((it) => it.category === "HMI");
+                const buttonItems = layoutData.items.filter((it) =>
+                  [
+                    "EMERGENCY_STOP",
+                    "PUSH_BUTTON",
+                    "PILOT_LAMP",
+                    "SELECTOR_SWITCH",
+                    "KEY_SWITCH",
+                    "BUZZER",
+                  ].includes(it.category)
+                );
+
+                return (
+                  <g id="hmi-side-view-dwg">
+                    {/* Label Tampak Depan */}
+                    <text
+                      x={layoutData.enclosure.widthMm / 2}
+                      y={h + 30}
+                      textAnchor="middle"
+                      fill="#94a3b8"
+                      fontSize="11"
+                      fontWeight="bold"
+                      fontFamily="monospace"
+                      letterSpacing="1"
+                    >
+                      TAMPAK DEPAN (FRONT VIEW)
+                    </text>
+
+                    {/* 1. Box Samping Enclosure OP Panel */}
+                    <rect
+                      x={sideX}
+                      y={0}
+                      width={hmiDepthMm}
+                      height={h}
+                      rx={6}
+                      fill="#1e293b"
+                      stroke="#475569"
+                      strokeWidth={2}
+                      className="drop-shadow-lg"
+                    />
+
+                    {/* Grid Samping halus */}
+                    <rect
+                      x={sideX}
+                      y={0}
+                      width={hmiDepthMm}
+                      height={h}
+                      rx={6}
+                      fill="url(#grid-100)"
+                      opacity={0.08}
+                    />
+
+                    {/* 2. Profil Daun Pintu Depan (Flange) di Sisi Kiri Tampak Samping */}
+                    <rect
+                      x={sideX - 12}
+                      y={6}
+                      width={12}
+                      height={h - 12}
+                      rx={2}
+                      fill="#334155"
+                      stroke="#64748b"
+                      strokeWidth={1.5}
+                    />
+                    {/* Engsel Samping Atas & Bawah */}
+                    <rect x={sideX - 15} y={35} width={4} height={28} rx={1.5} fill="#0f172a" stroke="#94a3b8" strokeWidth={1} />
+                    <rect x={sideX - 15} y={h - 63} width={4} height={28} rx={1.5} fill="#0f172a" stroke="#94a3b8" strokeWidth={1} />
+
+                    {/* 3. Siluet Bezel Layar Sentuh HMI di Tampak Samping */}
+                    {hmiItems.map((hmiIt) => (
+                      <g key={`side-hmi-${hmiIt.id}`}>
+                        {/* Bezel Luar Tonjolan di depan pintu */}
+                        <rect
+                          x={sideX - 22}
+                          y={hmiIt.yMm}
+                          width={10}
+                          height={hmiIt.heightMm}
+                          rx={2}
+                          fill="#0284c7"
+                          stroke="#38bdf8"
+                          strokeWidth={1.5}
+                        />
+                        {/* Bodi Internal HMI di dalam Box Panel (kedalaman 45mm) */}
+                        <rect
+                          x={sideX}
+                          y={hmiIt.yMm + 8}
+                          width={45}
+                          height={Math.max(10, hmiIt.heightMm - 16)}
+                          rx={2}
+                          fill="#0f172a"
+                          stroke="#0284c7"
+                          strokeWidth={1.2}
+                          strokeDasharray="4 2"
+                          opacity={0.85}
+                        />
+                        {/* Leader line pointer */}
+                        <line
+                          x1={sideX - 22}
+                          y1={hmiIt.yMm + hmiIt.heightMm / 2}
+                          x2={sideX - 45}
+                          y2={hmiIt.yMm + hmiIt.heightMm / 2}
+                          stroke="#38bdf8"
+                          strokeWidth={1.2}
+                        />
+                        <text
+                          x={sideX - 48}
+                          y={hmiIt.yMm + hmiIt.heightMm / 2 + 3}
+                          textAnchor="end"
+                          fontSize={9}
+                          fontWeight="bold"
+                          fill="#38bdf8"
+                          fontFamily="monospace"
+                        >
+                          HMI BEZEL
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* 4. Siluet Push Button & Emergency Stop di Tampak Samping */}
+                    {buttonItems.map((btn) => {
+                      const isEStop = btn.category === "EMERGENCY_STOP";
+                      const centerY = btn.yMm + btn.heightMm / 2;
+                      const color = isEStop
+                        ? "#ef4444"
+                        : btn.category === "PILOT_LAMP"
+                          ? "#10b981"
+                          : "#f59e0b";
+                      const strokeColor = isEStop ? "#f87171" : "#fbbf24";
+                      const headW = isEStop ? 15 : 7;
+                      const headH = isEStop ? 24 : 16;
+                      return (
+                        <g key={`side-btn-${btn.id}`}>
+                          {/* Kepala Tombol Luar */}
+                          <rect
+                            x={sideX - 12 - headW}
+                            y={centerY - headH / 2}
+                            width={headW}
+                            height={headH}
+                            rx={isEStop ? 4 : 2}
+                            fill={color}
+                            stroke={strokeColor}
+                            strokeWidth={1.2}
+                          />
+                          {/* Contact Block dalam Box */}
+                          <rect
+                            x={sideX}
+                            y={centerY - 8}
+                            width={42}
+                            height={16}
+                            rx={2}
+                            fill="#1e293b"
+                            stroke="#64748b"
+                            strokeWidth={1}
+                            strokeDasharray="3 2"
+                          />
+                        </g>
+                      );
+                    })}
+
+                    {/* 5. Dimensi Kedalaman / Tebal Box Samping (Bawah) */}
+                    <g id="side-depth-dim">
+                      <line x1={sideX} y1={h + 18} x2={sideX + hmiDepthMm} y2={h + 18} stroke="#94a3b8" strokeWidth={1.5} />
+                      <line x1={sideX} y1={h + 10} x2={sideX} y2={h + 23} stroke="#94a3b8" strokeWidth={1} />
+                      <line x1={sideX + hmiDepthMm} y1={h + 10} x2={sideX + hmiDepthMm} y2={h + 23} stroke="#94a3b8" strokeWidth={1} />
+                      <text
+                        x={sideX + hmiDepthMm / 2}
+                        y={h + 14}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fontWeight="extrabold"
+                        fill="#fbbf24"
+                        fontFamily="monospace"
+                      >
+                        {hmiDepthMm} mm
+                      </text>
+                    </g>
+
+                    {/* 6. Label Judul Tampak Samping */}
+                    <text
+                      x={sideX + hmiDepthMm / 2}
+                      y={h + 30}
+                      textAnchor="middle"
+                      fontSize={11}
+                      fontWeight="bold"
+                      fill="#f8fafc"
+                      fontFamily="monospace"
+                      letterSpacing="1"
+                    >
+                      TAMPAK SAMPING (SIDE VIEW)
+                    </text>
+                  </g>
+                );
+              })()}
             </svg>
           </div>
+        );
+      })()}
         </div>
 
         {/* Panel Multi-Select Inspector saat memilih >= 2 item (Ctrl + Klik Kiri) */}

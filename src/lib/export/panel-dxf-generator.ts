@@ -396,7 +396,7 @@ export function generatePanelLayoutDxf(
     addLine(layer, x1, y2, x1, y1, color);
   }
 
-  const totalCadW = mode === "HMI" ? plateWidth + 100 + (features.depthMm || 180) : plateWidth;
+  const totalCadW = mode === "HMI" ? plateWidth + 120 + (features.depthMm || 180) : plateWidth;
 
   // ==================== 1. HEADER SECTION ====================
   add(0, "SECTION");
@@ -635,45 +635,70 @@ export function generatePanelLayoutDxf(
 
     // ==================== TAMPAK SAMPING (SIDE VIEW) HMI ====================
     const D = features.depthMm || 180;
-    const sideX = plateWidth + 100;
+    const sideX = plateWidth + 120;
 
-    // 1. Box Samping Enclosure OP Panel
+    // 1. Box Samping Enclosure OP Panel (Enclosure Body)
     addRect("0_PLATE_OUTLINE", sideX, 0, sideX + D, plateHeight, 7);
 
-    // 2. Door Profile / Bezel Line di sisi depan
-    addLine("0_PLATE_OUTLINE", sideX - 6, 0, sideX - 6, plateHeight, 3);
-    addLine("0_PLATE_OUTLINE", sideX - 6, 0, sideX, 0, 3);
-    addLine("0_PLATE_OUTLINE", sideX - 6, plateHeight, sideX, plateHeight, 3);
+    // 2. Door Profile / Profil Daun Pintu Depan & Engsel (Tebal 14 mm)
+    addRect("0_PLATE_OUTLINE", sideX - 14, 0, sideX, plateHeight, 3);
+    addLine("0_PLATE_OUTLINE", sideX - 14, 0, sideX - 14, plateHeight, 3);
+    // Engsel / Lipatan Daun Pintu
+    addRect("0_PLATE_OUTLINE", sideX - 18, 30, sideX - 14, 60, 4);
+    addRect("0_PLATE_OUTLINE", sideX - 18, plateHeight - 60, sideX - 14, plateHeight - 30, 4);
 
     // 3. Siluet Bezel Layar Sentuh HMI di Tampak Samping
     if (cutouts.length > 0) {
-      const c = cutouts[0];
-      addRect("1_CUTOUT_HMI", sideX - 12, c.minY, sideX - 6, c.maxY, 1);
-      addText("6_DIMENSIONS", sideX - 14, (c.minY + c.maxY) / 2 - 2, 4.0, "HMI BEZEL", 90, 1, 1);
+      for (const c of cutouts) {
+        // Bezel Layar Sentuh di luar pintu
+        addRect("1_CUTOUT_HMI", sideX - 22, c.minY, sideX - 14, c.maxY, 1);
+        // Bodi Internal HMI di dalam Box Panel (Kedalaman 45 mm)
+        addRect("1_CUTOUT_HMI", sideX, c.minY + 10, sideX + 45, c.maxY - 10, 1);
+        // Leader Line & Teks Penunjuk Bezel HMI
+        const midY = (c.minY + c.maxY) / 2;
+        addLine("6_DIMENSIONS", sideX - 22, midY, sideX - 55, midY + 30, 4);
+        addLine("6_DIMENSIONS", sideX - 55, midY + 30, sideX - 120, midY + 30, 4);
+        addText("6_DIMENSIONS", sideX - 118, midY + 33, 4.0, "HMI TOUCH UNIT", 0, 4);
+      }
     }
 
-    // 4. Siluet Push Button & Emergency Stop di Tampak Samping
+    // 4. Siluet Push Button, Selector Switch & Emergency Stop di Tampak Samping
     if (holes.length > 0) {
       const minHoleY = Math.min(...holes.map((h) => h.cy));
       const maxHoleY = Math.max(...holes.map((h) => h.cy));
+      // Kepala Tombol / E-Stop di luar daun pintu
       addRect(
         "2_DRILL_HOLES",
-        sideX - 18,
-        Math.max(0, minHoleY - 12),
-        sideX - 6,
-        Math.min(plateHeight, maxHoleY + 12),
+        sideX - 26,
+        Math.max(0, minHoleY - 11),
+        sideX - 14,
+        Math.min(plateHeight, maxHoleY + 11),
         4
       );
+      // Bodi Contact Block di dalam box panel
+      addRect(
+        "2_DRILL_HOLES",
+        sideX,
+        Math.max(0, minHoleY - 9),
+        sideX + 48,
+        Math.min(plateHeight, maxHoleY + 9),
+        4
+      );
+      // Leader Line & Teks Penunjuk Tombol
+      const pbMidY = (minHoleY + maxHoleY) / 2;
+      addLine("6_DIMENSIONS", sideX - 26, pbMidY, sideX - 55, pbMidY - 30, 4);
+      addLine("6_DIMENSIONS", sideX - 55, pbMidY - 30, sideX - 140, pbMidY - 30, 4);
+      addText("6_DIMENSIONS", sideX - 138, pbMidY - 27, 4.0, "OP SWITCH / E-STOP", 0, 4);
     }
 
-    // 5. Dimensi Tebal/Kedalaman Tampak Samping
+    // 5. Dimensi Tebal/Kedalaman Tampak Samping (Sumbu X Bawah)
     const sideDimY = -30;
     addLine("6_DIMENSIONS", sideX, 0, sideX, sideDimY - 5, 3);
     addLine("6_DIMENSIONS", sideX + D, 0, sideX + D, sideDimY - 5, 3);
     addLine("6_DIMENSIONS", sideX, sideDimY, sideX + D, sideDimY, 3);
     addText("6_DIMENSIONS", sideX + D / 2, sideDimY + 4, 6.0, `${D}`, 0, 7, 1);
 
-    // Label Tampak Samping
+    // Label Judul Tampak Samping
     addText("7_TITLE_BLOCK", sideX + D / 2, -65, 6.0, "TAMPAK SAMPING (SIDE VIEW)", 0, 7, 1);
   }
 
@@ -902,10 +927,14 @@ export function generateOuterPanelDxf(
   const doorMargin = 16;
   addRect("1_DOOR", doorMargin, doorMargin, W - doorMargin, H - doorMargin, 3);
 
-  // 3. Lock Door Handle (pada sisi kiri pintu)
+  // 3. Lock Door Handle (pada sisi kiri pintu: otomatis center saat LOTO off)
+  const effectiveLockDoorY = hasLoto
+    ? (lockDoorY ?? Math.round(H * 0.58))
+    : Math.round(H * 0.5);
+
   if (hasLockDoor) {
     const lcx = Math.max(30, Math.min(W - 30, lockDoorX));
-    const lcy = H - lockDoorY; // Dari bawah
+    const lcy = H - effectiveLockDoorY; // Dari bawah
     // Plate handle
     addRect("2_LOCK_DOOR", lcx - 12, lcy - 48, lcx + 12, lcy + 48, 4);
     // Lever handle
@@ -961,9 +990,9 @@ export function generateOuterPanelDxf(
   addLine("1_DOOR", sideX - 8, 8, sideX, 8, 3);
   addLine("1_DOOR", sideX - 8, H - 8, sideX, H - 8, 3);
 
-  // 3. Siluet Lock Door protrusion pada tampak samping
+  // 3. Siluet Lock Door protrusion pada tampak samping (otomatis center saat LOTO off)
   if (hasLockDoor) {
-    const lcy = H - lockDoorY;
+    const lcy = H - effectiveLockDoorY;
     addRect("2_LOCK_DOOR", sideX - 18, lcy - 40, sideX - 8, lcy + 40, 4);
   }
 
