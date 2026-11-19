@@ -221,8 +221,14 @@ export function ProjectDetailClient({
         subKey = "wiring";
         elementId = "sub-wiring";
       } else if (itemKey === "pemprograman") {
-        subKey = "plc";
-        elementId = "sub-plc";
+        const needsPlc = !project.plcProgramFileUrl;
+        subKey = needsPlc ? "plc" : "hmi";
+        elementId = needsPlc ? "sub-plc" : "sub-hmi";
+        setOpenAlurSubSections((prev) => new Set([...prev, "plc", "hmi"]));
+        setTimeout(() => {
+          document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+        return;
       }
       setOpenAlurSubSections((prev) => new Set([...prev, subKey]));
       setTimeout(() => {

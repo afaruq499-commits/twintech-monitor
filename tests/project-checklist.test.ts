@@ -142,4 +142,43 @@ describe("project-checklist", () => {
     expect(res.completedCount).toBe(8);
     expect(res.progressPct).toBe(100);
   });
+
+  it("Berkas #8 (pemprograman) hanya otomatis tercentang jika kedua program PLC dan HMI lengkap; jika hanya salah satu (hanya HMI atau hanya PLC), belum tercentang", () => {
+    // Skenario 1: Hanya HMI terunggah
+    const onlyHmi = deriveChecklistDetection({
+      componentsCount: 0,
+      lanesCount: 0,
+      scheduleCellsCount: 0,
+      hmiProgramFileUrl: "/uploads/hmi.gtx",
+      hmiProgramFileName: "hmi.gtx",
+      plcProgramFileUrl: null,
+    });
+    const resHmi = computeChecklistProgress({}, onlyHmi);
+    expect(resHmi.autoByKey.pemprograman).toBe(false);
+
+    // Skenario 2: Hanya PLC terunggah
+    const onlyPlc = deriveChecklistDetection({
+      componentsCount: 0,
+      lanesCount: 0,
+      scheduleCellsCount: 0,
+      plcProgramFileUrl: "/uploads/plc.gx3",
+      plcProgramFileName: "plc.gx3",
+      hmiProgramFileUrl: null,
+    });
+    const resPlc = computeChecklistProgress({}, onlyPlc);
+    expect(resPlc.autoByKey.pemprograman).toBe(false);
+
+    // Skenario 3: Keduanya (PLC dan HMI) lengkap terunggah
+    const both = deriveChecklistDetection({
+      componentsCount: 0,
+      lanesCount: 0,
+      scheduleCellsCount: 0,
+      plcProgramFileUrl: "/uploads/plc.gx3",
+      plcProgramFileName: "plc.gx3",
+      hmiProgramFileUrl: "/uploads/hmi.gtx",
+      hmiProgramFileName: "hmi.gtx",
+    });
+    const resBoth = computeChecklistProgress({}, both);
+    expect(resBoth.autoByKey.pemprograman).toBe(true);
+  });
 });

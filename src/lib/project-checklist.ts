@@ -185,7 +185,7 @@ export function computeChecklistProgress(
     layout_panel_utama: false,
     flowchart: detection.hasFlowchart,
     diagram_wiring: detection.hasWiringPdf,
-    pemprograman: Boolean(detection.hasPlcProgram || detection.hasHmiProgram),
+    pemprograman: Boolean(detection.hasPlcProgram && detection.hasHmiProgram),
   };
 
   let completedCount = 0;

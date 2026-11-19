@@ -227,10 +227,10 @@ export function ProjectFileChecklistCard({
         projectData.hasPlcProgram && projectData.hasHmiProgram
           ? `Program PLC & HMI lengkap (${projectData.plcProgramFileName || "PLC"} + ${projectData.hmiProgramFileName || "HMI"})`
           : projectData.hasPlcProgram
-          ? `Program PLC tersimpan (${projectData.plcProgramFileName || "PLC"})`
+          ? `Program PLC tersimpan (${projectData.plcProgramFileName || "PLC"}) (Kurang Program HMI)`
           : projectData.hasHmiProgram
-          ? `Program HMI tersimpan (${projectData.hmiProgramFileName || "HMI"})`
-          : "Belum ada berkas program PLC / HMI",
+          ? `Program HMI tersimpan (${projectData.hmiProgramFileName || "HMI"}) (Kurang Program PLC)`
+          : "Belum ada berkas program PLC & HMI",
     },
   ];
 
