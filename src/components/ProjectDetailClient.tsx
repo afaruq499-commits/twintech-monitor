@@ -187,15 +187,28 @@ export function ProjectDetailClient({
             : "alur-sekuens";
 
   const [tab, setTab] = useState<ProjectDetailTabKey>(initialTab);
-  // Sub-accordions di dalam tab Flowchart, Wiring & Program:
+  // Sub-accordions di dalam tab Flowchart, Wiring & Program (default tertutup saat awal):
   const [openAlurSubSections, setOpenAlurSubSections] = useState<Set<string>>(
-    () => new Set(["flowchart"])
+    () => new Set()
   );
   const toggleAlurSubSection = (key: string) => {
     setOpenAlurSubSections((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      return next;
+    });
+  };
+
+  // Sub-accordions per kelompok di dalam tab Komponen PR (default tertutup saat awal):
+  const [openCompGroups, setOpenCompGroups] = useState<Set<string>>(
+    () => new Set()
+  );
+  const toggleCompGroup = (grp: string) => {
+    setOpenCompGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(grp)) next.delete(grp);
+      else next.add(grp);
       return next;
     });
   };
@@ -919,6 +932,23 @@ export function ProjectDetailClient({
                 />
                 Hanya Perlu Dicek
               </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (openCompGroups.size === groupedComponents.length) {
+                    setOpenCompGroups(new Set());
+                  } else {
+                    setOpenCompGroups(new Set(groupedComponents.map((g) => g.kelompok)));
+                  }
+                }}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer transition shadow-2xs"
+                title="Buka atau tutup seluruh kelompok komponen sekaligus"
+              >
+                {openCompGroups.size === groupedComponents.length
+                  ? "Tutup Semua Kelompok"
+                  : "Buka Semua Kelompok"}
+              </button>
             </div>
 
             {/* Baris 2: Tombol Aksi Komponen & Export */}
@@ -1298,11 +1328,15 @@ export function ProjectDetailClient({
                   key={group.kelompok}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white">
+                  <div
+                    onClick={() => toggleCompGroup(group.kelompok)}
+                    className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white cursor-pointer hover:bg-slate-800 transition select-none"
+                  >
                     <div className="flex items-center gap-2.5">
                       <input
                         type="checkbox"
                         checked={allGroupSelected}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedIds(
@@ -1316,13 +1350,29 @@ export function ProjectDetailClient({
                         }}
                       />
                       <h3 className="font-bold text-sm">{group.kelompok}</h3>
-                      <span className="text-xs text-slate-300">
+                      <span className="text-xs text-slate-300 font-semibold">
                         ({group.items.length} item)
                       </span>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                        {openCompGroups.has(group.kelompok) || compSearch.trim().length > 0
+                          ? "Tutup"
+                          : "Buka"}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-slate-400 transition-transform ${
+                          openCompGroups.has(group.kelompok) || compSearch.trim().length > 0
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                      />
+                    </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  {(openCompGroups.has(group.kelompok) || compSearch.trim().length > 0) && (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                         <tr>
@@ -1617,6 +1667,7 @@ export function ProjectDetailClient({
                       </tbody>
                     </table>
                   </div>
+                  )}
                 </div>
               );
             })

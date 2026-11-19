@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Check,
   CheckCircle2,
+  ChevronDown,
   Copy,
   Cpu,
   Download,
@@ -147,6 +148,26 @@ export function PlcAddressTablePanel({
       expansionDoRequired: Math.max(0, totalDo - cpuBuiltInDoCapacity),
     };
   }, [entries, cpuModel]);
+
+  // Accordion per kategori sinyal PLC (default tertutup saat awal)
+  const [openKinds, setOpenKinds] = useState<Set<PlcAddressKind>>(() => new Set());
+  const toggleKind = (k: PlcAddressKind) => {
+    setOpenKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const SECTIONS: { kind: PlcAddressKind; title: string; subtitle: string }[] = [
+    { kind: "DI", title: "Digital Input (DI / X)", subtitle: "Sensor, Push Button, Selector Switch" },
+    { kind: "DO", title: "Digital Output (DO / Y)", subtitle: "Solenoid Valve, Relay Coil, Tower Lamp, Buzzer" },
+    { kind: "AI", title: "Analog Input (AI)", subtitle: "Sensor Analog, Laser, Load Cell, Presisi" },
+    { kind: "AO", title: "Analog Output (AO)", subtitle: "Speed Reference Inverter, Proportional Valve" },
+    { kind: "M", title: "Internal Relay (M)", subtitle: "Bit Memori Internal, Tombol Layar HMI, Interlock" },
+    { kind: "D", title: "Data Register (D)", subtitle: "Data Numerik, Setting Posisi, Recipe, Counter" },
+  ];
 
   // Filter & Search
   const filteredEntries = useMemo(() => {
@@ -670,134 +691,178 @@ export function PlcAddressTablePanel({
           </button>
         </div>
 
-        {/* Search input */}
-        <div className="relative min-w-[220px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari alamat, tag name, deskripsi..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
-          />
+        {/* Search input + Toggle Semua Accordion */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (openKinds.size === SECTIONS.length) {
+                setOpenKinds(new Set());
+              } else {
+                setOpenKinds(new Set(SECTIONS.map((s) => s.kind)));
+              }
+            }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer transition shadow-2xs whitespace-nowrap"
+            title="Buka atau tutup seluruh accordion kategori alamat PLC"
+          >
+            {openKinds.size === SECTIONS.length ? "Tutup Semua" : "Buka Semua"}
+          </button>
+
+          <div className="relative min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari alamat, tag name, deskripsi..."
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Tabel Alamat PLC */}
-      <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
-                <th className="p-3 w-12 text-center">NO</th>
-                <th className="p-3 w-32">ALAMAT PLC</th>
-                <th className="p-3 w-64">TAG NAME</th>
-                <th className="p-3">DESKRIPSI</th>
-                <th className="p-3 w-20 text-center">AKSI</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEntries.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 font-bold">
-                    Tidak ada alamat yang sesuai dengan pencarian atau filter.
-                  </td>
-                </tr>
-              ) : (
-                filteredEntries.map((item, idx) => {
-                  const badge = KIND_BADGE_CLASSES[item.kind];
-                  const isNewKind =
-                    activeKindFilter === "ALL" &&
-                    !search &&
-                    (idx === 0 || item.kind !== filteredEntries[idx - 1].kind);
-
-                  return (
-                    <Fragment key={item.id}>
-                      {isNewKind && (
-                        <tr className="bg-slate-800 text-white font-bold text-[11px]">
-                          <td colSpan={5} className="px-4 py-2 tracking-wide">
-                            <div className="flex items-center justify-between">
-                              <span>
-                                {item.kind === "DI" && "▸ DIGITAL INPUT (DI / X)"}
-                                {item.kind === "DO" && "▸ DIGITAL OUTPUT (DO / Y)"}
-                                {item.kind === "AI" && "▸ ANALOG INPUT (AI)"}
-                                {item.kind === "AO" && "▸ ANALOG OUTPUT (AO)"}
-                                {item.kind === "M" && "▸ INTERNAL RELAY (M)"}
-                                {item.kind === "D" && "▸ DATA REGISTER (D)"}
-                              </span>
-                              <span className="text-[10px] font-semibold text-slate-400">
-                                {filteredEntries.filter((x) => x.kind === item.kind).length} item
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      <tr className="hover:bg-slate-50/80 transition">
-                        <td className="p-3 text-center text-slate-400 font-bold text-[11px]">
-                          {idx + 1}
-                        </td>
-
-                        <td className="p-3">
-                          <span className="font-mono font-black text-sm text-slate-900">
-                            {item.address}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5">
-                            <code className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                              {item.symbol}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={() => copySymbol(item)}
-                              title="Salin tag name"
-                              className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded"
-                            >
-                              {copiedId === item.id ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="text-slate-700 leading-relaxed">
-                            {item.description}
-                          </span>
-                        </td>
-
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(item)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer transition"
-                              title="Edit"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteEntry(item)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
-                              title="Hapus"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    </Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* Accordion Tabel Alamat PLC per Kategori */}
+      {filteredEntries.length === 0 ? (
+        <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center text-slate-500 font-bold shadow-2xs">
+          Tidak ada alamat yang sesuai dengan pencarian atau filter.
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {(activeKindFilter === "ALL"
+            ? SECTIONS
+            : SECTIONS.filter((s) => s.kind === activeKindFilter)
+          ).map((sec) => {
+            const secItems = filteredEntries.filter((item) => item.kind === sec.kind);
+            if (search.trim().length > 0 && secItems.length === 0) return null;
+            const isOpen =
+              openKinds.has(sec.kind) ||
+              search.trim().length > 0 ||
+              activeKindFilter === sec.kind;
+
+            return (
+              <div
+                key={sec.kind}
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs"
+              >
+                {/* Header Accordion */}
+                <div
+                  onClick={() => toggleKind(sec.kind)}
+                  className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white cursor-pointer hover:bg-slate-800 transition select-none"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono font-bold text-xs bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-200">
+                      {sec.kind}
+                    </span>
+                    <h3 className="font-bold text-sm text-white">{sec.title}</h3>
+                    <span className="text-xs text-slate-400 font-semibold">
+                      ({secItems.length} item)
+                    </span>
+                    <span className="text-[11px] text-slate-500 hidden md:inline">
+                      • {sec.subtitle}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                      {isOpen ? "Tutup" : "Buka"}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-400 transition-transform ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Body Accordion (Tabel 5 Kolom Sederhana) */}
+                {isOpen && (
+                  <div className="overflow-x-auto">
+                    {secItems.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 text-xs italic">
+                        Belum ada alamat untuk {sec.title}.
+                      </div>
+                    ) : (
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                            <th className="p-3 w-12 text-center">NO</th>
+                            <th className="p-3 w-32">ALAMAT PLC</th>
+                            <th className="p-3 w-64">TAG NAME</th>
+                            <th className="p-3">DESKRIPSI</th>
+                            <th className="p-3 w-20 text-center">AKSI</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {secItems.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                              <td className="p-3 text-center text-slate-400 font-bold text-[11px]">
+                                {idx + 1}
+                              </td>
+
+                              <td className="p-3">
+                                <span className="font-mono font-black text-sm text-slate-900">
+                                  {item.address}
+                                </span>
+                              </td>
+
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <code className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                                    {item.symbol}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => copySymbol(item)}
+                                    title="Salin tag name"
+                                    className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded"
+                                  >
+                                    {copiedId === item.id ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+
+                              <td className="p-3">
+                                <span className="text-slate-700 leading-relaxed">
+                                  {item.description}
+                                </span>
+                              </td>
+
+                              <td className="p-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEdit(item)}
+                                    className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer transition"
+                                    title="Edit"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEntry(item)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
+                                    title="Hapus"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal Edit Baris Alamat I/O */}
       {editingEntry && (
