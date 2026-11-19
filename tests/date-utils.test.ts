@@ -91,4 +91,18 @@ describe("isTanggalMerah", () => {
     const dates = laneDatesIso("2026-10-29", 4, ["2026-10-29", "2026-11-02", "2026-11-05"]);
     expect(dates).toEqual(["2026-10-29", "2026-11-02", "2026-11-05", "2026-11-01"]);
   });
+
+  it("mendukung pembuangan tanggal akhir pekan (Sabtu & Minggu) kosong dari jadwal lane", () => {
+    // Tanggal Kamis s/d Selasa: 26 Nov (Kamis), 27 Nov (Jumat), 28 Nov (Sabtu), 29 Nov (Minggu), 30 Nov (Senin)
+    const rawDates = ["2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29", "2026-11-30"];
+    
+    // Filter tanggal akhir pekan (Sabtu & Minggu) kosong
+    const workDaysOnly = rawDates.filter((dt) => !isTanggalMerah(dt).isWeekend);
+    expect(workDaysOnly).toEqual(["2026-11-26", "2026-11-27", "2026-11-30"]);
+
+    const laneDates = laneDatesIso("2026-11-26", workDaysOnly.length, workDaysOnly);
+    expect(laneDates).toEqual(["2026-11-26", "2026-11-27", "2026-11-30"]);
+    expect(laneDates).not.toContain("2026-11-28"); // Sabtu dibuang
+    expect(laneDates).not.toContain("2026-11-29"); // Minggu dibuang
+  });
 });

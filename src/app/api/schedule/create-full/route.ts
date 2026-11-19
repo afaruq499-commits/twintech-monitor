@@ -4,6 +4,7 @@ import {
   addDaysIso,
   diffDaysIso,
   fromIsoDateStr,
+  isTanggalMerah,
   todayIsoLocal,
 } from "@/lib/date-utils";
 import { createFullScheduleSchema } from "@/lib/validation/schemas";
@@ -54,8 +55,46 @@ export async function POST(request: Request) {
         maxEndIso = p.jadwalSelesai;
       }
     }
-    const spanDays = Math.max(0, diffDaysIso(baseStartIso, maxEndIso)) + 1;
-    const jumlahHari = Math.min(90, Math.max(6, spanDays));
+
+    // Kumpulkan tanggal yang diisi jadwal pekerjaan oleh user
+    const scheduledDatesSet = new Set<string>();
+    for (const p of d.pekerjaanList) {
+      if (p.jadwalMulai) {
+        const endIso =
+          p.jadwalSelesai && p.jadwalSelesai >= p.jadwalMulai
+            ? p.jadwalSelesai
+            : p.jadwalMulai;
+        const totalDays = Math.min(60, diffDaysIso(p.jadwalMulai, endIso));
+        for (let offset = 0; offset <= totalDays; offset++) {
+          scheduledDatesSet.add(addDaysIso(p.jadwalMulai, offset));
+        }
+      }
+    }
+
+    // Bangun rentang tanggal untuk lane:
+    // Lewati akhir pekan (Sabtu & Minggu) jika tidak ada pekerjaan yang dijadwalkan pada hari tersebut
+    const laneDates: string[] = [];
+    let curIso = baseStartIso;
+    let guard = 0;
+    while (curIso <= maxEndIso && guard < 180) {
+      guard++;
+      const merah = isTanggalMerah(curIso);
+      if (!merah.isWeekend || scheduledDatesSet.has(curIso)) {
+        laneDates.push(curIso);
+      }
+      curIso = addDaysIso(curIso, 1);
+    }
+    // Pastikan minimal ada 6 hari pengerjaan
+    while (laneDates.length < 6 && guard < 180) {
+      guard++;
+      const merah = isTanggalMerah(curIso);
+      if (!merah.isWeekend) {
+        laneDates.push(curIso);
+      }
+      curIso = addDaysIso(curIso, 1);
+    }
+    const jumlahHari = Math.min(90, laneDates.length);
+    const customDatesJson = JSON.stringify(laneDates.slice(0, jumlahHari));
 
     let projectId = d.existingProjectId ?? "";
 
@@ -98,10 +137,11 @@ export async function POST(request: Request) {
         urutan: existingLanesCount + 1,
         nama: d.judulPengerjaan,
         subjudul: "(Schedule Pengerjaan Proyek)",
-        tanggalMulai: fromIsoDateStr(baseStartIso)!,
+        tanggalMulai: fromIsoDateStr(laneDates[0] || baseStartIso)!,
         jumlahHari,
         deadline: fromIsoDateStr(d.deadline),
         pic: d.picUtama || null,
+        customDatesJson,
         workItems: {
           create: d.pekerjaanList.map((p, idx) => {
             // Bangun daftar sel tanggal jadwal hanya jika jadwalMulai diisi oleh user
