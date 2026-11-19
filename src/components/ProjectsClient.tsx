@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Archive,
+  ArchiveRestore,
   Calendar,
   CalendarPlus,
   CheckCircle2,
   ChevronRight,
   Edit3,
   FileSpreadsheet,
+  FolderCheck,
+  FolderKanban,
   GitFork,
   LayoutGrid,
   List,
@@ -57,6 +61,7 @@ export function ProjectsClient({
   projects: ProjectOverviewItem[];
 }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -65,13 +70,16 @@ export function ProjectsClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<EditableProject | null>(null);
 
-  // Deteksi trigger pembuatan proyek dari Primary Action sidebar (?action=baru / ?action=new)
+  // Deteksi trigger pembuatan proyek atau tab arsip dari URL
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("action") === "baru" || params.get("action") === "new") {
         setEditing(null);
         setModalOpen(true);
+      }
+      if (params.get("tab") === "arsip" || params.get("tab") === "archived") {
+        setActiveTab("ARCHIVED");
       }
       const savedView = window.localStorage.getItem("pm_projects_view");
       if (savedView === "LIST" || savedView === "GRID") {
@@ -80,6 +88,20 @@ export function ProjectsClient({
     }
   }, []);
 
+  function handleTabChange(tab: "ACTIVE" | "ARCHIVED") {
+    setActiveTab(tab);
+    setStatusFilter("ALL");
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "ARCHIVED") {
+        url.searchParams.set("tab", "arsip");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  }
+
   function handleViewModeChange(mode: "GRID" | "LIST") {
     setViewMode(mode);
     if (typeof window !== "undefined") {
@@ -87,10 +109,23 @@ export function ProjectsClient({
     }
   }
 
-  const filtered = projects.filter((p) => {
+  const activeProjects = useMemo(
+    () => projects.filter((p) => p.status !== "SELESAI"),
+    [projects]
+  );
+
+  const archivedProjects = useMemo(
+    () => projects.filter((p) => p.status === "SELESAI"),
+    [projects]
+  );
+
+  const currentList = activeTab === "ACTIVE" ? activeProjects : archivedProjects;
+
+  const filtered = currentList.filter((p) => {
     if (typeFilter !== "ALL" && (p.tipeProyek ?? "AUTOMATION_KECIL") !== typeFilter)
       return false;
-    if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
+    if (activeTab === "ACTIVE" && statusFilter !== "ALL" && p.status !== statusFilter)
+      return false;
     if (priorityFilter !== "ALL" && p.prioritas !== priorityFilter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -115,16 +150,37 @@ export function ProjectsClient({
     if (res.ok) router.refresh();
   }
 
+  async function handleToggleArchive(p: ProjectOverviewItem, shouldArchive: boolean) {
+    const actionLabel = shouldArchive
+      ? `Tandai proyek "${p.nama}" sebagai SELESAI dan pindahkan ke Arsip Proyek?`
+      : `Buka kembali proyek "${p.nama}" dari arsip ke daftar proyek aktif?`;
+    if (!window.confirm(actionLabel)) return;
+
+    const newStatus = shouldArchive ? "SELESAI" : "COMMISSIONING";
+    const res = await fetch(`/api/projects/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) {
+      router.refresh();
+    } else {
+      alert("Gagal mengubah status arsip proyek.");
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            Manajemen Proyek
+            {activeTab === "ACTIVE" ? "Manajemen Proyek" : "Arsip Proyek Selesai"}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Daftar seluruh mesin otomasi, kemajuan 8 berkas proyek, PR, dan timeline pengerjaan.
+            {activeTab === "ACTIVE"
+              ? "Daftar proyek mesin otomasi yang sedang berjalan, progress komponen PR, dan timeline."
+              : "Daftar proyek otomasi yang telah selesai & serah terima. Riwayat berkas dan PR tersimpan permanen."}
           </p>
         </div>
 
@@ -188,6 +244,65 @@ export function ProjectsClient({
         </div>
       </div>
 
+      {/* Tabs Navigasi: Proyek Aktif vs Arsip Proyek Selesai */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-white/10 pb-2">
+        <button
+          type="button"
+          onClick={() => handleTabChange("ACTIVE")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+            activeTab === "ACTIVE"
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04]"
+          }`}
+        >
+          <FolderKanban className="w-3.5 h-3.5" />
+          <span>Proyek Aktif</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeTab === "ACTIVE"
+                ? "bg-white/20 text-white dark:bg-slate-900/15 dark:text-slate-900"
+                : "bg-slate-100 dark:bg-white/[0.08] text-slate-500"
+            }`}
+          >
+            {activeProjects.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("ARCHIVED")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+            activeTab === "ARCHIVED"
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04]"
+          }`}
+        >
+          <Archive className="w-3.5 h-3.5" />
+          <span>Arsip Proyek</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeTab === "ARCHIVED"
+                ? "bg-white/20 text-white"
+                : "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+            }`}
+          >
+            {archivedProjects.length}
+          </span>
+        </button>
+      </div>
+
+      {/* Banner Khusus Tab Arsip */}
+      {activeTab === "ARCHIVED" && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-500/20 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-emerald-900 dark:text-emerald-300">
+            <FolderCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              Menampilkan <strong>{archivedProjects.length} proyek yang telah selesai</strong>. Seluruh riwayat berkas gambar teknis, PR komponen, dan timeline pengerjaan tetap tersimpan aman.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Filter Toolbar Airy & Refined */}
       <div className="bg-white dark:bg-[#161822] rounded-2xl border border-slate-200/70 dark:border-white/[0.08] p-3 flex flex-col md:flex-row items-stretch gap-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <div className="relative flex-1">
@@ -196,7 +311,7 @@ export function ProjectsClient({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari kode proyek, nama proyek, atau nama client..."
+            placeholder={`Cari di ${activeTab === "ACTIVE" ? "proyek aktif" : "arsip proyek"} (kode, nama, atau client)...`}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/70 dark:border-white/[0.08] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F05232]/30 transition"
           />
         </div>
@@ -215,18 +330,20 @@ export function ProjectsClient({
             ))}
           </select>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/70 dark:border-white/[0.08] text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">Semua Status</option>
-            {PROJECT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {PROJECT_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
+          {activeTab === "ACTIVE" && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/70 dark:border-white/[0.08] text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">Semua Status Aktif</option>
+              {PROJECT_STATUSES.filter((s) => s !== "SELESAI").map((s) => (
+                <option key={s} value={s}>
+                  {PROJECT_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             value={priorityFilter}
@@ -261,12 +378,16 @@ export function ProjectsClient({
       {/* Main View Area: GRID or LIST */}
       {filtered.length === 0 ? (
         <div className="bg-white dark:bg-[#161822] rounded-2xl border border-slate-200/70 dark:border-white/[0.08] p-12 text-center text-slate-500 text-xs">
-          Belum ada proyek yang sesuai dengan kriteria pencarian atau filter.
+          {activeTab === "ACTIVE"
+            ? "Tidak ada proyek aktif yang sesuai filter."
+            : "Belum ada proyek yang diarsipkan / selesai."}
         </div>
       ) : viewMode === "GRID" ? (
         /* ==================== 1. GRID CARDS VIEW ==================== */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5 transition-all duration-200">
           {filtered.map((p) => {
+            const isCompleted = p.status === "SELESAI";
+
             const prioBadge =
               p.prioritas === "TINGGI"
                 ? "bg-rose-50 text-rose-700 border-rose-200/60 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20"
@@ -274,17 +395,20 @@ export function ProjectsClient({
                 ? "bg-amber-50 text-amber-700 border-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
                 : "bg-slate-50 text-slate-600 border-slate-200/60 dark:bg-white/[0.05] dark:text-slate-300 dark:border-white/10";
 
-            const statusBadge =
-              p.status === "SELESAI"
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-                : p.status === "WIRING" || p.status === "PROGRAMMING" || p.status === "COMMISSIONING"
-                ? "bg-blue-50 text-blue-700 border-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
-                : "bg-slate-50 text-slate-700 border-slate-200/60 dark:bg-white/[0.05] dark:text-slate-300 dark:border-white/10";
+            const statusBadge = isCompleted
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+              : p.status === "WIRING" || p.status === "PROGRAMMING" || p.status === "COMMISSIONING"
+              ? "bg-blue-50 text-blue-700 border-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
+              : "bg-slate-50 text-slate-700 border-slate-200/60 dark:bg-white/[0.05] dark:text-slate-300 dark:border-white/10";
 
             return (
               <div
                 key={p.id}
-                className="bg-white dark:bg-[#161822] rounded-2xl border border-slate-200/70 dark:border-white/[0.08] p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03),0_4px_12px_rgba(0,0,0,0.02)] hover:border-slate-300 dark:hover:border-white/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-180 ease-out group"
+                className={`bg-white dark:bg-[#161822] rounded-2xl border p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03),0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-180 ease-out group ${
+                  isCompleted
+                    ? "border-emerald-200/80 dark:border-emerald-500/20 hover:border-emerald-300"
+                    : "border-slate-200/70 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20"
+                }`}
               >
                 <div>
                   {/* Card Top Meta & Pill Badges */}
@@ -306,9 +430,10 @@ export function ProjectsClient({
                         {PROJECT_PRIORITY_LABELS[p.prioritas as ProjectPriority] ?? "Sedang"}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge}`}
                       >
-                        {PROJECT_STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
+                        {isCompleted && <CheckCircle2 className="w-2.5 h-2.5" />}
+                        {isCompleted ? "Arsip Selesai" : (PROJECT_STATUS_LABELS[p.status as ProjectStatus] ?? p.status)}
                       </span>
                       {p.bolehParalel && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-200/60 text-[10px] font-bold">
@@ -318,6 +443,27 @@ export function ProjectsClient({
                     </div>
 
                     <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition">
+                      {/* Tombol Arsip / Unarchive */}
+                      {isCompleted ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleArchive(p, false)}
+                          className="p-1 rounded-lg text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition cursor-pointer"
+                          title="Buka kembali proyek ke Proyek Aktif"
+                        >
+                          <ArchiveRestore className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleArchive(p, true)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition cursor-pointer"
+                          title="Tandai Selesai & Pindahkan ke Arsip"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => {
@@ -429,13 +575,24 @@ export function ProjectsClient({
                     </span>
                   </div>
 
-                  <Link
-                    href={`/proyek/${p.id}`}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-[#F05232] hover:text-[#da381b] group-hover:translate-x-0.5 transition-all"
-                  >
-                    <span>Detail ({p.lanesCount} Lane)</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleArchive(p, false)}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition"
+                      >
+                        Buka Kembali
+                      </button>
+                    )}
+                    <Link
+                      href={`/proyek/${p.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#F05232] hover:text-[#da381b] group-hover:translate-x-0.5 transition-all"
+                    >
+                      <span>Detail ({p.lanesCount} Lane)</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
@@ -451,7 +608,7 @@ export function ProjectsClient({
                   <th className="py-3 px-4">Proyek & Kode</th>
                   <th className="py-3 px-3">Client</th>
                   <th className="py-3 px-3">Tipe & Prioritas</th>
-                  <th className="py-3 px-3">Status PR</th>
+                  <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3">Progress Berkas</th>
                   <th className="py-3 px-3">Deadline</th>
                   <th className="py-3 px-3">PIC</th>
@@ -459,105 +616,135 @@ export function ProjectsClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
-                {filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors duration-150 group"
-                  >
-                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      <Link
-                        href={`/proyek/${p.id}`}
-                        className="flex items-center gap-2 hover:text-[#F05232] transition"
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: p.warna || "#F05232" }}
-                        />
-                        {p.kode && (
-                          <span className="font-mono text-[10px] bg-slate-100 dark:bg-white/[0.08] px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200">
-                            {p.kode}
-                          </span>
-                        )}
-                        <span className="truncate max-w-[220px]">{p.nama}</span>
-                      </Link>
-                    </td>
-
-                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300 font-medium">
-                      {p.client}
-                    </td>
-
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-white/[0.06] text-slate-700 dark:text-slate-200">
-                          {PROJECT_TYPE_LABELS[(p.tipeProyek as ProjectType)] ?? "Otomasi"}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            p.prioritas === "TINGGI"
-                              ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400"
-                              : p.prioritas === "SEDANG"
-                              ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
-                              : "bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-400"
-                          }`}
-                        >
-                          {PROJECT_PRIORITY_LABELS[p.prioritas as ProjectPriority] ?? "Sedang"}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300 font-medium">
-                      {PR_STATUS_LABELS[p.prStatus as PrStatus] ?? "Draft"}
-                    </td>
-
-                    <td className="py-3 px-3">
-                      <div className="w-28 space-y-1">
-                        <div className="flex justify-between text-[10px] text-slate-500 font-semibold">
-                          <span>{p.checklistCompletedCount}/{p.checklistTotalCount}</span>
-                          <span>{p.progressPct}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-slate-100 dark:bg-white/[0.08] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full"
-                            style={{ width: `${p.progressPct}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-                      {formatTanggalId(p.deadline, false)}
-                    </td>
-
-                    <td className="py-3 px-3">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                        <User className="w-3 h-3 text-slate-400" />
-                        {p.pic || "Team"}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
+                {filtered.map((p) => {
+                  const isCompleted = p.status === "SELESAI";
+                  return (
+                    <tr
+                      key={p.id}
+                      className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors duration-150 group"
+                    >
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
                         <Link
                           href={`/proyek/${p.id}`}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold text-[#F05232] hover:bg-[#F05232]/10 transition"
+                          className="flex items-center gap-2 hover:text-[#F05232] transition"
                         >
-                          Detail
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: p.warna || "#F05232" }}
+                          />
+                          {p.kode && (
+                            <span className="font-mono text-[10px] bg-slate-100 dark:bg-white/[0.08] px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200">
+                              {p.kode}
+                            </span>
+                          )}
+                          <span className="truncate max-w-[220px]">{p.nama}</span>
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditing(p);
-                            setModalOpen(true);
-                          }}
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-white"
-                          title="Edit"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      <td className="py-3 px-3 text-slate-600 dark:text-slate-300 font-medium">
+                        {p.client}
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-white/[0.06] text-slate-700 dark:text-slate-200">
+                            {PROJECT_TYPE_LABELS[(p.tipeProyek as ProjectType)] ?? "Otomasi"}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              p.prioritas === "TINGGI"
+                                ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400"
+                                : p.prioritas === "SEDANG"
+                                ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                                : "bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-400"
+                            }`}
+                          >
+                            {PROJECT_PRIORITY_LABELS[p.prioritas as ProjectPriority] ?? "Sedang"}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3 font-medium">
+                        {isCompleted ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Arsip Selesai
+                          </span>
+                        ) : (
+                          <span className="text-slate-700 dark:text-slate-300">
+                            {PROJECT_STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="w-28 space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-500 font-semibold">
+                            <span>{p.checklistCompletedCount}/{p.checklistTotalCount}</span>
+                            <span>{p.progressPct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-slate-100 dark:bg-white/[0.08] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full"
+                              style={{ width: `${p.progressPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                        {formatTanggalId(p.deadline, false)}
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          <User className="w-3 h-3 text-slate-400" />
+                          {p.pic || "Team"}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {isCompleted ? (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleArchive(p, false)}
+                              className="p-1 rounded-md text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                              title="Buka kembali ke Proyek Aktif"
+                            >
+                              <ArchiveRestore className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleArchive(p, true)}
+                              className="p-1 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                              title="Selesaikan & Pindahkan ke Arsip"
+                            >
+                              <Archive className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <Link
+                            href={`/proyek/${p.id}`}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold text-[#F05232] hover:bg-[#F05232]/10 transition"
+                          >
+                            Detail
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditing(p);
+                              setModalOpen(true);
+                            }}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

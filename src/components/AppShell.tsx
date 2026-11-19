@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionUser } from "@/lib/auth";
 import {
+  Archive,
   BrainCircuit,
   CalendarDays,
   CalendarPlus,
@@ -78,6 +79,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: "Manajemen Proyek",
         shortLabel: "Proyek",
         icon: FolderKanban,
+      },
+      {
+        href: "/proyek?tab=arsip",
+        label: "Arsip Proyek",
+        shortLabel: "Arsip",
+        icon: Archive,
       },
       {
         href: "/jadwal",
@@ -315,6 +322,24 @@ export function AppShell({
   function isActive(href: string) {
     if (!pathname) return false;
     if (href === "/") return pathname === "/";
+    if (href === "/proyek?tab=arsip") {
+      if (typeof window !== "undefined") {
+        return (
+          pathname === "/proyek" &&
+          new URLSearchParams(window.location.search).get("tab") === "arsip"
+        );
+      }
+      return false;
+    }
+    if (href === "/proyek") {
+      if (typeof window !== "undefined") {
+        return (
+          pathname === "/proyek" &&
+          new URLSearchParams(window.location.search).get("tab") !== "arsip"
+        );
+      }
+      return pathname === "/proyek";
+    }
     if (href === "/jadwal") {
       return (
         pathname === "/jadwal" ||
@@ -345,6 +370,16 @@ export function AppShell({
       return [{ label: "Workspace", href: "/" }, { label: "Overview" }];
     }
     if (pathname === "/proyek") {
+      const isArsip =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("tab") === "arsip";
+      if (isArsip) {
+        return [
+          { label: "Workspace", href: "/" },
+          { label: "Proyek", href: "/proyek" },
+          { label: "Arsip Proyek Selesai" },
+        ];
+      }
       return [{ label: "Workspace", href: "/" }, { label: "Manajemen Proyek" }];
     }
     if (pathname.startsWith("/proyek/")) {
