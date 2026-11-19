@@ -509,79 +509,79 @@ export function PlcAddressTablePanel({
 
         {/* Statistik Utilisasi Alamat */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-blue-700">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
               DIGITAL INPUT (DI)
             </div>
-            <div className="text-lg font-black text-blue-900">
+            <div className="text-lg font-black text-slate-900">
               {summary.totalDi} Titik
             </div>
-            <div className="text-[10px] text-blue-600 font-semibold">
-              Kapasitas CPU: {summary.cpuBuiltInDiCapacity}
+            <div className="text-[10px] text-slate-500 font-medium">
+              CPU: {summary.cpuBuiltInDiCapacity}
               {summary.expansionDiRequired > 0 &&
-                ` (+${summary.expansionDiRequired} ekspansi)`}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-emerald-700">
-              DIGITAL OUTPUT (DO)
-            </div>
-            <div className="text-lg font-black text-emerald-900">
-              {summary.totalDo} Titik
-            </div>
-            <div className="text-[10px] text-emerald-600 font-semibold">
-              Kapasitas CPU: {summary.cpuBuiltInDoCapacity}
-              {summary.expansionDoRequired > 0 &&
-                ` (+${summary.expansionDoRequired} ekspansi)`}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200/80 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-purple-700">
-              ANALOG INPUT (AI)
-            </div>
-            <div className="text-lg font-black text-purple-900">
-              {summary.totalAi} Channel
-            </div>
-            <div className="text-[10px] text-purple-600 font-semibold">
-              Laser / Load Cell / Presisi
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200/80 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-indigo-700">
-              ANALOG OUTPUT (AO)
-            </div>
-            <div className="text-lg font-black text-indigo-900">
-              {summary.totalAo} Channel
-            </div>
-            <div className="text-[10px] text-indigo-600 font-semibold">
-              Speed Ref Inverter
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-amber-700">
-              INTERNAL RELAY (M)
-            </div>
-            <div className="text-lg font-black text-amber-900">
-              {summary.totalM} Bit
-            </div>
-            <div className="text-[10px] text-amber-600 font-semibold">
-              Tombol HMI & Interlock
+                ` (+${summary.expansionDiRequired})`}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
-            <div className="text-[10px] font-extrabold uppercase text-slate-700">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
+              DIGITAL OUTPUT (DO)
+            </div>
+            <div className="text-lg font-black text-slate-900">
+              {summary.totalDo} Titik
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">
+              CPU: {summary.cpuBuiltInDoCapacity}
+              {summary.expansionDoRequired > 0 &&
+                ` (+${summary.expansionDoRequired})`}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
+              ANALOG INPUT (AI)
+            </div>
+            <div className="text-lg font-black text-slate-900">
+              {summary.totalAi} Channel
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">
+              Sensor Analog
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
+              ANALOG OUTPUT (AO)
+            </div>
+            <div className="text-lg font-black text-slate-900">
+              {summary.totalAo} Channel
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">
+              Speed Ref Inverter
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
+              INTERNAL RELAY (M)
+            </div>
+            <div className="text-lg font-black text-slate-900">
+              {summary.totalM} Bit
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">
+              Bit HMI & Interlock
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="text-[10px] font-bold uppercase text-slate-500">
               DATA REGISTER (D)
             </div>
             <div className="text-lg font-black text-slate-900">
               {summary.totalD} Word
             </div>
-            <div className="text-[10px] text-slate-500 font-semibold">
-              Posisi, Speed & Resep
+            <div className="text-[10px] text-slate-500 font-medium">
+              Posisi & Parameter
             </div>
           </div>
         </div>
@@ -594,10 +594,10 @@ export function PlcAddressTablePanel({
           <button
             type="button"
             onClick={() => setActiveKindFilter("ALL")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "ALL"
                 ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Semua ({entries.length})
@@ -605,32 +605,32 @@ export function PlcAddressTablePanel({
           <button
             type="button"
             onClick={() => setActiveKindFilter("DI")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "DI"
-                ? "bg-blue-600 text-white"
-                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Digital Input (DI / X) ({summary.totalDi})
+            Input DI ({summary.totalDi})
           </button>
           <button
             type="button"
             onClick={() => setActiveKindFilter("DO")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "DO"
-                ? "bg-emerald-600 text-white"
-                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Digital Output (DO / Y) ({summary.totalDo})
+            Output DO ({summary.totalDo})
           </button>
           <button
             type="button"
             onClick={() => setActiveKindFilter("AI")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "AI"
-                ? "bg-purple-600 text-white"
-                : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Analog In ({summary.totalAi})
@@ -638,10 +638,10 @@ export function PlcAddressTablePanel({
           <button
             type="button"
             onClick={() => setActiveKindFilter("AO")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "AO"
-                ? "bg-indigo-600 text-white"
-                : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Analog Out ({summary.totalAo})
@@ -649,21 +649,21 @@ export function PlcAddressTablePanel({
           <button
             type="button"
             onClick={() => setActiveKindFilter("M")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "M"
-                ? "bg-amber-600 text-white"
-                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Relay Bit M ({summary.totalM})
+            Relay M ({summary.totalM})
           </button>
           <button
             type="button"
             onClick={() => setActiveKindFilter("D")}
-            className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
               activeKindFilter === "D"
-                ? "bg-slate-700 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Register D ({summary.totalD})
@@ -677,8 +677,8 @@ export function PlcAddressTablePanel({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari alamat, simbol, wire no, fungsi..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-600"
+            placeholder="Cari alamat, tag name, deskripsi..."
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
           />
         </div>
       </div>
@@ -690,21 +690,16 @@ export function PlcAddressTablePanel({
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
                 <th className="p-3 w-12 text-center">NO</th>
-                <th className="p-3 w-28">TIPE</th>
                 <th className="p-3 w-32">ALAMAT PLC</th>
-                <th className="p-3 w-56">SIMBOL / TAG NAME</th>
-                <th className="p-3 w-32">NO. KABEL / WIRE</th>
-                <th className="p-3 w-28">TIPE DATA</th>
-                <th className="p-3 min-w-[240px]">DESKRIPSI & FUNGSI</th>
-                <th className="p-3 w-64">SUMBER KOMPONEN PR</th>
-                <th className="p-3 w-36">MODUL / ROL</th>
-                <th className="p-3 w-24 text-center">AKSI</th>
+                <th className="p-3 w-64">TAG NAME</th>
+                <th className="p-3">DESKRIPSI</th>
+                <th className="p-3 w-20 text-center">AKSI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-slate-500 font-bold">
+                  <td colSpan={5} className="p-8 text-center text-slate-500 font-bold">
                     Tidak ada alamat yang sesuai dengan pencarian atau filter.
                   </td>
                 </tr>
@@ -719,58 +714,44 @@ export function PlcAddressTablePanel({
                   return (
                     <Fragment key={item.id}>
                       {isNewKind && (
-                        <tr className="bg-slate-900 text-white font-extrabold text-xs">
-                          <td colSpan={10} className="px-4 py-2.5 tracking-wide">
+                        <tr className="bg-slate-800 text-white font-bold text-[11px]">
+                          <td colSpan={5} className="px-4 py-2 tracking-wide">
                             <div className="flex items-center justify-between">
-                              <span className="font-extrabold text-slate-100">
-                                {item.kind === "DI" &&
-                                  "▼ BAGIAN 1: DIGITAL INPUT (DI / X) — SEMUA SINYAL INPUT DIGITAL"}
-                                {item.kind === "DO" &&
-                                  "▼ BAGIAN 2: DIGITAL OUTPUT (DO / Y) — SEMUA SINYAL OUTPUT DIGITAL"}
-                                {item.kind === "AI" &&
-                                  "▼ BAGIAN 3: ANALOG INPUT (AI) — SENSOR ANALOG"}
-                                {item.kind === "AO" &&
-                                  "▼ BAGIAN 4: ANALOG OUTPUT (AO) — SPEED REF INVERTER / VALVE"}
-                                {item.kind === "M" &&
-                                  "▼ BAGIAN 5: INTERNAL RELAY (M) — BIT TOMBOL HMI & STATUS SISTEM"}
-                                {item.kind === "D" &&
-                                  "▼ BAGIAN 6: DATA REGISTER (D) — DATA NUMERIK / POSISI / SPEED / RECIPE"}
+                              <span>
+                                {item.kind === "DI" && "▸ DIGITAL INPUT (DI / X)"}
+                                {item.kind === "DO" && "▸ DIGITAL OUTPUT (DO / Y)"}
+                                {item.kind === "AI" && "▸ ANALOG INPUT (AI)"}
+                                {item.kind === "AO" && "▸ ANALOG OUTPUT (AO)"}
+                                {item.kind === "M" && "▸ INTERNAL RELAY (M)"}
+                                {item.kind === "D" && "▸ DATA REGISTER (D)"}
                               </span>
-                              <span className="text-[11px] font-semibold text-slate-300">
-                                {filteredEntries.filter((x) => x.kind === item.kind).length} Item
+                              <span className="text-[10px] font-semibold text-slate-400">
+                                {filteredEntries.filter((x) => x.kind === item.kind).length} item
                               </span>
                             </div>
                           </td>
                         </tr>
                       )}
                       <tr className="hover:bg-slate-50/80 transition">
-                        <td className="p-3 text-center text-slate-400 font-bold">
+                        <td className="p-3 text-center text-slate-400 font-bold text-[11px]">
                           {idx + 1}
                         </td>
 
                         <td className="p-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-lg border font-extrabold text-[10px] ${badge.bg} ${badge.text}`}
-                          >
-                            {badge.label}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="font-mono font-black text-sm text-blue-700">
+                          <span className="font-mono font-black text-sm text-slate-900">
                             {item.address}
                           </span>
                         </td>
 
                         <td className="p-3">
                           <div className="flex items-center gap-1.5">
-                            <code className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                            <code className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
                               {item.symbol}
                             </code>
                             <button
                               type="button"
                               onClick={() => copySymbol(item)}
-                              title="Salin tag name ke clipboard"
+                              title="Salin tag name"
                               className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded"
                             >
                               {copiedId === item.id ? (
@@ -783,41 +764,8 @@ export function PlcAddressTablePanel({
                         </td>
 
                         <td className="p-3">
-                          <span className="font-mono font-semibold text-slate-700">
-                            {item.wireNo || "-"}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="text-[11px] font-semibold text-slate-600">
-                            {item.dataType}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="text-slate-800 leading-relaxed font-medium">
+                          <span className="text-slate-700 leading-relaxed">
                             {item.description}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          {item.sourceComponent ? (
-                            <div>
-                              <div className="font-bold text-slate-900 truncate max-w-[240px]">
-                                {item.sourceComponent.partType}
-                              </div>
-                              <div className="text-[11px] text-slate-500 truncate max-w-[240px]">
-                                {item.sourceComponent.partName} ({item.sourceComponent.kelompok})
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic">-</span>
-                          )}
-                        </td>
-
-                        <td className="p-3">
-                          <span className="text-[11px] text-slate-600 font-medium">
-                            {item.moduleRole || "-"}
                           </span>
                         </td>
 
@@ -827,7 +775,7 @@ export function PlcAddressTablePanel({
                               type="button"
                               onClick={() => handleOpenEdit(item)}
                               className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer transition"
-                              title="Edit alamat, simbol, wire no, dan fungsi baris ini"
+                              title="Edit"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -835,7 +783,7 @@ export function PlcAddressTablePanel({
                               type="button"
                               onClick={() => handleDeleteEntry(item)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
-                              title="Hapus baris alamat I/O ini"
+                              title="Hapus"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
