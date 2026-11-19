@@ -205,13 +205,19 @@ function writeEntryRow(
 export async function buildPlcAddressWorkbook(
   result: PlcAddressAllocationResult,
   project: PlcAddressExportProjectInfo,
-  company: PlcAddressExportCompanyInfo
+  company: PlcAddressExportCompanyInfo = {
+    namaPerusahaan: "PT. Twintech Precision",
+    alamatPerusahaan: "",
+    telpPerusahaan: "",
+    faxPerusahaan: "",
+  }
 ): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = company.namaPerusahaan || "PT. Twintech Precision";
+  const companyName = company?.namaPerusahaan || "PT. Twintech Precision";
+  wb.creator = companyName;
   wb.created = new Date();
 
-  const titleText = `${company.namaPerusahaan.toUpperCase()} — TABEL PENGELAMATAN I/O & REGISTER PLC`;
+  const titleText = `${companyName.toUpperCase()} — TABEL PENGELAMATAN I/O & REGISTER PLC`;
   const subText = `Proyek: ${project.nama} | Client: ${project.client}${
     project.kode ? ` | Kode: ${project.kode}` : ""
   } | Format: ${
@@ -289,7 +295,12 @@ export async function buildPlcAddressWorkbook(
 export async function exportPlcAddressesToBuffer(
   result: PlcAddressAllocationResult,
   project: PlcAddressExportProjectInfo,
-  company: PlcAddressExportCompanyInfo
+  company: PlcAddressExportCompanyInfo = {
+    namaPerusahaan: "PT. Twintech Precision",
+    alamatPerusahaan: "",
+    telpPerusahaan: "",
+    faxPerusahaan: "",
+  }
 ): Promise<Buffer> {
   const wb = await buildPlcAddressWorkbook(result, project, company);
   const arrayBuffer = await wb.xlsx.writeBuffer();

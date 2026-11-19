@@ -1688,24 +1688,6 @@ export function ProjectDetailClient({
       {/* TAB 4: PENGELAMATAN I/O & REGISTER PLC */}
       {tab === "pengelamatan-plc" && (
         <div className="space-y-5">
-          {/* Berkas Program PLC Mesin */}
-          <ProjectPlcProgramPanel
-            projectId={project.id}
-            initialFileUrl={project.plcProgramFileUrl}
-            initialFileName={project.plcProgramFileName}
-            initialFileSize={project.plcProgramFileSize}
-            onUpdateSuccess={() => router.refresh()}
-          />
-
-          {/* Berkas Program HMI Mesin */}
-          <ProjectHmiProgramPanel
-            projectId={project.id}
-            initialFileUrl={project.hmiProgramFileUrl}
-            initialFileName={project.hmiProgramFileName}
-            initialFileSize={project.hmiProgramFileSize}
-            onUpdateSuccess={() => router.refresh()}
-          />
-
           <PlcAddressTablePanel
             projectId={project.id}
             projectNama={project.nama}
