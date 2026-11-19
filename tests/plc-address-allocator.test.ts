@@ -137,7 +137,7 @@ describe("PLC Address & Register Allocator (Pengelamatan I/O & Register PLC)", (
     expect(lastMIndex).toBeLessThan(firstDIndex);
   });
 
-  it("menghasilkan workbook Excel multi-sheet terpisah untuk DI, DO, Analog, dan Register dengan banner pemisah", async () => {
+  it("menghasilkan workbook Excel format 5-kolom bersih (NO, ALAMAT PLC, SIMBOL, TIPE DATA, FUNGSI) dengan banner pemisah", async () => {
     const mockComponents: ComponentInputForPlc[] = [
       { partType: "SMC SY5120", partName: "Solenoid Valve", qty: 1 },
       { partType: "Load Cell Transducer", partName: "Analog Sensor Presisi 0-10V", qty: 1 },
@@ -155,20 +155,16 @@ describe("PLC Address & Register Allocator (Pengelamatan I/O & Register PLC)", (
     );
 
     const sheetNames = wb.worksheets.map((s) => s.name);
-    expect(sheetNames).toContain("Semua I-O & Register");
-    expect(sheetNames).toContain("Digital Input (DI)");
-    expect(sheetNames).toContain("Digital Output (DO)");
-    expect(sheetNames).toContain("Analog (AI & AO)");
-    expect(sheetNames).toContain("Register & Relay (D & M)");
+    expect(sheetNames).toEqual(["Semua I-O & Register"]);
 
-    const diSheet = wb.getWorksheet("Digital Input (DI)")!;
-    // Semua baris di DI sheet memiliki kind DI
-    for (let r = 8; r <= diSheet.rowCount; r++) {
-      const kind = diSheet.getCell(r, 3).value;
-      if (kind) {
-        expect(kind).toBe("DI");
-      }
-    }
+    const mainSheet = wb.getWorksheet("Semua I-O & Register")!;
+    expect(mainSheet.getCell("B7").value).toBe("NO");
+    expect(mainSheet.getCell("C7").value).toBe("ALAMAT PLC");
+    expect(mainSheet.getCell("D7").value).toBe("SIMBOL / TAG NAME");
+    expect(mainSheet.getCell("E7").value).toBe("TIPE DATA");
+    expect(mainSheet.getCell("F7").value).toBe("FUNGSI & DESKRIPSI");
+    // Kolom G (kolom ke-7) harus kosong karena format baru hanya 5 kolom
+    expect(mainSheet.getCell("G7").value).toBeNull();
   });
 
   it("memastikan Skun Y dan aksesoris wiring kabel TIDAK dianggap sebagai sensor I/O", () => {

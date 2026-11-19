@@ -10,7 +10,7 @@ export async function POST(request: Request) {
 
     if (!file || typeof file === "string" || typeof (file as File).arrayBuffer !== "function") {
       return NextResponse.json(
-        { error: "Berkas Excel (.xlsx / .xls) pengelamatan I/O tidak ditemukan." },
+        { error: "Berkas tabel I/O (.xlsx / .xls / .csv) tidak ditemukan." },
         { status: 400 }
       );
     }
@@ -18,9 +18,9 @@ export async function POST(request: Request) {
     const uploadedFile = file as File;
     const filename = uploadedFile.name || "tabel_io.xlsx";
 
-    if (!/\.(xlsx|xls)$/i.test(filename)) {
+    if (!/\.(xlsx|xls|csv)$/i.test(filename)) {
       return NextResponse.json(
-        { error: "Format berkas tidak didukung. Mohon unggah berkas Excel berekstensi .xlsx atau .xls." },
+        { error: "Format berkas tidak didukung. Mohon unggah berkas berekstensi .xlsx, .xls, atau .csv." },
         { status: 400 }
       );
     }
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Tidak ditemukan baris alamat I/O yang valid dalam berkas Excel. Pastikan terdapat kolom ALAMAT PLC, SIMBOL, TIPE, dsb.",
+            "Tidak ditemukan baris alamat I/O yang valid dalam berkas. Pastikan terdapat kolom ALAMAT PLC, SIMBOL / TAG NAME, TIPE DATA, dsb.",
         },
         { status: 422 }
       );

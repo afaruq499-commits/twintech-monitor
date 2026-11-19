@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAppSettings } from "@/lib/data-queries";
 import { prisma } from "@/lib/db";
-import { exportPlcAddressesToBuffer } from "@/lib/export/plc-address-exporter";
+import {
+  exportPlcAddressesToBuffer,
+  exportPlcAddressesToCsvBuffer,
+} from "@/lib/export/plc-address-exporter";
 import {
   generatePlcAddressesFromComponents,
   type PlcAddressingSystem,
@@ -110,6 +113,34 @@ export async function GET(request: Request) {
       );
     }
 
+    const safeProj = project.nama.replace(/[/\\?%*:|"<>]/g, "_").slice(0, 30);
+    const isCsvFormat = searchParams.get("format")?.toLowerCase() === "csv";
+
+    if (isCsvFormat) {
+      const csvBuffer = await exportPlcAddressesToCsvBuffer(
+        allocationResult,
+        {
+          nama: project.nama,
+          client: project.client,
+          kode: project.kode,
+        },
+        {
+          namaPerusahaan: settings.namaPerusahaan,
+          alamatPerusahaan: settings.alamatPerusahaan,
+          telpPerusahaan: settings.telpPerusahaan,
+          faxPerusahaan: settings.faxPerusahaan,
+        }
+      );
+
+      return new NextResponse(csvBuffer as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="Tabel_IO_PLC_${safeProj}.csv"`,
+        },
+      });
+    }
+
     const buffer = await exportPlcAddressesToBuffer(
       allocationResult,
       {
@@ -125,7 +156,6 @@ export async function GET(request: Request) {
       }
     );
 
-    const safeProj = project.nama.replace(/[/\\?%*:|"<>]/g, "_").slice(0, 30);
     const filename = `Tabel_IO_PLC_${safeProj}.xlsx`;
 
     return new NextResponse(buffer as unknown as BodyInit, {

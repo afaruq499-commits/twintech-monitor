@@ -464,11 +464,11 @@ export function PlcAddressTablePanel({
               <Plus className="w-3.5 h-3.5" /> Tambah Alamat
             </button>
 
-            {/* Tombol Import Excel I/O */}
+            {/* Tombol Import Excel & CSV I/O */}
             <input
               type="file"
               ref={fileInputRef}
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               onChange={handleFileSelected}
               className="hidden"
             />
@@ -477,29 +477,38 @@ export function PlcAddressTablePanel({
               onClick={() => fileInputRef.current?.click()}
               disabled={isImporting}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 border border-teal-300 text-teal-800 hover:bg-teal-100 text-xs font-extrabold shadow-xs transition cursor-pointer"
-              title="Import data tabel pengelamatan dari file Excel (.xlsx / .xls)"
+              title="Import data tabel pengelamatan dari berkas Excel (.xlsx / .xls) atau CSV (.csv)"
             >
               {isImporting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
-                  Membaca Excel...
+                  Membaca Berkas...
                 </>
               ) : (
                 <>
                   <Upload className="w-3.5 h-3.5 text-teal-700" />
-                  Import Excel I/O
+                  Import Tabel I/O
                 </>
               )}
             </button>
 
-            {/* Tombol Export Excel */}
-            <a
-              href={`/api/export/plc-addresses?projectId=${projectId}&system=${system}`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold shadow-xs"
-              title="Export tabel lengkap ke format Excel (.xlsx)"
-            >
-              <Download className="w-3.5 h-3.5" /> Export Excel
-            </a>
+            {/* Tombol Export Excel (.xlsx) & CSV (.csv) */}
+            <div className="inline-flex items-stretch rounded-xl shadow-xs overflow-hidden border border-slate-700 bg-slate-900">
+              <a
+                href={`/api/export/plc-addresses?projectId=${projectId}&system=${system}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-white hover:bg-slate-800 text-xs font-extrabold transition"
+                title="Export tabel lengkap ke format Excel (.xlsx)"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Excel
+              </a>
+              <a
+                href={`/api/export/plc-addresses?projectId=${projectId}&system=${system}&format=csv`}
+                className="inline-flex items-center px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-black border-l border-slate-700 transition"
+                title="Export tabel lengkap ke format CSV (.csv)"
+              >
+                .CSV
+              </a>
+            </div>
           </div>
         </div>
 
@@ -1207,7 +1216,7 @@ export function PlcAddressTablePanel({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">
-                    Pratinjau & Konfirmasi Import Excel I/O PLC
+                    Pratinjau & Konfirmasi Import Tabel I/O PLC
                   </h3>
                   <p className="text-xs text-slate-500">
                     Berkas: <strong className="text-slate-800">{importPreview.filename || "tabel_io.xlsx"}</strong>
@@ -1332,7 +1341,7 @@ export function PlcAddressTablePanel({
                     <div>
                       <div className="text-xs font-extrabold">Ganti Semua Alamat (Replace)</div>
                       <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                        Menimpa seluruh daftar alamat saat ini dengan data persis seperti di berkas Excel ({importPreview.entries.length} baris).
+                        Menimpa seluruh daftar alamat saat ini dengan data persis seperti di berkas ({importPreview.entries.length} baris).
                       </p>
                     </div>
                   </label>

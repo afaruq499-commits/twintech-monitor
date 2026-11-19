@@ -17,14 +17,9 @@ export interface PlcAddressExportProjectInfo {
   kode?: string | null;
 }
 
-const KIND_COLORS_ARGB: Record<string, string> = {
-  DI: "FFD9E1F2", // Soft Blue
-  DO: "FFE2EFDA", // Soft Green
-  AI: "FFE1D5E7", // Soft Purple
-  AO: "FFDAE8FC", // Soft Indigo
-  M: "FFFFF2CC", // Soft Yellow
-  D: "FFF2F2F2", // Soft Gray
-};
+export interface BuildPlcAddressWorkbookOptions {
+  includeCategorySheets?: boolean;
+}
 
 const KIND_HEADER_BG_ARGB: Record<string, string> = {
   DI: "FF1E3A8A", // Blue 900
@@ -59,17 +54,13 @@ function formatWorksheetHeaders(
     fitToHeight: 0,
   };
 
-  // Column widths
+  // Format 5 Kolom Inti (+ Kolom A Margin)
   ws.getColumn(1).width = 5; // A: Margin
   ws.getColumn(2).width = 6; // B: NO
-  ws.getColumn(3).width = 8; // C: JENIS
-  ws.getColumn(4).width = 16; // D: ALAMAT PLC
-  ws.getColumn(5).width = 28; // E: SIMBOL / TAG NAME
-  ws.getColumn(6).width = 15; // F: WIRE NO / FERRULE
-  ws.getColumn(7).width = 14; // G: TIPE DATA
-  ws.getColumn(8).width = 46; // H: DESKRIPSI & FUNGSI
-  ws.getColumn(9).width = 30; // I: KOMPONEN PR
-  ws.getColumn(10).width = 22; // J: MODUL / RAK
+  ws.getColumn(3).width = 16; // C: ALAMAT PLC
+  ws.getColumn(4).width = 28; // D: SIMBOL / TAG NAME
+  ws.getColumn(5).width = 14; // E: TIPE DATA
+  ws.getColumn(6).width = 46; // F: FUNGSI & DESKRIPSI
 
   // Title Block
   ws.getRow(2).height = 24;
@@ -82,12 +73,12 @@ function formatWorksheetHeaders(
   subCell.value = subTitle;
   subCell.font = { name: "Calibri", size: 10, italic: true, color: { argb: "FF475569" } };
 
-  // Summary Stat Cards in row 5
+  // Summary Stat Cards in row 5 (Merged B5:F5)
   ws.getRow(5).height = 22;
   const statCell = ws.getCell("B5");
   statCell.value = statText;
   statCell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF0F172A" } };
-  ws.mergeCells("B5:J5");
+  ws.mergeCells("B5:F5");
   statCell.fill = {
     type: "pattern",
     pattern: "solid",
@@ -95,19 +86,15 @@ function formatWorksheetHeaders(
   };
   statCell.alignment = { horizontal: "center", vertical: "middle" };
 
-  // Table Headers at Row 7
+  // Table Headers at Row 7 (5 Kolom)
   const headerRow = 7;
   ws.getRow(headerRow).height = 24;
   const headers = [
     { col: 2, label: "NO" },
-    { col: 3, label: "TIPE" },
-    { col: 4, label: "ALAMAT PLC" },
-    { col: 5, label: "SIMBOL / TAG NAME" },
-    { col: 6, label: "WIRE NO" },
-    { col: 7, label: "TIPE DATA" },
-    { col: 8, label: "FUNGSI & DESKRIPSI" },
-    { col: 9, label: "SUMBER KOMPONEN PR" },
-    { col: 10, label: "MODUL / ROL" },
+    { col: 3, label: "ALAMAT PLC" },
+    { col: 4, label: "SIMBOL / TAG NAME" },
+    { col: 5, label: "TIPE DATA" },
+    { col: 6, label: "FUNGSI & DESKRIPSI" },
   ];
 
   for (const h of headers) {
@@ -139,59 +126,37 @@ function writeEntryRow(
 ) {
   ws.getRow(r).height = 20;
 
+  // B: NO
   const cNo = ws.getCell(r, 2);
   cNo.value = displayNo;
   cNo.alignment = { horizontal: "center", vertical: "middle" };
+  cNo.font = { name: "Calibri", size: 10 };
 
-  const cKind = ws.getCell(r, 3);
-  cKind.value = entry.kind;
-  cKind.alignment = { horizontal: "center", vertical: "middle" };
-  cKind.font = { name: "Calibri", size: 10, bold: true };
-  const bgArgb = KIND_COLORS_ARGB[entry.kind] || "FFFFFFFF";
-  cKind.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: bgArgb },
-  };
-
-  const cAddr = ws.getCell(r, 4);
+  // C: ALAMAT PLC
+  const cAddr = ws.getCell(r, 3);
   cAddr.value = entry.address;
   cAddr.alignment = { horizontal: "center", vertical: "middle" };
   cAddr.font = { name: "Consolas", size: 10, bold: true, color: { argb: "FF1E40AF" } };
 
-  const cSym = ws.getCell(r, 5);
+  // D: SIMBOL / TAG NAME
+  const cSym = ws.getCell(r, 4);
   cSym.value = entry.symbol;
   cSym.alignment = { horizontal: "left", vertical: "middle" };
   cSym.font = { name: "Consolas", size: 9.5, bold: true };
 
-  const cWire = ws.getCell(r, 6);
-  cWire.value = entry.wireNo;
-  cWire.alignment = { horizontal: "center", vertical: "middle" };
-  cWire.font = { name: "Consolas", size: 9.5 };
-
-  const cData = ws.getCell(r, 7);
+  // E: TIPE DATA
+  const cData = ws.getCell(r, 5);
   cData.value = entry.dataType;
   cData.alignment = { horizontal: "center", vertical: "middle" };
   cData.font = { name: "Calibri", size: 9 };
 
-  const cDesc = ws.getCell(r, 8);
-  cDesc.value = entry.description;
+  // F: FUNGSI & DESKRIPSI
+  const cDesc = ws.getCell(r, 6);
+  cDesc.value = entry.description || "";
   cDesc.alignment = { horizontal: "left", vertical: "middle" };
   cDesc.font = { name: "Calibri", size: 9.5 };
 
-  const cComp = ws.getCell(r, 9);
-  cComp.value = entry.sourceComponent
-    ? `${entry.sourceComponent.partType} (${entry.sourceComponent.partName})`
-    : "-";
-  cComp.alignment = { horizontal: "left", vertical: "middle" };
-  cComp.font = { name: "Calibri", size: 9, italic: true };
-
-  const cMod = ws.getCell(r, 10);
-  cMod.value = entry.moduleRole || "-";
-  cMod.alignment = { horizontal: "left", vertical: "middle" };
-  cMod.font = { name: "Calibri", size: 9 };
-
-  for (let col = 2; col <= 10; col++) {
+  for (let col = 2; col <= 6; col++) {
     const cell = ws.getCell(r, col);
     cell.border = {
       top: { style: "thin", color: { argb: "FFE2E8F0" } },
@@ -210,7 +175,8 @@ export async function buildPlcAddressWorkbook(
     alamatPerusahaan: "",
     telpPerusahaan: "",
     faxPerusahaan: "",
-  }
+  },
+  options?: BuildPlcAddressWorkbookOptions
 ): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   const companyName = company?.namaPerusahaan || "PT. Twintech Precision";
@@ -239,7 +205,7 @@ export async function buildPlcAddressWorkbook(
     const groupEntries = result.entries.filter((e) => e.kind === k);
     if (groupEntries.length === 0) continue;
 
-    // Header banner seksi
+    // Header banner seksi (Merge B:F / col 2 sampai 6)
     wsMain.getRow(currentRow).height = 24;
     const bannerCell = wsMain.getCell(currentRow, 2);
     bannerCell.value = `${KIND_SECTION_TITLES[k]} (${groupEntries.length} Item)`;
@@ -250,7 +216,7 @@ export async function buildPlcAddressWorkbook(
       pattern: "solid",
       fgColor: { argb: KIND_HEADER_BG_ARGB[k] || "FF1E293B" },
     };
-    wsMain.mergeCells(currentRow, 2, currentRow, 10);
+    wsMain.mergeCells(currentRow, 2, currentRow, 6);
     currentRow++;
 
     // Tulis baris dalam kategori ini
@@ -264,29 +230,31 @@ export async function buildPlcAddressWorkbook(
     currentRow++;
   }
 
-  // 2. SHEET INDIVIDUAL: DI, DO, AI-AO, D-M
-  const categorySheets = [
-    { name: "Digital Input (DI)", kinds: ["DI"] as const },
-    { name: "Digital Output (DO)", kinds: ["DO"] as const },
-    { name: "Analog (AI & AO)", kinds: ["AI", "AO"] as const },
-    { name: "Register & Relay (D & M)", kinds: ["M", "D"] as const },
-  ];
+  // 2. SHEET INDIVIDUAL OPSIONAL: jika includeCategorySheets diaktifkan
+  if (options?.includeCategorySheets) {
+    const categorySheets = [
+      { name: "Digital Input (DI)", kinds: ["DI"] as const },
+      { name: "Digital Output (DO)", kinds: ["DO"] as const },
+      { name: "Analog (AI & AO)", kinds: ["AI", "AO"] as const },
+      { name: "Register & Relay (D & M)", kinds: ["M", "D"] as const },
+    ];
 
-  for (const cat of categorySheets) {
-    const catEntries = result.entries.filter((e) =>
-      (cat.kinds as readonly string[]).includes(e.kind)
-    );
-    if (catEntries.length === 0) continue;
+    for (const cat of categorySheets) {
+      const catEntries = result.entries.filter((e) =>
+        (cat.kinds as readonly string[]).includes(e.kind)
+      );
+      if (catEntries.length === 0) continue;
 
-    const wsCat = wb.addWorksheet(cat.name);
-    const catStat = `Kategori: ${cat.name} (${catEntries.length} Item)`;
-    formatWorksheetHeaders(wsCat, `${titleText} — ${cat.name}`, subText, catStat);
+      const wsCat = wb.addWorksheet(cat.name);
+      const catStat = `Kategori: ${cat.name} (${catEntries.length} Item)`;
+      formatWorksheetHeaders(wsCat, `${titleText} — ${cat.name}`, subText, catStat);
 
-    let catRow = 8;
-    catEntries.forEach((entry, idx) => {
-      writeEntryRow(wsCat, catRow, entry, idx + 1);
-      catRow++;
-    });
+      let catRow = 8;
+      catEntries.forEach((entry, idx) => {
+        writeEntryRow(wsCat, catRow, entry, idx + 1);
+        catRow++;
+      });
+    }
   }
 
   return wb;
@@ -300,9 +268,27 @@ export async function exportPlcAddressesToBuffer(
     alamatPerusahaan: "",
     telpPerusahaan: "",
     faxPerusahaan: "",
+  },
+  options?: BuildPlcAddressWorkbookOptions
+): Promise<Buffer> {
+  const wb = await buildPlcAddressWorkbook(result, project, company, options);
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+export async function exportPlcAddressesToCsvBuffer(
+  result: PlcAddressAllocationResult,
+  project: PlcAddressExportProjectInfo,
+  company: PlcAddressExportCompanyInfo = {
+    namaPerusahaan: "PT. Twintech Precision",
+    alamatPerusahaan: "",
+    telpPerusahaan: "",
+    faxPerusahaan: "",
   }
 ): Promise<Buffer> {
-  const wb = await buildPlcAddressWorkbook(result, project, company);
-  const arrayBuffer = await wb.xlsx.writeBuffer();
+  const wb = await buildPlcAddressWorkbook(result, project, company, {
+    includeCategorySheets: false,
+  });
+  const arrayBuffer = await wb.csv.writeBuffer();
   return Buffer.from(arrayBuffer);
 }

@@ -1,3 +1,4 @@
+import { Readable } from "stream";
 import ExcelJS from "exceljs";
 import { cellText } from "@/lib/excel/cells";
 import type {
@@ -131,18 +132,55 @@ function extractNumericIndex(address: string, fallback: number): number {
 }
 
 /**
- * Membaca buffer Excel (.xlsx / .xls) dan memetakan ke array PlcAddressEntry[]
+ * Membaca buffer Excel (.xlsx / .xls) atau CSV (.csv) dan memetakan ke array PlcAddressEntry[]
  */
 export async function parsePlcAddressWorkbook(
   buffer: Buffer | ArrayBuffer,
   filename?: string
 ): Promise<ParsedPlcAddressResult> {
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  const isZip =
+    buf.length >= 4 &&
+    buf[0] === 0x50 &&
+    buf[1] === 0x4b &&
+    buf[2] === 0x03 &&
+    buf[3] === 0x04;
+  const isExplicitCsv = filename ? /\.csv$/i.test(filename) : false;
+
   const workbook = new ExcelJS.Workbook();
-  // @ts-expect-error exceljs Buffer compatibility
-  await workbook.xlsx.load(buffer);
+
+  if (isExplicitCsv || !isZip) {
+    try {
+      await workbook.csv.read(Readable.from(buf));
+    } catch (csvErr) {
+      if (isZip) {
+        // Fallback jika ternyata berkas zip/xlsx valid
+        // @ts-expect-error exceljs Buffer compatibility
+        await workbook.xlsx.load(buf);
+      } else {
+        throw new Error(
+          `Gagal memproses berkas CSV: ${csvErr instanceof Error ? csvErr.message : "Format tidak valid"}`
+        );
+      }
+    }
+  } else {
+    try {
+      // @ts-expect-error exceljs Buffer compatibility
+      await workbook.xlsx.load(buf);
+    } catch (xlsxErr) {
+      // Fallback: coba baca sebagai CSV jika ternyata teks CSV diunggah dengan nama .xlsx
+      try {
+        await workbook.csv.read(Readable.from(buf));
+      } catch {
+        throw new Error(
+          `Gagal membaca berkas Excel: ${xlsxErr instanceof Error ? xlsxErr.message : "Format tidak valid"}`
+        );
+      }
+    }
+  }
 
   if (!workbook.worksheets || workbook.worksheets.length === 0) {
-    throw new Error("Berkas Excel tidak memiliki lembar kerja (worksheet).");
+    throw new Error("Berkas tidak memiliki lembar kerja atau baris tabel yang dapat dibaca.");
   }
 
   // Cari sheet komprehensif (misal: "Semua I-O & Register" / "Semua" / "All")
@@ -156,7 +194,7 @@ export async function parsePlcAddressWorkbook(
   } else if (workbook.worksheets.length === 1) {
     targetSheets = [workbook.worksheets[0]];
   } else {
-    // Multi-sheet per kategori (misal: Digital Input, Digital Output, Register & Relay)
+    // Multi-sheet per kategori
     targetSheets = workbook.worksheets;
   }
 
@@ -219,9 +257,9 @@ export async function parsePlcAddressWorkbook(
         for (const c of upperRow) {
           if (c.upper === "NO" || c.upper === "NO.") {
             colMap.no = c.col;
-          } else if (c.upper.includes("TIPE") && !c.upper.includes("DATA")) {
-            colMap.kind = c.col;
-          } else if (c.upper.includes("JENIS") || c.upper === "TYPE" || c.upper === "KIND") {
+          } else if (c.upper.includes("TIPE DATA") || c.upper.includes("DATA TYPE")) {
+            colMap.dataType = c.col;
+          } else if (c.upper.includes("TIPE") || c.upper.includes("JENIS") || c.upper === "TYPE" || c.upper === "KIND") {
             colMap.kind = c.col;
           } else if (c.upper.includes("ALAMAT") || c.upper.includes("ADDRESS")) {
             colMap.address = c.col;
@@ -229,12 +267,11 @@ export async function parsePlcAddressWorkbook(
             colMap.symbol = c.col;
           } else if (c.upper.includes("WIRE") || c.upper.includes("KABEL") || c.upper.includes("FERRULE")) {
             colMap.wireNo = c.col;
-          } else if (c.upper.includes("TIPE DATA") || c.upper.includes("DATA TYPE")) {
-            colMap.dataType = c.col;
           } else if (
             c.upper.includes("FUNGSI") ||
             c.upper.includes("DESKRIPSI") ||
-            c.upper.includes("KETERANGAN")
+            c.upper.includes("KETERANGAN") ||
+            c.upper.includes("DESCRIPTION")
           ) {
             colMap.description = c.col;
           } else if (c.upper.includes("SUMBER") || c.upper.includes("KOMPONEN") || c.upper.includes("PART")) {
@@ -252,37 +289,89 @@ export async function parsePlcAddressWorkbook(
       continue;
     }
 
-    // Default kolom jika tidak terpetakan eksplisit
-    const colAddress = colMap.address ?? 4;
-    const colKind = colMap.kind ?? 3;
-    const colSymbol = colMap.symbol ?? 5;
-    const colWireNo = colMap.wireNo ?? 6;
-    const colDataType = colMap.dataType ?? 7;
-    const colDescription = colMap.description ?? 8;
-    const colSource = colMap.sourceComponent ?? 9;
-    const colModule = colMap.moduleRole ?? 10;
+    // Default kolom jika tidak terpetakan eksplisit (mengikuti 5-kolom: B=NO, C=ALAMAT, D=SIMBOL, E=TIPE DATA, F=DESKRIPSI)
+    const colAddress = colMap.address ?? 3;
+    const colSymbol = colMap.symbol ?? 4;
+    const colDataType = colMap.dataType ?? 5;
+    const colDescription = colMap.description ?? 6;
+
+    // Lacak kind seksi aktif jika dokumen menggunakan banner seksi (BAGIAN 1, 2, 5, 6, dsb.)
+    let currentSectionKind: PlcAddressKind | null = null;
 
     // 2. Loop setiap baris data setelah header
     for (let r = headerRowIndex + 1; r <= ws.rowCount; r++) {
-      const rawAddress = getWsText(ws, r, colAddress);
+      // Kumpulkan teks seluruh kolom baris ini
+      const rowTexts: string[] = [];
+      for (let c = 1; c <= Math.max(ws.columnCount || 10, 10); c++) {
+        const val = getWsText(ws, r, c);
+        if (val) rowTexts.push(val);
+      }
 
-      if (!rawAddress) continue;
+      if (rowTexts.length === 0) continue;
+      const combinedRowUpper = rowTexts.join(" ").toUpperCase();
 
-      // Abaikan baris judul bagian (misal: "BAGIAN 1: DIGITAL INPUT", "KATEGORI: ...", "Total I/O: ...")
-      const upperAddr = rawAddress.toUpperCase();
+      // Deteksi banner pembatas seksi
+      if (combinedRowUpper.includes("BAGIAN 1") || (combinedRowUpper.includes("DIGITAL INPUT") && !combinedRowUpper.includes("X0"))) {
+        currentSectionKind = "DI";
+        continue;
+      }
+      if (combinedRowUpper.includes("BAGIAN 2") || (combinedRowUpper.includes("DIGITAL OUTPUT") && !combinedRowUpper.includes("Y0"))) {
+        currentSectionKind = "DO";
+        continue;
+      }
+      if (combinedRowUpper.includes("BAGIAN 3") || combinedRowUpper.includes("ANALOG INPUT")) {
+        currentSectionKind = "AI";
+        continue;
+      }
+      if (combinedRowUpper.includes("BAGIAN 4") || combinedRowUpper.includes("ANALOG OUTPUT")) {
+        currentSectionKind = "AO";
+        continue;
+      }
+      if (combinedRowUpper.includes("BAGIAN 5") || combinedRowUpper.includes("INTERNAL RELAY") || combinedRowUpper.includes("HMI BIT")) {
+        currentSectionKind = "M";
+        continue;
+      }
+      if (combinedRowUpper.includes("BAGIAN 6") || combinedRowUpper.includes("DATA REGISTER")) {
+        currentSectionKind = "D";
+        continue;
+      }
+
+      // Abaikan baris informasi/ringkasan
       if (
-        upperAddr.startsWith("BAGIAN") ||
-        upperAddr.startsWith("TOTAL") ||
-        upperAddr.startsWith("KATEGORI") ||
-        upperAddr.startsWith("CATATAN") ||
-        upperAddr.startsWith("SUMMARY")
+        combinedRowUpper.startsWith("BAGIAN") ||
+        combinedRowUpper.startsWith("TOTAL") ||
+        combinedRowUpper.startsWith("KATEGORI") ||
+        combinedRowUpper.startsWith("CATATAN") ||
+        combinedRowUpper.startsWith("SUMMARY") ||
+        combinedRowUpper.includes("TABEL PENGELAMATAN")
       ) {
         continue;
       }
 
-      const rawKind = getWsText(ws, r, colKind);
-      const kind = normalizeKind(rawKind, rawAddress);
+      const rawAddress = getWsText(ws, r, colAddress);
+      if (!rawAddress) continue;
+
       const normalizedAddress = rawAddress.toUpperCase();
+      if (normalizedAddress === "ALAMAT PLC" || normalizedAddress === "ADDRESS") {
+        continue;
+      }
+
+      // Tentukan kind: gunakan kolom kind jika ada, atau currentSectionKind, atau inferensi prefix
+      let kind: PlcAddressKind;
+      if (colMap.kind !== undefined) {
+        const rawKind = getWsText(ws, r, colMap.kind);
+        if (rawKind) {
+          kind = normalizeKind(rawKind, normalizedAddress);
+        } else if (currentSectionKind) {
+          kind = currentSectionKind;
+        } else {
+          kind = normalizeKind("", normalizedAddress);
+        }
+      } else if (currentSectionKind) {
+        kind = currentSectionKind;
+      } else {
+        kind = normalizeKind("", normalizedAddress);
+      }
 
       // Hindari duplikasi jika alamat yang sama sudah ada di list
       const dedupKey = `${kind}:${normalizedAddress}`;
@@ -291,27 +380,27 @@ export async function parsePlcAddressWorkbook(
       }
       seenKeys.add(dedupKey);
 
-      let symbol = getWsText(ws, r, colSymbol);
+      let symbol = colSymbol ? getWsText(ws, r, colSymbol) : "";
       if (!symbol || symbol === "-") {
         symbol = `${kind}_${normalizedAddress.replace(/[^A-Z0-9]/gi, "_")}`;
       } else {
         symbol = symbol.toUpperCase().replace(/\s+/g, "_");
       }
 
-      let wireNo = getWsText(ws, r, colWireNo);
+      let wireNo = colMap.wireNo ? getWsText(ws, r, colMap.wireNo) : "-";
       if (!wireNo || wireNo === "-") {
         wireNo = "-";
       }
 
-      const rawDataType = getWsText(ws, r, colDataType);
+      const rawDataType = colDataType ? getWsText(ws, r, colDataType) : "";
       const dataType = normalizeDataType(rawDataType, kind);
 
-      let description = getWsText(ws, r, colDescription);
-      if (!description || description === "-") {
-        description = `Alamat ${normalizedAddress} (${symbol})`;
+      let description = colDescription ? getWsText(ws, r, colDescription) : "";
+      if (description === "-") {
+        description = "";
       }
 
-      const sourceText = getWsText(ws, r, colSource);
+      const sourceText = colMap.sourceComponent ? getWsText(ws, r, colMap.sourceComponent) : "";
       const sourceComponent =
         sourceText && sourceText !== "-"
           ? {
@@ -321,9 +410,9 @@ export async function parsePlcAddressWorkbook(
             }
           : null;
 
-      let moduleRole = getWsText(ws, r, colModule);
+      let moduleRole = colMap.moduleRole ? getWsText(ws, r, colMap.moduleRole) : "";
       if (!moduleRole || moduleRole === "-") {
-        moduleRole = "Import Excel";
+        moduleRole = "Import Tabel I/O";
       }
 
       const numericIndex = extractNumericIndex(normalizedAddress, entries.length + 1);
