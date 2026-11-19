@@ -7,12 +7,8 @@ import { PrismaClient } from "@prisma/client";
  * 2. Atau variabel komponen terpisah (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT, DB_TYPE)
  */
 export function resolveDatabaseUrl(): string | undefined {
-  let url = process.env.DATABASE_URL?.trim();
+  const url = process.env.DATABASE_URL?.trim();
   if (url && url.length > 0) {
-    // Optimasi serverless pooler: batasi 1 koneksi per lambda instance untuk kurangi overhead
-    if (url.includes("pooler.supabase.com") && !url.includes("connection_limit=")) {
-      url += (url.includes("?") ? "&" : "?") + "connection_limit=1";
-    }
     return url;
   }
 

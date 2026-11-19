@@ -6,6 +6,7 @@ import {
   type ScheduledWorkEntry,
 } from "@/lib/schedule";
 import { rankProjectPriorities } from "@/lib/priority/score";
+import { createFullScheduleSchema } from "@/lib/validation/schemas";
 
 describe("Deteksi Konflik Jadwal & Peringatan Komponen", () => {
   const existingEntries: ScheduledWorkEntry[] = [
@@ -320,5 +321,51 @@ describe("Perhitungan Prioritas Pengerjaan", () => {
     );
     expect(overridden[0].project.id).toBe("p-far");
     expect(overridden[0].isManualOverride).toBe(true);
+  });
+});
+
+describe("Validasi Schema Pembuatan Schedule Proyek (createFullScheduleSchema)", () => {
+  it("mengizinkan tanggalMulai dikosongkan dan hanya mencatat deadline", () => {
+    const payload = {
+      projectMode: "EXISTING",
+      existingProjectId: "proj-123",
+      judulPengerjaan: "Wiring Panel & Trial",
+      deadline: "2026-12-15",
+      picUtama: "Apip",
+      proyekParalel: true,
+      pekerjaanList: [
+        {
+          judul: "Perakitan Panel",
+          jenis: "WIRING",
+          subPekerjaan: [
+            {
+              judul: "1. Mounting & Wiring",
+              details: ["a. Pasang MCB", "b. Wiring relay"],
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = createFullScheduleSchema.safeParse(payload);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.tanggalMulai).toBeNull();
+      expect(parsed.data.deadline).toBe("2026-12-15");
+      expect(parsed.data.pekerjaanList[0].jadwalMulai).toBeNull();
+      expect(parsed.data.pekerjaanList[0].jadwalSelesai).toBeNull();
+    }
+  });
+
+  it("menolak jika nama pekerjaan atau subpekerjaan kosong", () => {
+    const invalidPayload = {
+      projectMode: "EXISTING",
+      existingProjectId: "proj-123",
+      judulPengerjaan: "Wiring Panel",
+      pekerjaanList: [],
+    };
+
+    const parsed = createFullScheduleSchema.safeParse(invalidPayload);
+    expect(parsed.success).toBe(false);
   });
 });

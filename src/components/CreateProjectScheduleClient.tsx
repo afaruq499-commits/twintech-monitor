@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   CalendarPlus,
   CheckCircle2,
@@ -90,7 +91,6 @@ export function CreateProjectScheduleClient({
 
   // Field Utama Schedule Pengerjaan
   const [judulPengerjaan, setJudulPengerjaan] = useState("");
-  const [tanggalMulai, setTanggalMulai] = useState(defaultTodayIso);
   const [deadline, setDeadline] = useState(preselectedProj?.deadline ?? "");
   const [picUtama, setPicUtama] = useState(preselectedProj?.pic ?? "");
   const [proyekParalel, setProyekParalel] = useState(
@@ -105,8 +105,8 @@ export function CreateProjectScheduleClient({
       pic: "",
       deadline: "",
       bolehParalel: false,
-      jadwalMulai: defaultTodayIso,
-      jadwalSelesai: defaultTodayIso,
+      jadwalMulai: "",
+      jadwalSelesai: "",
       warnaKolom: "#00B050",
       komentarAwal: "",
       subPekerjaan: tpl.subPekerjaan.map((sp) => ({
@@ -128,8 +128,8 @@ export function CreateProjectScheduleClient({
         pic: picUtama.trim(),
         deadline: deadline || "",
         bolehParalel: false,
-        jadwalMulai: tanggalMulai || defaultTodayIso,
-        jadwalSelesai: tanggalMulai || defaultTodayIso,
+        jadwalMulai: "",
+        jadwalSelesai: "",
         warnaKolom: "#00B050",
         komentarAwal: "",
         subPekerjaan: tpl.subPekerjaan.map((sp) => ({
@@ -164,8 +164,8 @@ export function CreateProjectScheduleClient({
         pic: "",
         deadline: "",
         bolehParalel: false,
-        jadwalMulai: tanggalMulai,
-        jadwalSelesai: tanggalMulai,
+        jadwalMulai: "",
+        jadwalSelesai: "",
         warnaKolom: "#00B050",
         komentarAwal: "",
         subPekerjaan: [
@@ -298,7 +298,6 @@ export function CreateProjectScheduleClient({
           warnaProyek,
           proyekParalel,
           judulPengerjaan,
-          tanggalMulai,
           deadline: deadline || null,
           picUtama: picUtama.trim() || null,
           pekerjaanList: formattedWorkList,
@@ -341,8 +340,12 @@ export function CreateProjectScheduleClient({
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold">
-          {errorMsg}
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold flex items-start gap-2.5">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-extrabold text-rose-900">Gagal Membuat Schedule Proyek</div>
+            <div className="text-xs text-rose-700 font-medium">{errorMsg}</div>
+          </div>
         </div>
       )}
 
@@ -535,29 +538,19 @@ export function CreateProjectScheduleClient({
             />
           </div>
 
-          <div>
+          <div className="sm:col-span-2">
             <label className="block text-sm font-bold text-slate-800 mb-1">
-              Tanggal Mulai (Day 1) *
-            </label>
-            <input
-              type="date"
-              required
-              value={tanggalMulai}
-              onChange={(e) => setTanggalMulai(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-base"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1">
-              Deadline Selesai
+              Deadline Target Selesai
             </label>
             <input
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-base"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-base focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              Cukup catat tanggal deadline target. Tanggal pelaksanaan per tugas dapat langsung diatur di tabel schedule.
+            </p>
           </div>
 
           <div className="sm:col-span-2">
@@ -675,7 +668,10 @@ export function CreateProjectScheduleClient({
                     SCOPE OF WORK (Sub-Pekerjaan & Rincian Tugas)
                   </th>
                   <th className="py-3.5 px-4 w-56 lg:w-64 text-left font-black tracking-wider uppercase text-xs shrink-0">
-                    JADWAL PENGERJAAN
+                    JADWAL PENGERJAAN (OPSIONAL)
+                    <span className="block text-[10px] font-medium normal-case text-slate-300 mt-0.5">
+                      Bisa dikosongkan & diisi di tabel
+                    </span>
                   </th>
                   <th className="py-3.5 px-3 w-14 text-center font-black tracking-wider uppercase text-xs shrink-0">
                     AKSI

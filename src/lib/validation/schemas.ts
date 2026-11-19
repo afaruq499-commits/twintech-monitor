@@ -245,7 +245,7 @@ export const createFullScheduleSchema = z.object({
     .trim()
     .min(1, "Judul pengerjaan wajib diisi")
     .max(200),
-  tanggalMulai: isoDateRequired,
+  tanggalMulai: isoDateOptional,
   deadline: isoDateOptional,
   picUtama: z
     .string()
