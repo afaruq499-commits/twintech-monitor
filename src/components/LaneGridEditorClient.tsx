@@ -17,6 +17,8 @@ import {
   Download,
   Edit3,
   Eraser,
+  Eye,
+  EyeOff,
   GitFork,
   Layers,
   ListOrdered,
@@ -439,6 +441,18 @@ export function LaneGridEditorClient({
     });
   }, [dayDates, allLaneCellDates]);
 
+  // Hanya tampilkan kolom tanggal yang memiliki plan pengerjaan (default: true jika ada plan)
+  const [onlyPlannedDates, setOnlyPlannedDates] = useState(true);
+
+  // Kolom tanggal aktif yang dirender pada tabel
+  const activeDayDates = useMemo(() => {
+    if (onlyPlannedDates && allLaneCellDates.size > 0) {
+      const planned = dayDates.filter((dt) => allLaneCellDates.has(dt));
+      return planned.length > 0 ? planned : dayDates;
+    }
+    return dayDates;
+  }, [dayDates, onlyPlannedDates, allLaneCellDates]);
+
   // Fitur Shift + Scroll Mouse untuk menggeser kolom Hari secara horizontal
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
@@ -545,8 +559,11 @@ export function LaneGridEditorClient({
   }
 
   // Buang 1 kolom tanggal tertentu (misalnya tanggal libur / kosong)
-  async function handleRemoveSingleDay(dayIndex: number) {
-    const targetDate = dayDates[dayIndex];
+  async function handleRemoveDate(targetDateOrIndex: string | number) {
+    const targetDate =
+      typeof targetDateOrIndex === "string"
+        ? targetDateOrIndex
+        : dayDates[targetDateOrIndex];
     if (!targetDate) return;
 
     if (dayDates.length <= 1) {
@@ -555,15 +572,15 @@ export function LaneGridEditorClient({
     }
 
     const hasTasks = allLaneCellDates.has(targetDate);
-    const dayLabel = `DAY ${dayIndex + 1} (${formatHariTanggalSingkat(targetDate)})`;
+    const dayLabel = formatHariTanggalSingkat(targetDate);
     const confirmMsg = hasTasks
-      ? `${dayLabel} memiliki pekerjaan yang terjadwal. Jika dihapus, jadwal pekerjaan pada hari tersebut akan ikut terhapus. Yakin ingin membuang hari ini dari schedule?`
+      ? `Kolom ${dayLabel} memiliki pekerjaan yang terjadwal. Jika dihapus, jadwal pekerjaan pada hari tersebut akan ikut terhapus. Yakin ingin membuang hari ini dari schedule?`
       : `Buang kolom ${dayLabel} dari schedule proyek?`;
 
     if (!window.confirm(confirmMsg)) return;
 
-    const remainingDates = dayDates.filter((_, idx) => idx !== dayIndex);
-    const isDay1 = dayIndex === 0;
+    const remainingDates = dayDates.filter((d) => d !== targetDate);
+    const isDay1 = targetDate === dayDates[0];
 
     setCustomDates(remainingDates);
     setDateChangeToast(`Membuang ${dayLabel} dari schedule...`);
@@ -609,7 +626,7 @@ export function LaneGridEditorClient({
       alert(
         onlyWeekends
           ? "Tidak ada hari Sabtu & Minggu (akhir pekan) kosong yang perlu dibuang."
-          : "Tidak ada tanggal kosong yang perlu dibuang."
+          : "Tidak ada kolom tanggal kosong yang perlu dihapus."
       );
       return;
     }
@@ -631,13 +648,13 @@ export function LaneGridEditorClient({
 
     const confirmMsg = onlyWeekends
       ? `Ditemukan ${targets.length} hari libur akhir pekan (Sabtu/Minggu) kosong:\n${targetLabels}\n\nBuang hari libur kosong ini dari schedule proyek?`
-      : `Ditemukan ${targets.length} kolom tanggal tanpa pengerjaan:\n${targetLabels}\n\nBuang seluruh tanggal kosong ini dari schedule proyek?`;
+      : `Ditemukan ${targets.length} kolom tanggal tanpa rencana pengerjaan:\n${targetLabels}\n\nHapus seluruh kolom tanggal kosong ini secara permanen dari schedule?`;
 
     if (!window.confirm(confirmMsg)) return;
 
     setCustomDates(remainingDates);
     setDateChangeToast(
-      `Membuang ${targets.length} tanggal kosong dari schedule...`
+      `Menghapus ${targets.length} tanggal kosong dari schedule...`
     );
 
     try {
@@ -661,17 +678,17 @@ export function LaneGridEditorClient({
 
       if (res.ok) {
         setDateChangeToast(
-          `${targets.length} tanggal kosong berhasil dibuang dari schedule!`
+          `${targets.length} kolom tanpa plan berhasil dihapus dari schedule!`
         );
         setTimeout(() => setDateChangeToast(null), 3000);
         router.refresh();
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.error || "Gagal membuang tanggal kosong.");
+        alert(err.error || "Gagal menghapus tanggal dari schedule.");
         router.refresh();
       }
     } catch {
-      alert("Gagal menghubungi server saat membuang tanggal kosong.");
+      alert("Gagal menghubungi server saat menghapus tanggal.");
       router.refresh();
     }
   }
@@ -1358,45 +1375,75 @@ export function LaneGridEditorClient({
                   SCOPE of WORK (Rincian)
                 </th>
                 <th
-                  colSpan={dayDates.length}
-                  className="border-b border-r border-slate-700 px-2 py-1.5 text-center font-extrabold text-xs tracking-wider bg-slate-900 text-white"
+                  colSpan={activeDayDates.length}
+                  className="border-b border-r border-slate-700 px-2 py-1 text-center font-extrabold text-xs tracking-wider bg-slate-900 text-white"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-1.5 px-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] uppercase tracking-wider text-slate-300 font-extrabold">
-                        KOLOM HARI (DAY 1..{dayDates.length})
+                      <span className="text-[11px] uppercase tracking-wider text-slate-200 font-black">
+                        KOLOM HARI (DAY 1..{activeDayDates.length})
                       </span>
-                      {emptyWeekendDates.length > 0 && (
-                        <span className="text-[10px] text-rose-300 bg-rose-950/80 border border-rose-700 px-1.5 py-0.2 rounded-full font-bold">
-                          {emptyWeekendDates.length} Weekend Kosong
+                      {emptyDates.length > 0 && onlyPlannedDates && (
+                        <span className="text-[10px] text-amber-200 bg-amber-950/80 border border-amber-700 px-1.5 py-0.2 rounded-full font-bold">
+                          {emptyDates.length} Kolom Kosong Disembunyikan
                         </span>
                       )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1">
-                      {/* Tombol Buang Weekend Kosong */}
-                      {emptyWeekendDates.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handlePurgeEmptyDates(true)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-700 hover:bg-rose-600 text-white text-[11px] font-bold transition shadow-xs cursor-pointer animate-pulse"
-                          title="Buang hari Sabtu & Minggu (akhir pekan) yang kosong dari schedule proyek"
-                        >
-                          <Trash2 className="w-3 h-3 text-rose-200" />
-                          Buang Weekend ({emptyWeekendDates.length})
-                        </button>
-                      )}
-
-                      {/* Tombol Buang Semua Tanggal Kosong */}
+                      {/* Tombol Hapus Semua Kolom Tanpa Plan (Permanen ke Database) */}
                       {emptyDates.length > 0 && (
                         <button
                           type="button"
                           onClick={() => handlePurgeEmptyDates(false)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold transition shadow-xs cursor-pointer"
-                          title="Buang semua kolom tanggal yang tidak memiliki kegiatan/pekerjaan"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-black transition shadow-xs cursor-pointer animate-pulse"
+                          title="Hapus permanen semua kolom tanggal yang tidak memiliki rencana pengerjaan dari database"
                         >
-                          <Trash2 className="w-3 h-3 text-amber-200" />
-                          Buang Tgl Kosong ({emptyDates.length})
+                          <Trash2 className="w-3 h-3 text-rose-100" />
+                          Hapus Kolom Tanpa Plan ({emptyDates.length})
+                        </button>
+                      )}
+
+                      {/* Toggle Tampilkan/Sembunyikan Kolom Kosong */}
+                      {emptyDates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOnlyPlannedDates(!onlyPlannedDates)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold transition shadow-xs cursor-pointer ${
+                            onlyPlannedDates
+                              ? "bg-blue-600 hover:bg-blue-500 text-white"
+                              : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+                          }`}
+                          title={
+                            onlyPlannedDates
+                              ? "Menampilkan hanya tanggal yang ada rencana pekerjaan. Klik untuk menampilkan semua kolom tanggal."
+                              : "Menampilkan semua kolom tanggal. Klik untuk hanya menampilkan tanggal berencana."
+                          }
+                        >
+                          {onlyPlannedDates ? (
+                            <>
+                              <EyeOff className="w-3 h-3" />
+                              Hanya Hari Kerja ({activeDayDates.length})
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3" />
+                              Semua Kolom ({dayDates.length})
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Tombol Buang Weekend Kosong (jika menampilkan semua dan ada weekend) */}
+                      {!onlyPlannedDates && emptyWeekendDates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePurgeEmptyDates(true)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-700 hover:bg-rose-600 text-white text-[11px] font-bold transition shadow-xs cursor-pointer"
+                          title="Buang hari Sabtu & Minggu (akhir pekan) yang kosong dari schedule proyek"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-200" />
+                          Weekend ({emptyWeekendDates.length})
                         </button>
                       )}
 
@@ -1426,10 +1473,11 @@ export function LaneGridEditorClient({
                 </th>
               </tr>
               <tr className="bg-slate-800 text-white">
-                {dayDates.map((dtIso, idx) => {
+                {activeDayDates.map((dtIso, idx) => {
                   const occ = globalOccupantsByDate[dtIso] ?? [];
                   const tglMerah = isTanggalMerah(dtIso);
                   const isToday = dtIso === todayIsoLocal();
+                  const originalIdx = dayDates.indexOf(dtIso);
                   return (
                     <th
                       key={`day-${idx}-${dtIso}`}
@@ -1474,7 +1522,10 @@ export function LaneGridEditorClient({
                               type="date"
                               value={dtIso}
                               onChange={(e) =>
-                                handleDayDateChange(idx, e.target.value)
+                                handleDayDateChange(
+                                  originalIdx >= 0 ? originalIdx : idx,
+                                  e.target.value
+                                )
                               }
                               className="sr-only"
                               onClick={(e) => {
@@ -1487,9 +1538,9 @@ export function LaneGridEditorClient({
 
                           <button
                             type="button"
-                            onClick={() => handleRemoveSingleDay(idx)}
+                            onClick={() => handleRemoveDate(dtIso)}
                             className="inline-flex items-center p-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white cursor-pointer transition shadow-2xs"
-                            title={`Buang DAY ${idx + 1} (${formatHariTanggalSingkat(dtIso)}) dari schedule proyek`}
+                            title={`Hapus DAY ${idx + 1} (${formatHariTanggalSingkat(dtIso)}) dari schedule proyek`}
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                           </button>
@@ -1510,13 +1561,16 @@ export function LaneGridEditorClient({
                                 : "bg-slate-700/60 border-slate-600/70 text-slate-100 hover:bg-slate-600"
                           }`}
                         >
-                          {formatTanggalKolomRamping(dtIso)}
+                          {formatHariTanggalSingkat(dtIso)}
                         </div>
                         <input
                           type="date"
                           value={dtIso}
                           onChange={(e) =>
-                            handleDayDateChange(idx, e.target.value)
+                            handleDayDateChange(
+                              originalIdx >= 0 ? originalIdx : idx,
+                              e.target.value
+                            )
                           }
                           className="sr-only"
                           onClick={(e) => {
@@ -1553,7 +1607,7 @@ export function LaneGridEditorClient({
               {lane.workItems.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4 + dayDates.length}
+                    colSpan={4 + activeDayDates.length}
                     className="p-12 text-center text-base text-slate-500"
                   >
                     Belum ada pekerjaan pada lane ini. Klik &ldquo;Tambah
@@ -1829,7 +1883,7 @@ export function LaneGridEditorClient({
                           </td>
 
                           {/* Sel Hari Day 1..N: Setiap sub point (a, b, c, dst) memiliki kotak sendiri */}
-                          {dayDates.map((dtIso) => {
+                          {activeDayDates.map((dtIso) => {
                             const isFirstSubScope = ssIdx === 0;
                             const hasSubScopeCellsForDate =
                               wi.scheduleCells.some(

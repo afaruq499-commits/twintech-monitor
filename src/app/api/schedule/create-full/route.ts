@@ -72,28 +72,34 @@ export async function POST(request: Request) {
     }
 
     // Bangun rentang tanggal untuk lane:
-    // Lewati akhir pekan (Sabtu & Minggu) jika tidak ada pekerjaan yang dijadwalkan pada hari tersebut
-    const laneDates: string[] = [];
-    let curIso = baseStartIso;
-    let guard = 0;
-    while (curIso <= maxEndIso && guard < 180) {
-      guard++;
-      const merah = isTanggalMerah(curIso);
-      if (!merah.isWeekend || scheduledDatesSet.has(curIso)) {
-        laneDates.push(curIso);
+    // Jika user sudah menentukan tanggal pengerjaan, gunakan HANYA tanggal-tanggal tersebut (tanpa kolom kosong)
+    let laneDates: string[] = [];
+    if (scheduledDatesSet.size > 0) {
+      laneDates = Array.from(scheduledDatesSet).sort();
+    } else {
+      // Fallback jika belum ada tanggal pekerjaan spesifik:
+      // Buat rentang kerja (Senin - Jumat) dari baseStartIso s/d maxEndIso
+      let curIso = baseStartIso;
+      let guard = 0;
+      while (curIso <= maxEndIso && guard < 180) {
+        guard++;
+        const merah = isTanggalMerah(curIso);
+        if (!merah.isWeekend) {
+          laneDates.push(curIso);
+        }
+        curIso = addDaysIso(curIso, 1);
       }
-      curIso = addDaysIso(curIso, 1);
-    }
-    // Pastikan minimal ada 6 hari pengerjaan
-    while (laneDates.length < 6 && guard < 180) {
-      guard++;
-      const merah = isTanggalMerah(curIso);
-      if (!merah.isWeekend) {
-        laneDates.push(curIso);
+      // Pastikan minimal ada 6 hari pengerjaan
+      while (laneDates.length < 6 && guard < 180) {
+        guard++;
+        const merah = isTanggalMerah(curIso);
+        if (!merah.isWeekend) {
+          laneDates.push(curIso);
+        }
+        curIso = addDaysIso(curIso, 1);
       }
-      curIso = addDaysIso(curIso, 1);
     }
-    const jumlahHari = Math.min(90, laneDates.length);
+    const jumlahHari = Math.min(90, Math.max(1, laneDates.length));
     const customDatesJson = JSON.stringify(laneDates.slice(0, jumlahHari));
 
     let projectId = d.existingProjectId ?? "";
