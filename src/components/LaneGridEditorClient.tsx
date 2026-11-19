@@ -101,6 +101,20 @@ interface TemplateOption {
   subScopesCount: number;
 }
 
+// Format ramping untuk tanggal kolom Day (contoh: "Kam 19 Nov")
+function formatTanggalKolomRamping(dtIso: string): string {
+  if (!dtIso) return "-";
+  const [y, m, d] = dtIso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = dt.getUTCDay();
+  const HARI_SINGKAT = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const BULAN_SINGKAT = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+  ];
+  return `${HARI_SINGKAT[dayOfWeek]} ${d} ${BULAN_SINGKAT[m - 1]}`;
+}
+
 export function LaneGridEditorClient({
   lane,
   project,
@@ -1321,55 +1335,55 @@ export function LaneGridEditorClient({
           ref={tableScrollRef}
           className="overflow-x-auto w-full max-w-full schedule-scrollbar"
         >
-          <table className="w-full border-separate border-spacing-0 text-xs sm:text-sm">
+          <table className="w-full border-separate border-spacing-0 text-xs">
             <thead>
               <tr className="bg-slate-900 text-white">
                 <th
                   rowSpan={2}
-                  className="sticky left-0 top-0 z-40 bg-slate-900 text-white border-b border-r border-slate-700 px-2 py-2 w-[44px] min-w-[44px] max-w-[44px] text-center font-black text-xs"
+                  className="sticky left-0 top-0 z-40 bg-slate-900 text-white border-b border-r border-slate-700 px-1 py-1 w-[36px] min-w-[36px] max-w-[36px] text-center font-black text-[11px]"
                 >
                   NO
                 </th>
                 <th
                   rowSpan={2}
                   colSpan={2}
-                  className="sticky left-[44px] top-0 z-40 bg-slate-900 text-white border-b border-r border-slate-700 px-2.5 py-2 text-center font-black text-xs sm:text-sm w-[400px] min-w-[400px] max-w-[400px]"
+                  className="sticky left-[36px] top-0 z-40 bg-slate-900 text-white border-b border-r border-slate-700 px-2 py-1 text-center font-black text-xs w-[280px] min-w-[280px] max-w-[280px]"
                 >
                   DESCRIPTION (Pekerjaan & Sub-Pekerjaan)
                 </th>
                 <th
                   rowSpan={2}
-                  className="sticky left-[444px] top-0 z-40 bg-slate-900 text-white border-b border-r-2 border-r-slate-500 px-2.5 py-2 text-center font-black text-xs sm:text-sm w-[280px] min-w-[280px] max-w-[280px] shadow-[4px_0_10px_-2px_rgba(0,0,0,0.35)]"
+                  className="sticky left-[316px] top-0 z-40 bg-slate-900 text-white border-b border-r-2 border-r-slate-500 px-2 py-1 text-center font-black text-xs w-[190px] min-w-[190px] max-w-[190px] shadow-[4px_0_10px_-2px_rgba(0,0,0,0.35)]"
                 >
-                  SCOPE of WORK (Rincian Tugas)
+                  SCOPE of WORK (Rincian)
                 </th>
                 <th
                   colSpan={dayDates.length}
-                  className="border-b border-r border-slate-700 px-3 py-2 text-center font-extrabold text-xs sm:text-sm tracking-wider bg-slate-900 text-white"
+                  className="border-b border-r border-slate-700 px-2 py-1.5 text-center font-extrabold text-xs tracking-wider bg-slate-900 text-white"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs uppercase tracking-wider text-slate-300 font-extrabold">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 px-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] uppercase tracking-wider text-slate-300 font-extrabold">
                         KOLOM HARI (DAY 1..{dayDates.length})
                       </span>
                       {emptyWeekendDates.length > 0 && (
-                        <span className="text-[11px] text-rose-300 bg-rose-950/80 border border-rose-700 px-2 py-0.5 rounded-full font-bold">
-                          {emptyWeekendDates.length} Libur Akhir Pekan Kosong
+                        <span className="text-[10px] text-rose-300 bg-rose-950/80 border border-rose-700 px-1.5 py-0.2 rounded-full font-bold">
+                          {emptyWeekendDates.length} Weekend Kosong
                         </span>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1">
                       {/* Tombol Buang Weekend Kosong */}
                       {emptyWeekendDates.length > 0 && (
                         <button
                           type="button"
                           onClick={() => handlePurgeEmptyDates(true)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition shadow-xs cursor-pointer animate-pulse"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-700 hover:bg-rose-600 text-white text-[11px] font-bold transition shadow-xs cursor-pointer animate-pulse"
                           title="Buang hari Sabtu & Minggu (akhir pekan) yang kosong dari schedule proyek"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-200" />
-                          Buang Weekend Kosong ({emptyWeekendDates.length})
+                          <Trash2 className="w-3 h-3 text-rose-200" />
+                          Buang Weekend ({emptyWeekendDates.length})
                         </button>
                       )}
 
@@ -1378,11 +1392,11 @@ export function LaneGridEditorClient({
                         <button
                           type="button"
                           onClick={() => handlePurgeEmptyDates(false)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold transition shadow-xs cursor-pointer"
                           title="Buang semua kolom tanggal yang tidak memiliki kegiatan/pekerjaan"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-amber-200" />
-                          Buang Tanggal Kosong ({emptyDates.length})
+                          <Trash2 className="w-3 h-3 text-amber-200" />
+                          Buang Tgl Kosong ({emptyDates.length})
                         </button>
                       )}
 
@@ -1390,10 +1404,10 @@ export function LaneGridEditorClient({
                       <button
                         type="button"
                         onClick={handleReorderSkipWeekends}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold transition shadow-xs cursor-pointer"
                         title="Urutkan kembali tanggal Day mulai Day 1 hanya melewati Hari Kerja (Senin - Jumat), lewati Sabtu & Minggu"
                       >
-                        <CalendarDays className="w-3.5 h-3.5 text-emerald-200" />
+                        <CalendarDays className="w-3 h-3 text-emerald-200" />
                         Lewati Weekend
                       </button>
 
@@ -1401,11 +1415,11 @@ export function LaneGridEditorClient({
                       <button
                         type="button"
                         onClick={handleResetSequentialDates}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold transition shadow-xs cursor-pointer"
                         title="Urutkan kembali semua tanggal Day secara kalender berurutan mulai dari Day 1"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-blue-300" />
-                        Auto-Urutkan
+                        <RotateCcw className="w-3 h-3 text-blue-300" />
+                        Urutkan
                       </button>
                     </div>
                   </div>
@@ -1419,7 +1433,7 @@ export function LaneGridEditorClient({
                   return (
                     <th
                       key={`day-${idx}-${dtIso}`}
-                      className={`border-b border-r px-2 py-2 min-w-[125px] text-center transition-colors relative group/dayth ${
+                      className={`border-b border-r px-1 py-1 w-[76px] min-w-[76px] max-w-[78px] text-center transition-colors relative group/dayth ${
                         isToday
                           ? "ring-2 ring-blue-500 ring-inset bg-blue-950/70 border-blue-400"
                           : tglMerah.isRed
@@ -1429,17 +1443,17 @@ export function LaneGridEditorClient({
                     >
                       {/* Badge HARI INI */}
                       {isToday && (
-                        <div className="mb-1 flex items-center justify-center">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm ring-1 ring-blue-300">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <div className="mb-0.5 flex items-center justify-center">
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase tracking-wider shadow-sm">
+                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
                             Hari Ini
                           </span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="flex items-center justify-between gap-0.5 mb-0.5">
                         <span
-                          className={`text-sm font-black px-1.5 py-0.5 rounded ${
+                          className={`text-[11px] font-black px-1 rounded ${
                             isToday
                               ? "bg-blue-600 text-white"
                               : tglMerah.isRed
@@ -1447,16 +1461,15 @@ export function LaneGridEditorClient({
                                 : "bg-slate-700 text-white"
                           }`}
                         >
-                          DAY {idx + 1}
+                          D{idx + 1}
                         </span>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                           <label
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold cursor-pointer transition shadow-xs"
+                            className="inline-flex items-center p-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition shadow-2xs"
                             title={`Ubah tanggal DAY ${idx + 1}`}
                           >
                             <Edit3 className="w-2.5 h-2.5" />
-                            <span>Ubah</span>
                             <input
                               type="date"
                               value={dtIso}
@@ -1475,7 +1488,7 @@ export function LaneGridEditorClient({
                           <button
                             type="button"
                             onClick={() => handleRemoveSingleDay(idx)}
-                            className="inline-flex items-center p-1 rounded bg-rose-700/80 hover:bg-rose-600 text-white cursor-pointer transition shadow-xs"
+                            className="inline-flex items-center p-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white cursor-pointer transition shadow-2xs"
                             title={`Buang DAY ${idx + 1} (${formatHariTanggalSingkat(dtIso)}) dari schedule proyek`}
                           >
                             <Trash2 className="w-2.5 h-2.5" />
@@ -1489,15 +1502,15 @@ export function LaneGridEditorClient({
                         title={`Klik untuk ubah tanggal DAY ${idx + 1}`}
                       >
                         <div
-                          className={`text-xs font-extrabold whitespace-nowrap px-1.5 py-1 rounded-md transition border ${
+                          className={`text-[10px] font-black whitespace-nowrap px-1 py-0.5 rounded transition border ${
                             isToday
-                              ? "bg-blue-900/80 border-blue-400 text-blue-100 font-black shadow-xs"
+                              ? "bg-blue-900/80 border-blue-400 text-blue-100 shadow-2xs"
                               : tglMerah.isRed
                                 ? "bg-rose-900/60 border-rose-700/60 text-rose-100 hover:bg-rose-800/80"
                                 : "bg-slate-700/60 border-slate-600/70 text-slate-100 hover:bg-slate-600"
                           }`}
                         >
-                          {formatHariTanggalSingkat(dtIso)}
+                          {formatTanggalKolomRamping(dtIso)}
                         </div>
                         <input
                           type="date"
@@ -1517,7 +1530,7 @@ export function LaneGridEditorClient({
                       {tglMerah.isRed && (
                         <div
                           title={tglMerah.keterangan}
-                          className="mt-1 px-1.5 py-0.5 rounded bg-rose-600/30 text-rose-200 border border-rose-500/40 text-[10px] font-bold truncate max-w-[120px] mx-auto tracking-tight"
+                          className="mt-0.5 px-1 py-0.2 rounded bg-rose-600/30 text-rose-200 border border-rose-500/40 text-[9px] font-bold truncate max-w-[70px] mx-auto tracking-tight"
                         >
                           {tglMerah.keterangan || "Libur"}
                         </div>
@@ -1525,7 +1538,7 @@ export function LaneGridEditorClient({
                       {occ.length > 0 && (
                         <div
                           title={`Terisi: ${occ.map((o) => o.label).join(", ")}`}
-                          className="mt-1 px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[10px] font-bold truncate max-w-[120px] mx-auto"
+                          className="mt-0.5 px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 text-[9px] font-bold truncate max-w-[70px] mx-auto"
                         >
                           {occ.length} agenda
                         </div>
@@ -1624,7 +1637,7 @@ export function LaneGridEditorClient({
                           {isWiFirst && (
                             <td
                               rowSpan={totalDetailRows}
-                              className="sticky left-0 z-30 bg-slate-100 border-b border-r border-slate-300 px-1 py-1.5 text-center font-black text-xs text-slate-800 align-middle w-[44px] min-w-[44px] max-w-[44px]"
+                              className="sticky left-0 z-30 bg-slate-100 border-b border-r border-slate-300 px-0.5 py-1 text-center font-black text-xs text-slate-800 align-middle w-[36px] min-w-[36px] max-w-[36px]"
                             >
                               <div className="flex flex-col items-center justify-center gap-0.5">
                                 <button
@@ -1634,7 +1647,7 @@ export function LaneGridEditorClient({
                                   className="p-0.5 rounded hover:bg-slate-300 text-slate-400 hover:text-slate-800 disabled:opacity-15 disabled:hover:bg-transparent transition cursor-pointer"
                                   title={`Geser naik ke No. ${wiIdx}`}
                                 >
-                                  <ChevronUp className="w-3.5 h-3.5" />
+                                  <ChevronUp className="w-3 h-3" />
                                 </button>
 
                                 <button
@@ -1646,7 +1659,7 @@ export function LaneGridEditorClient({
                                       targetUrutan: wiIdx + 1,
                                     })
                                   }
-                                  className="w-7 h-7 rounded-lg bg-white hover:bg-blue-600 hover:text-white border border-slate-300 hover:border-blue-600 shadow-2xs font-black text-xs flex items-center justify-center transition cursor-pointer text-slate-800"
+                                  className="w-6 h-6 rounded-md bg-white hover:bg-blue-600 hover:text-white border border-slate-300 hover:border-blue-600 shadow-2xs font-black text-[11px] flex items-center justify-center transition cursor-pointer text-slate-800"
                                   title={`Nomor Urut ${wiIdx + 1}. Klik untuk mengubah nomor urutan`}
                                 >
                                   {wiIdx + 1}
@@ -1659,7 +1672,7 @@ export function LaneGridEditorClient({
                                   className="p-0.5 rounded hover:bg-slate-300 text-slate-400 hover:text-slate-800 disabled:opacity-15 disabled:hover:bg-transparent transition cursor-pointer"
                                   title={`Geser turun ke No. ${wiIdx + 2}`}
                                 >
-                                  <ChevronDown className="w-3.5 h-3.5" />
+                                  <ChevronDown className="w-3 h-3" />
                                 </button>
                               </div>
                             </td>
@@ -1668,35 +1681,35 @@ export function LaneGridEditorClient({
                           {isWiFirst && (
                             <td
                               rowSpan={totalDetailRows}
-                              className="sticky left-[44px] z-30 bg-white border-b border-r border-slate-300 p-2.5 align-middle w-[210px] min-w-[210px] max-w-[210px]"
+                              className="sticky left-[36px] z-30 bg-white border-b border-r border-slate-300 p-2 align-middle w-[150px] min-w-[150px] max-w-[150px]"
                             >
-                              <div className="font-extrabold text-slate-900 text-xs sm:text-sm leading-snug">
+                              <div className="font-bold text-slate-900 text-xs leading-snug line-clamp-2">
                                 {wi.judul}
                               </div>
 
-                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                              <div className="flex flex-wrap gap-0.5 mt-1">
+                                <span className="px-1 py-0.2 rounded bg-blue-50 text-blue-700 text-[9px] font-bold border border-blue-200">
                                   {WORK_TYPE_LABELS[wi.jenis]}
                                 </span>
                                 {(wi.bolehParalel || project.bolehParalel) && (
-                                  <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200">
+                                  <span className="px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 text-[9px] font-bold border border-indigo-200">
                                     Paralel
                                   </span>
                                 )}
                               </div>
 
                               {(displayPic || displayDeadline) && (
-                                <div className="mt-2 space-y-0.5 text-[11px] font-semibold text-slate-600">
+                                <div className="mt-1 space-y-0.2 text-[10px] font-semibold text-slate-600">
                                   {displayPic && (
                                     <div className="flex items-center gap-1">
-                                      <User className="w-3 h-3 text-blue-600 shrink-0" />
+                                      <User className="w-2.5 h-2.5 text-blue-600 shrink-0" />
                                       <span className="truncate">PIC: {displayPic}</span>
                                     </div>
                                   )}
                                   {displayDeadline && (
                                     <div className="flex items-center gap-1 text-rose-700 font-bold">
-                                      <Clock className="w-3 h-3 shrink-0" />
-                                      <span>
+                                      <Clock className="w-2.5 h-2.5 shrink-0" />
+                                      <span className="truncate">
                                         DL: {formatTanggalId(displayDeadline, false)}
                                       </span>
                                     </div>
@@ -1704,7 +1717,7 @@ export function LaneGridEditorClient({
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-1 mt-2.5">
+                              <div className="flex items-center gap-0.5 mt-1.5">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1724,26 +1737,26 @@ export function LaneGridEditorClient({
                                         "TARGET",
                                     });
                                   }}
-                                  className="p-1 rounded hover:bg-emerald-100 text-emerald-700 cursor-pointer"
+                                  className="p-0.5 rounded hover:bg-emerald-100 text-emerald-700 cursor-pointer"
                                   title="Ubah Tanggal Pengerjaan & Sesuaikan Prioritas Tanpa Bentrok"
                                 >
-                                  <CalendarDays className="w-3.5 h-3.5" />
+                                  <CalendarDays className="w-3 h-3" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => openEditWorkItem(wi)}
-                                  className="p-1 rounded hover:bg-slate-200 text-slate-700 cursor-pointer"
+                                  className="p-0.5 rounded hover:bg-slate-200 text-slate-700 cursor-pointer"
                                   title="Edit Pekerjaan, PIC, Deadline & Sub-Scope"
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <Edit3 className="w-3 h-3" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleSaveAsTemplate(wi)}
-                                  className="p-1 rounded hover:bg-indigo-100 text-indigo-600 cursor-pointer"
+                                  className="p-0.5 rounded hover:bg-indigo-100 text-indigo-600 cursor-pointer"
                                   title="Simpan sebagai Template Pekerjaan"
                                 >
-                                  <BookmarkPlus className="w-3.5 h-3.5" />
+                                  <BookmarkPlus className="w-3 h-3" />
                                 </button>
                                 <button
                                   type="button"
@@ -1754,18 +1767,18 @@ export function LaneGridEditorClient({
                                       targetUrutan: wiIdx + 1,
                                     })
                                   }
-                                  className="p-1 rounded hover:bg-amber-100 text-amber-700 cursor-pointer"
+                                  className="p-0.5 rounded hover:bg-amber-100 text-amber-700 cursor-pointer"
                                   title={`Ubah Nomor Urut (saat ini No. ${wiIdx + 1})`}
                                 >
-                                  <ListOrdered className="w-3.5 h-3.5" />
+                                  <ListOrdered className="w-3 h-3" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteWorkItem(wi)}
-                                  className="p-1 rounded hover:bg-rose-100 text-rose-600 cursor-pointer"
+                                  className="p-0.5 rounded hover:bg-rose-100 text-rose-600 cursor-pointer"
                                   title="Hapus Pekerjaan"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
                               </div>
                             </td>
@@ -1774,9 +1787,9 @@ export function LaneGridEditorClient({
                           {isSsFirst && (
                             <td
                               rowSpan={details.length}
-                              className="sticky left-[254px] z-30 bg-white border-b border-r border-slate-300 p-2 align-middle w-[190px] min-w-[190px] max-w-[190px] font-bold text-xs text-slate-900"
+                              className="sticky left-[186px] z-30 bg-white border-b border-r border-slate-300 p-1.5 align-middle w-[130px] min-w-[130px] max-w-[130px] font-semibold text-[11px] text-slate-900 leading-snug"
                             >
-                              <div className="flex items-start justify-between gap-1">
+                              <div className="flex items-start justify-between gap-0.5">
                                 <span className="leading-snug">{ss.judul}</span>
                                 {ss.id && !ss.id.startsWith("empty-") && (
                                   <button
@@ -1804,14 +1817,14 @@ export function LaneGridEditorClient({
                                     className="text-slate-400 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition cursor-pointer shrink-0"
                                     title={`Ubah tanggal untuk sub-pekerjaan: ${ss.judul}`}
                                   >
-                                    <CalendarDays className="w-3 h-3" />
+                                    <CalendarDays className="w-2.5 h-2.5" />
                                   </button>
                                 )}
                               </div>
                             </td>
                           )}
 
-                          <td className="sticky left-[444px] z-30 bg-white border-b border-r-2 border-r-slate-400 p-2 text-xs font-normal text-slate-700 whitespace-pre-line leading-relaxed w-[280px] min-w-[280px] max-w-[280px] shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)]">
+                          <td className="sticky left-[316px] z-30 bg-white border-b border-r-2 border-r-slate-400 p-1.5 text-[11px] font-normal text-slate-700 whitespace-pre-line leading-tight w-[190px] min-w-[190px] max-w-[190px] shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)]">
                             {det.teks}
                           </td>
 
@@ -1951,7 +1964,7 @@ export function LaneGridEditorClient({
                                           subScopeJudulParam || wi.judul
                                         }] (${activeBrush})`
                                 }
-                                className={`p-1 text-center cursor-pointer transition relative select-none group border-b border-r ${
+                                className={`p-0.5 text-center cursor-pointer transition relative select-none group border-b border-r w-[76px] min-w-[76px] max-w-[78px] h-[30px] ${
                                   !scheduled && tglMerah.isRed
                                     ? "bg-rose-100/70 hover:bg-rose-200/80 border-rose-300/90"
                                     : !scheduled && otherOcc.length > 0
@@ -1968,7 +1981,7 @@ export function LaneGridEditorClient({
                               >
                                 {scheduled && scheduled.catatan && (
                                   <div
-                                    className="w-full max-w-[135px] mx-auto rounded-lg bg-white/95 text-slate-900 px-2 py-1 shadow-xs border border-slate-900/15 text-left cursor-pointer hover:bg-white"
+                                    className="w-full rounded bg-white/95 text-slate-900 px-1 py-0.5 shadow-2xs border border-slate-900/15 text-left cursor-pointer hover:bg-white"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setNoteModal({
@@ -1986,14 +1999,11 @@ export function LaneGridEditorClient({
                                         catatan: scheduled.catatan ?? "",
                                       });
                                     }}
-                                    title="Klik untuk membuka catatan"
+                                    title={`Catatan: ${scheduled.catatan}`}
                                   >
-                                    <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-700">
-                                      <MessageSquare className="w-3 h-3 shrink-0" />
-                                      <span>Catatan</span>
-                                    </div>
-                                    <div className="text-xs font-semibold leading-snug line-clamp-3 mt-0.5 break-words">
-                                      {scheduled.catatan}
+                                    <div className="flex items-center gap-0.5 text-[9px] font-bold text-blue-700">
+                                      <MessageSquare className="w-2.5 h-2.5 shrink-0" />
+                                      <span className="truncate">{scheduled.catatan}</span>
                                     </div>
                                   </div>
                                 )}
