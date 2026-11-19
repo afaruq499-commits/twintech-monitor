@@ -187,29 +187,38 @@ export function ProjectDetailClient({
             : "alur-sekuens";
 
   const [tab, setTab] = useState<ProjectDetailTabKey>(initialTab);
-  // Accordion open state: set of tab keys that are currently expanded
-  const [openSections, setOpenSections] = useState<Set<ProjectDetailTabKey>>(
-    () => new Set([initialTab])
+  // Sub-accordions di dalam tab Flowchart, Wiring & Program:
+  const [openAlurSubSections, setOpenAlurSubSections] = useState<Set<string>>(
+    () => new Set(["flowchart"])
   );
-  const toggleSection = (key: ProjectDetailTabKey) => {
-    setOpenSections((prev) => {
+  const toggleAlurSubSection = (key: string) => {
+    setOpenAlurSubSections((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-    setTab(key);
   };
-  const openSection = (key: ProjectDetailTabKey, scrollId?: string) => {
-    setOpenSections((prev) => new Set([...prev, key]));
-    setTab(key);
-    if (scrollId) {
+  const navigateToChecklistTarget = (targetTab: ProjectDetailTabKey, itemKey?: string) => {
+    setTab(targetTab);
+    if (targetTab === "alur-sekuens") {
+      let subKey = "flowchart";
+      let elementId = "sub-flowchart";
+      if (itemKey === "diagram_wiring") {
+        subKey = "wiring";
+        elementId = "sub-wiring";
+      } else if (itemKey === "pemprograman") {
+        subKey = "plc";
+        elementId = "sub-plc";
+      }
+      setOpenAlurSubSections((prev) => new Set([...prev, subKey]));
       setTimeout(() => {
-        document.getElementById(scrollId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 150);
+        document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+    } else {
+      setTimeout(() => {
+        document.getElementById("project-main-tab-content")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
     }
   };
   const [checklistState, setChecklistState] = useState<FileChecklistState>(() =>
@@ -630,111 +639,224 @@ export function ProjectDetailClient({
         currentUserRole={currentUserRole}
         currentUserName={currentUserName}
         onChecklistChange={setChecklistState}
-        onNavigateTab={(targetTab) => {
-          openSection(targetTab, `section-${targetTab}`);
+        onNavigateTab={(targetTab, itemKey) => {
+          navigateToChecklistTarget(targetTab, itemKey);
         }}
       />
 
-      {/* ─── ACCORDION SECTIONS ─── */}
-      <div className="space-y-2">
+      {/* Navigasi Tab Utama */}
+      <div id="project-main-tab-content" className="flex items-center gap-1.5 border-b border-slate-200 overflow-x-auto pb-1 scroll-mt-20">
+        <button
+          type="button"
+          onClick={() => setTab("alur-sekuens")}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-extrabold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "alur-sekuens"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Workflow className="w-4 h-4 text-slate-600" />
+          <span>Flowchart, Wiring &amp; Program</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("layout-panel")}
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "layout-panel"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Layers className="w-4 h-4 text-slate-600" />
+          <span>Layout Panel</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("komponen")}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "komponen"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          Komponen PR ({activeComps.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("jadwal")}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "jadwal"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          Jadwal ({project.lanes.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("pengelamatan-plc")}
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            tab === "pengelamatan-plc"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Cpu className="w-3.5 h-3.5 text-slate-600" /> Alamat I/O
+        </button>
+      </div>
 
-        {/* ── ACCORDION: Flowchart, Wiring & Program ── */}
-        <div id="section-alur-sekuens" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection("alur-sekuens")}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <Workflow className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="font-bold text-sm text-slate-900">Flowchart, Wiring &amp; Program</span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${openSections.has("alur-sekuens") ? "rotate-180" : ""}`}
-            />
-          </button>
-          {openSections.has("alur-sekuens") && (
-            <div className="border-t border-slate-100 p-5 space-y-5">
-              <ProjectFlowchartPngViewer
-                projectId={project.id}
-                projectName={project.nama}
-                initialDataJson={project.flowSequenceJson}
-                onUpdateSuccess={() => router.refresh()}
+      {/* TAB 0: FLOWCHART, WIRING & PROGRAM (SUB-ACCORDION) */}
+      {tab === "alur-sekuens" && (
+        <div className="space-y-3">
+          {/* Sub-Accordion 1: Flowchart */}
+          <div id="sub-flowchart" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
+            <button
+              type="button"
+              onClick={() => toggleAlurSubSection("flowchart")}
+              className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Workflow className="w-4 h-4 text-slate-600 shrink-0" />
+                <span className="font-bold text-sm text-slate-900">Flowchart</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">Dokumentasi Mesin</span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${
+                  openAlurSubSections.has("flowchart") ? "rotate-180" : ""
+                }`}
               />
-              <ProjectWiringPdfPanel
-                projectId={project.id}
-                initialPdfUrl={project.wiringDiagramPdfUrl}
-                initialPdfName={project.wiringDiagramPdfName}
-                onUpdateSuccess={() => router.refresh()}
+            </button>
+            {openAlurSubSections.has("flowchart") && (
+              <div className="border-t border-slate-100 p-4">
+                <ProjectFlowchartPngViewer
+                  projectId={project.id}
+                  projectName={project.nama}
+                  initialDataJson={project.flowSequenceJson}
+                  onUpdateSuccess={() => router.refresh()}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Sub-Accordion 2: Diagram Wiring */}
+          <div id="sub-wiring" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
+            <button
+              type="button"
+              onClick={() => toggleAlurSubSection("wiring")}
+              className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-4 h-4 text-slate-600 shrink-0" />
+                <span className="font-bold text-sm text-slate-900">Diagram Wiring</span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {project.wiringDiagramPdfName ? `(${project.wiringDiagramPdfName})` : "(Belum Ada)"}
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${
+                  openAlurSubSections.has("wiring") ? "rotate-180" : ""
+                }`}
               />
-              <ProjectPlcProgramPanel
-                projectId={project.id}
-                initialFileUrl={project.plcProgramFileUrl}
-                initialFileName={project.plcProgramFileName}
-                initialFileSize={project.plcProgramFileSize}
-                onUpdateSuccess={() => router.refresh()}
+            </button>
+            {openAlurSubSections.has("wiring") && (
+              <div className="border-t border-slate-100 p-4">
+                <ProjectWiringPdfPanel
+                  projectId={project.id}
+                  initialPdfUrl={project.wiringDiagramPdfUrl}
+                  initialPdfName={project.wiringDiagramPdfName}
+                  onUpdateSuccess={() => router.refresh()}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Sub-Accordion 3: Program PLC */}
+          <div id="sub-plc" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
+            <button
+              type="button"
+              onClick={() => toggleAlurSubSection("plc")}
+              className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Cpu className="w-4 h-4 text-slate-600 shrink-0" />
+                <span className="font-bold text-sm text-slate-900">Program PLC</span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {project.plcProgramFileName ? `(${project.plcProgramFileName})` : "(Belum Ada)"}
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${
+                  openAlurSubSections.has("plc") ? "rotate-180" : ""
+                }`}
               />
-              <ProjectHmiProgramPanel
-                projectId={project.id}
-                initialFileUrl={project.hmiProgramFileUrl}
-                initialFileName={project.hmiProgramFileName}
-                initialFileSize={project.hmiProgramFileSize}
-                onUpdateSuccess={() => router.refresh()}
+            </button>
+            {openAlurSubSections.has("plc") && (
+              <div className="border-t border-slate-100 p-4">
+                <ProjectPlcProgramPanel
+                  projectId={project.id}
+                  initialFileUrl={project.plcProgramFileUrl}
+                  initialFileName={project.plcProgramFileName}
+                  initialFileSize={project.plcProgramFileSize}
+                  onUpdateSuccess={() => router.refresh()}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Sub-Accordion 4: Program HMI */}
+          <div id="sub-hmi" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
+            <button
+              type="button"
+              onClick={() => toggleAlurSubSection("hmi")}
+              className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-4 h-4 text-slate-600 shrink-0" />
+                <span className="font-bold text-sm text-slate-900">Program HMI</span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {project.hmiProgramFileName ? `(${project.hmiProgramFileName})` : "(Belum Ada)"}
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${
+                  openAlurSubSections.has("hmi") ? "rotate-180" : ""
+                }`}
               />
-            </div>
-          )}
+            </button>
+            {openAlurSubSections.has("hmi") && (
+              <div className="border-t border-slate-100 p-4">
+                <ProjectHmiProgramPanel
+                  projectId={project.id}
+                  initialFileUrl={project.hmiProgramFileUrl}
+                  initialFileName={project.hmiProgramFileName}
+                  initialFileSize={project.hmiProgramFileSize}
+                  onUpdateSuccess={() => router.refresh()}
+                />
+              </div>
+            )}
+          </div>
         </div>
+      )}
 
-        {/* ── ACCORDION: Layout Panel ── */}
-        <div id="section-layout-panel" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection("layout-panel")}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="font-bold text-sm text-slate-900">Layout Panel</span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${openSections.has("layout-panel") ? "rotate-180" : ""}`}
-            />
-          </button>
-          {openSections.has("layout-panel") && (
-            <div className="border-t border-slate-100 p-4">
-              <ProjectControlPanelLayoutEditor
-                projectId={project.id}
-                projectKode={project.kode}
-                projectNama={project.nama}
-                projectClient={project.client}
-                projectPic={project.pic}
-                components={project.components}
-                initialLayoutJson={project.panelLayoutJson}
-                onSaveSuccess={() => router.refresh()}
-              />
-            </div>
-          )}
+      {/* TAB 1: LAYOUT PANEL */}
+      {tab === "layout-panel" && (
+        <div id="section-layout-panel" className="space-y-4">
+          <ProjectControlPanelLayoutEditor
+            projectId={project.id}
+            projectKode={project.kode}
+            projectNama={project.nama}
+            projectClient={project.client}
+            projectPic={project.pic}
+            components={project.components}
+            initialLayoutJson={project.panelLayoutJson}
+            onSaveSuccess={() => router.refresh()}
+          />
         </div>
+      )}
 
-        {/* ── ACCORDION: Komponen PR ── */}
-        <div id="section-komponen" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection("komponen")}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <ClipboardList className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="font-bold text-sm text-slate-900">Komponen PR</span>
-              <span className="text-xs font-semibold text-slate-500">({activeComps.length} item)</span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${openSections.has("komponen") ? "rotate-180" : ""}`}
-            />
-          </button>
-          {openSections.has("komponen") && (
-            <div className="border-t border-slate-100 p-4 space-y-4">
-
+      {/* TAB 2: KOMPONEN PR */}
+      {tab === "komponen" && (
+        <div id="section-komponen" className="space-y-4">
           {/* Toolbar Filter & Export Komponen */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             {/* Baris 1: Filter & Pencarian */}
@@ -824,7 +946,7 @@ export function ProjectDetailClient({
                 </button>
                 <button
                   type="button"
-                  onClick={() => openSection("pengelamatan-plc", "section-pengelamatan-plc")}
+                  onClick={() => navigateToChecklistTarget("pengelamatan-plc")}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition shadow-2xs"
                   title="Lihat alokasi alamat I/O, AI, AO, dan Register PLC otomatis dari daftar komponen PR ini"
                 >
@@ -1499,28 +1621,12 @@ export function ProjectDetailClient({
               );
             })
           )}
-            </div>
-          )}
         </div>
+      )}
 
-        {/* ── ACCORDION: Jadwal ── */}
-        <div id="section-jadwal" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection("jadwal")}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <CalendarPlus className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="font-bold text-sm text-slate-900">Jadwal</span>
-              <span className="text-xs font-semibold text-slate-500">({project.lanes.length} lane)</span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${openSections.has("jadwal") ? "rotate-180" : ""}`}
-            />
-          </button>
-          {openSections.has("jadwal") && (
-            <div className="border-t border-slate-100 p-4 space-y-4">
+      {/* TAB 3: JADWAL */}
+      {tab === "jadwal" && (
+        <div id="section-jadwal" className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900">
@@ -1707,38 +1813,20 @@ export function ProjectDetailClient({
               ))}
             </div>
           )}
-            </div>
-          )}
         </div>
+      )}
 
-        {/* ── ACCORDION: Alamat I/O ── */}
-        <div id="section-pengelamatan-plc" className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection("pengelamatan-plc")}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <Cpu className="w-4 h-4 text-slate-600 shrink-0" />
-              <span className="font-bold text-sm text-slate-900">Alamat I/O</span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${openSections.has("pengelamatan-plc") ? "rotate-180" : ""}`}
-            />
-          </button>
-          {openSections.has("pengelamatan-plc") && (
-            <div className="border-t border-slate-100 p-4">
-              <PlcAddressTablePanel
-                projectId={project.id}
-                projectNama={project.nama}
-                components={project.components}
-                initialPlcAddressesJson={project.plcAddressesJson}
-              />
-            </div>
-          )}
+      {/* TAB 4: ALAMAT I/O */}
+      {tab === "pengelamatan-plc" && (
+        <div id="section-pengelamatan-plc" className="space-y-4">
+          <PlcAddressTablePanel
+            projectId={project.id}
+            projectNama={project.nama}
+            components={project.components}
+            initialPlcAddressesJson={project.plcAddressesJson}
+          />
         </div>
-
-      </div>{/* end accordion wrapper */}
+      )}
 
       {/* Modal Edit Proyek */}
       {editModalOpen && (

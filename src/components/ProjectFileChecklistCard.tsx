@@ -46,7 +46,7 @@ interface ProjectFileChecklistCardProps {
   projectData: ChecklistDetectionSummary;
   currentUserRole?: UserRole;
   currentUserName?: string;
-  onNavigateTab: (tab: ProjectDetailTabKey) => void;
+  onNavigateTab: (tab: ProjectDetailTabKey, itemKey?: ProjectChecklistKey) => void;
   onChecklistChange?: (newState: FileChecklistState) => void;
 }
 
@@ -323,54 +323,48 @@ export function ProjectFileChecklistCard({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all">
       {/* Top Header Card */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start sm:items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shadow-inner">
-            <ClipboardCheck className="w-5 h-5 text-indigo-400" />
+      <div className="px-4 py-3 sm:px-5 sm:py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+            <ClipboardCheck className="w-4 h-4 text-indigo-400" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
+              <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
                 Ceklis File &amp; Dokumen Proyek
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
                 8 Berkas Standar
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                 isAdmin
                   ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
                   : "bg-slate-700/60 text-slate-300 border-slate-600/60"
               }`}>
-                {isAdmin ? "Admin (Akses Penuh)" : "Member"}
+                {isAdmin ? "Admin" : "Member"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Kontrol kelengkapan 8 berkas inti engineering (Komponen, Jadwal, I/O, Layout HMI, Layout Panel, Flowchart, Wiring DWG/PDF, &amp; Pemprograman PLC).
-            </p>
           </div>
         </div>
 
         {/* Status Counter & Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="bg-white/10 backdrop-blur-xs px-3.5 py-1.5 rounded-xl border border-white/10 text-right">
-            <div className="text-[11px] font-medium text-slate-300 leading-none">
-              Kelengkapan Berkas
-            </div>
-            <div className="text-sm font-extrabold text-emerald-400 mt-0.5">
+        <div className="flex items-center gap-2">
+          <div className="bg-white/10 px-3 py-1 rounded-lg border border-white/10 text-right">
+            <span className="text-xs font-extrabold text-emerald-400">
               {completedCount} / {totalCount} Selesai ({progressPercent}%)
-            </div>
+            </span>
           </div>
 
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition cursor-pointer border border-white/10"
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition cursor-pointer border border-white/10"
             title={isCollapsed ? "Tampilkan Rincian" : "Sembunyikan Rincian"}
           >
             {isCollapsed ? (
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3.5 h-3.5" />
             ) : (
-              <ChevronUp className="w-4 h-4" />
+              <ChevronUp className="w-3.5 h-3.5" />
             )}
           </button>
         </div>
@@ -392,12 +386,12 @@ export function ProjectFileChecklistCard({
 
       {/* Body: Daftar 8 File Ceklis */}
       {!isCollapsed && (
-        <div className="p-4 sm:p-5 space-y-4">
+        <div className="p-3 sm:p-4 space-y-3">
           {/* Admin Notice Banner jika member mencoba mencentang berkas admin */}
           {adminNotice && (
-            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-2 shadow-xs transition-all">
+            <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-2 shadow-xs transition-all">
               <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span className="font-semibold">{adminNotice}</span>
               </div>
               <button
@@ -410,9 +404,8 @@ export function ProjectFileChecklistCard({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {checklistItems.map((item) => {
-              const ItemIcon = item.icon;
               const isChecked = checklistState[item.key]?.checked ?? false;
               const isReady = isItemComplete(item);
               const canToggle = !item.isAdminOnly || isAdmin;
@@ -420,137 +413,97 @@ export function ProjectFileChecklistCard({
               return (
                 <div
                   key={item.key}
-                  className={`relative flex flex-col justify-between p-3.5 rounded-xl border transition-all ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl border transition-all ${
                     isReady
-                      ? "bg-emerald-50/40 border-emerald-200 hover:border-emerald-300 shadow-2xs"
+                      ? "bg-emerald-50/30 border-emerald-200/80 hover:border-emerald-300 shadow-2xs"
                       : "bg-slate-50/60 border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  <div>
-                    {/* Header Item: Checkbox + Nomor & Nama */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleCheck(item.key)}
-                          className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center transition border ${
-                            !canToggle
-                              ? isChecked
-                                ? "bg-emerald-600 border-emerald-600 text-white cursor-not-allowed opacity-90 shadow-2xs"
-                                : "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed hover:border-amber-400"
-                              : isChecked
-                              ? "bg-emerald-600 border-emerald-600 text-white shadow-2xs cursor-pointer hover:bg-emerald-700"
-                              : item.autoDetected
-                              ? "bg-emerald-100 border-emerald-300 text-emerald-700 cursor-pointer hover:bg-emerald-200"
-                              : "bg-white border-slate-300 text-transparent hover:border-slate-400 cursor-pointer"
-                          }`}
-                          title={
-                            !canToggle
-                              ? "Khusus Admin: Hanya Admin (Faruq) yang berhak memverifikasi berkas ini."
-                              : isChecked
-                              ? "Dicentang manual. Klik untuk membatalkan."
-                              : item.autoDetected
-                              ? "Terdeteksi otomatis di sistem. Klik untuk mencentang permanen."
-                              : item.isAdminOnly
-                              ? "Verifikasi Admin: Klik untuk menandai berkas sudah diverifikasi selesai."
-                              : "Klik untuk menandai berkas sudah selesai."
-                          }
-                        >
-                          {!canToggle && !isChecked ? (
-                            <Lock className="w-3 h-3 text-slate-400" />
-                          ) : (
-                            <CheckCircle2
-                              className={`w-3.5 h-3.5 ${
-                                isChecked || item.autoDetected
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              }`}
-                            />
-                          )}
-                        </button>
-
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
-                              Berkas #{item.nomor}
-                            </span>
-                            {item.isAdminOnly && (
-                              <span
-                                className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-300/80 inline-flex items-center gap-0.5 shadow-2xs"
-                                title="Ceklis berkas ini diverifikasi manual khusus oleh Admin"
-                              >
-                                <ShieldCheck className="w-2.5 h-2.5 text-amber-600" />
-                                Khusus Admin
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="font-bold text-slate-900 text-sm leading-tight flex items-center gap-1.5 mt-0.5">
-                            <span>{item.nama}</span>
-                          </h4>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`p-1.5 rounded-lg shrink-0 ${
-                          isReady
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-200 text-slate-600"
-                        }`}
-                      >
-                        <ItemIcon className="w-4 h-4" />
-                      </span>
-                    </div>
-
-                    {/* Deskripsi & Kategori */}
-                    <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
-                      {item.deskripsi}
-                    </p>
-                  </div>
-
-                  {/* Footer Card: Status Verifikasi & Tombol Buka Tab */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 text-[11px] truncate">
-                      {item.isAdminOnly ? (
-                        isChecked ? (
-                          <span
-                            className="text-emerald-700 font-semibold flex items-center gap-1 truncate"
-                            title={`Diverifikasi oleh Admin. Data: ${item.autoDetail}`}
-                          >
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            <span className="truncate">Terverifikasi Admin ({item.autoDetail})</span>
-                          </span>
-                        ) : (
-                          <span
-                            className="text-amber-700 font-medium flex items-center gap-1 truncate"
-                            title={`Menunggu verifikasi checklist oleh Admin. Data: ${item.autoDetail}`}
-                          >
-                            <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
-                            <span className="truncate">Menunggu verifikasi Admin ({item.autoDetail})</span>
-                          </span>
-                        )
-                      ) : item.autoDetected || isChecked ? (
-                        <span className="text-emerald-700 font-semibold flex items-center gap-1 truncate">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span className="truncate">{item.autoDetail}</span>
-                        </span>
-                      ) : (
-                        <span className="text-amber-700 font-medium flex items-center gap-1 truncate">
-                          <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
-                          <span className="truncate">{item.autoDetail}</span>
-                        </span>
-                      )}
-                    </div>
-
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <button
                       type="button"
-                      onClick={() => onNavigateTab(item.tabTarget)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold shadow-2xs transition shrink-0 cursor-pointer"
-                      title={`Buka tab ${item.tabTarget}`}
+                      onClick={() => handleToggleCheck(item.key)}
+                      className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition border ${
+                        !canToggle
+                          ? isChecked
+                            ? "bg-emerald-600 border-emerald-600 text-white cursor-not-allowed opacity-90"
+                            : "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed"
+                          : isChecked
+                          ? "bg-emerald-600 border-emerald-600 text-white shadow-2xs cursor-pointer hover:bg-emerald-700"
+                          : item.autoDetected
+                          ? "bg-emerald-100 border-emerald-300 text-emerald-700 cursor-pointer hover:bg-emerald-200"
+                          : "bg-white border-slate-300 text-transparent hover:border-slate-400 cursor-pointer"
+                      }`}
+                      title={
+                        !canToggle
+                          ? "Khusus Admin"
+                          : isChecked
+                          ? "Dicentang manual. Klik untuk membatalkan."
+                          : item.autoDetected
+                          ? "Terdeteksi otomatis di sistem."
+                          : "Klik untuk menandai berkas sudah selesai."
+                      }
                     >
-                      <span>Buka</span>
-                      <ExternalLink className="w-2.5 h-2.5 text-slate-600" />
+                      {!canToggle && !isChecked ? (
+                        <Lock className="w-2.5 h-2.5 text-slate-400" />
+                      ) : (
+                        <CheckCircle2
+                          className={`w-3 h-3 ${
+                            isChecked || item.autoDetected
+                              ? "opacity-100"
+                              : "opacity-0"
+                          }`}
+                        />
+                      )}
                     </button>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-slate-900 text-xs truncate">
+                          BERKAS #{item.nomor} - {item.nama}
+                        </span>
+                        {item.isAdminOnly && (
+                          <span
+                            className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-300/80 inline-flex items-center gap-0.5"
+                            title="Khusus diverifikasi oleh Admin"
+                          >
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate">
+                        {item.isAdminOnly ? (
+                          isChecked ? (
+                            <span className="text-emerald-700 font-medium">
+                              Terverifikasi Admin ({item.autoDetail})
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 font-medium">
+                              Menunggu verifikasi Admin ({item.autoDetail})
+                            </span>
+                          )
+                        ) : item.autoDetected || isChecked ? (
+                          <span className="text-emerald-700 font-medium">
+                            {item.autoDetail}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">
+                            {item.autoDetail}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab(item.tabTarget, item.key)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold shadow-2xs transition shrink-0 cursor-pointer ml-2"
+                    title={`Buka ${item.nama}`}
+                  >
+                    <span>Buka</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+                  </button>
                 </div>
               );
             })}
