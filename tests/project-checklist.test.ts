@@ -12,17 +12,18 @@ describe("project-checklist", () => {
   it("mengidentifikasi berkas verifikasi manual khusus Admin dengan benar", () => {
     expect(ADMIN_MANUAL_CHECKLIST_KEYS).toEqual([
       "komponen_pr",
+      "schedule_pengerjaan",
       "layout_panel_hmi",
       "layout_panel_utama",
     ]);
 
     expect(isAdminOnlyChecklistKey("komponen_pr")).toBe(true);
+    expect(isAdminOnlyChecklistKey("schedule_pengerjaan")).toBe(true);
     expect(isAdminOnlyChecklistKey("layout_panel_hmi")).toBe(true);
     expect(isAdminOnlyChecklistKey("layout_panel_utama")).toBe(true);
     expect(isAdminOnlyChecklistKey("flowchart")).toBe(false);
     expect(isAdminOnlyChecklistKey("diagram_wiring")).toBe(false);
     expect(isAdminOnlyChecklistKey("pemprograman")).toBe(false);
-    expect(isAdminOnlyChecklistKey("schedule_pengerjaan")).toBe(false);
     expect(isAdminOnlyChecklistKey("alamat_io")).toBe(false);
   });
 

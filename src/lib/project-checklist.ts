@@ -27,6 +27,7 @@ export const PROJECT_CHECKLIST_TOTAL_COUNT = PROJECT_CHECKLIST_KEYS.length;
  */
 export const ADMIN_MANUAL_CHECKLIST_KEYS = [
   "komponen_pr",
+  "schedule_pengerjaan",
   "layout_panel_hmi",
   "layout_panel_utama",
 ] as const;
@@ -166,9 +167,9 @@ export function deriveChecklistDetection(
  * Computes completion counts and percentage across the 8 checklist items.
  *
  * Catatan penting:
- * - Berkas #1 (Komponen PR), #4 (Layout HMI), dan #5 (Layout Panel Utama) TIDAK LAGI
+ * - Berkas #1 (Komponen PR), #2 (Schedule pengerjaan), #4 (Layout HMI), dan #5 (Layout Panel Utama) TIDAK LAGI
  *   otomatis tercentang oleh deteksi sistem, melainkan murni verifikasi manual khusus ADMIN.
- * - Berkas lainnya (Schedule, Alamat I/O, Flowchart, Diagram Wiring, Program PLC/HMI)
+ * - Berkas lainnya (Alamat I/O, Flowchart, Diagram Wiring, Program PLC/HMI)
  *   tetap tercentang otomatis jika berkas/data telah diinput atau dicentang manual.
  */
 export function computeChecklistProgress(
@@ -178,7 +179,7 @@ export function computeChecklistProgress(
   const autoByKey: Record<ProjectChecklistKey, boolean> = {
     // Verifikasi manual khusus Admin (tidak otomatis aktif oleh deteksi sistem)
     komponen_pr: false,
-    schedule_pengerjaan: detection.scheduleCellsCount > 0,
+    schedule_pengerjaan: false,
     alamat_io: detection.hasPlcAddresses,
     layout_panel_hmi: false,
     layout_panel_utama: false,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import os from "os";
 
 export const dynamic = "force-dynamic";
 
@@ -62,25 +63,41 @@ export async function POST(req: Request) {
         fsError?.code === "EACCES" ||
         fsError?.message?.includes("read-only");
 
-      if (isReadOnlyFs && buffer.length <= 8 * 1024 * 1024) {
-        // Simpan sebagai Data URL jika ukuran berkas wajar (<= 8MB)
-        const mime = file.type || "application/octet-stream";
-        const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
-        return NextResponse.json({
-          success: true,
-          url: dataUrl,
-          fileName: originalName,
-          fileSize: file.size,
-          mimeType: mime,
-          isDataUrl: true,
-        });
+      if (isReadOnlyFs) {
+        // Coba tulis ke os.tmpdir()/uploads/${category}
+        try {
+          const tmpDir = path.join(os.tmpdir(), "uploads", category);
+          await mkdir(tmpDir, { recursive: true });
+          await writeFile(path.join(tmpDir, uniqueName), buffer);
+          return NextResponse.json({
+            success: true,
+            url: `/uploads/${category}/${uniqueName}`,
+            fileName: originalName,
+            fileSize: file.size,
+            mimeType: file.type,
+          });
+        } catch {
+          // Jika tmpdir juga gagal, simpan sebagai Data URL jika ukuran berkas wajar
+          if (buffer.length <= 25 * 1024 * 1024) {
+            const mime = file.type || "application/octet-stream";
+            const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+            return NextResponse.json({
+              success: true,
+              url: dataUrl,
+              fileName: originalName,
+              fileSize: file.size,
+              mimeType: mime,
+              isDataUrl: true,
+            });
+          }
+        }
       }
 
       console.error("Gagal menulis berkas ke filesystem:", fsError);
       return NextResponse.json(
         {
           error: isReadOnlyFs
-            ? "Filesystem server bersifat read-only. File melebihi batas 8MB serverless."
+            ? "Filesystem server bersifat read-only. File melebihi batas 25MB serverless."
             : "Gagal menyimpan berkas ke media penyimpanan.",
         },
         { status: 500 }

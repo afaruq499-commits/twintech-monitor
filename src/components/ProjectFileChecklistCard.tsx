@@ -135,7 +135,7 @@ export function ProjectFileChecklistCard({
       deskripsi: "Matriks jadwal pekerjaan per hari, PIC pelaksana, & deadline target.",
       tabTarget: "jadwal",
       autoDetected: autoByKey.schedule_pengerjaan,
-      isAdminOnly: false,
+      isAdminOnly: true,
       autoDetail:
         projectData.scheduleCellsCount > 0
           ? `${projectData.lanesCount} lane aktif (${projectData.scheduleCellsCount} sel terisi)`
@@ -265,7 +265,7 @@ export function ProjectFileChecklistCard({
   const handleToggleCheck = (key: ProjectChecklistKey) => {
     if (isAdminOnlyChecklistKey(key) && !isAdmin) {
       setAdminNotice(
-        "Berkas Komponen PR dan Layout Panel/HMI khusus diverifikasi manual oleh Admin (Faruq)."
+        "Berkas Komponen PR, Schedule, dan Layout Panel/HMI khusus diverifikasi manual oleh Admin."
       );
       setTimeout(() => setAdminNotice(null), 4500);
       return;

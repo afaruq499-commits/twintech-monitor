@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile, stat } from "fs/promises";
 import path from "path";
+import os from "os";
 
 export const dynamic = "force-dynamic";
 
@@ -32,15 +33,34 @@ export async function GET(
 
     // Hindari directory traversal
     const safeSegments = pathSegments.map((s) => s.replace(/\.\./g, ""));
-    const filePath = path.join(process.cwd(), "public", "uploads", ...safeSegments);
+    let filePath = path.join(process.cwd(), "public", "uploads", ...safeSegments);
 
-    // Cek apakah file ada
+    // Cek apakah file ada di public/uploads
+    let fileExists = false;
     try {
       const fileStat = await stat(filePath);
-      if (!fileStat.isFile()) {
-        return NextResponse.json({ error: "Bukan berkas" }, { status: 404 });
+      if (fileStat.isFile()) {
+        fileExists = true;
       }
     } catch {
+      fileExists = false;
+    }
+
+    // Jika tidak ditemukan di public/uploads (lingkungan serverless), cek di os.tmpdir()/uploads/...
+    if (!fileExists) {
+      const tmpPath = path.join(os.tmpdir(), "uploads", ...safeSegments);
+      try {
+        const fileStat = await stat(tmpPath);
+        if (fileStat.isFile()) {
+          filePath = tmpPath;
+          fileExists = true;
+        }
+      } catch {
+        fileExists = false;
+      }
+    }
+
+    if (!fileExists) {
       return NextResponse.json({ error: "Berkas tidak ditemukan" }, { status: 404 });
     }
 

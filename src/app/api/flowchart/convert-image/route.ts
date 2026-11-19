@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import os from "os";
 import {
   callGeminiVisionMulti,
   runLocalOcr,
@@ -44,8 +45,21 @@ export async function POST(req: Request) {
       "image/bmp",
     ];
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "flowcharts");
-    await mkdir(uploadDir, { recursive: true });
+    // Direktori penyimpanan: coba public/uploads, jika read-only (serverless seperti Vercel), fallback ke os.tmpdir()
+    let uploadDir: string | null = null;
+    try {
+      const publicUploads = path.join(process.cwd(), "public", "uploads", "flowcharts");
+      await mkdir(publicUploads, { recursive: true });
+      uploadDir = publicUploads;
+    } catch {
+      try {
+        const tmpUploads = path.join(os.tmpdir(), "uploads", "flowcharts");
+        await mkdir(tmpUploads, { recursive: true });
+        uploadDir = tmpUploads;
+      } catch {
+        uploadDir = null;
+      }
+    }
 
     // Kumpulkan data semua gambar & hitung dimensinya
     const processedImages: Array<{
@@ -96,8 +110,18 @@ export async function POST(req: Request) {
         .replace(/[^a-zA-Z0-9_\-]/g, "_")
         .slice(0, 50);
 
-      const uniqueFileName = `${Date.now()}_${i + 1}_${baseName}${ext}`;
-      await writeFile(path.join(uploadDir, uniqueFileName), buffer);
+      // Default URL adalah Data URL base64 sehingga selalu berfungsi di platform serverless / EROFS
+      let publicUrl = `data:${mimeType};base64,${base64Data}`;
+      if (uploadDir) {
+        try {
+          const uniqueFileName = `${Date.now()}_${i + 1}_${baseName}${ext}`;
+          await writeFile(path.join(uploadDir, uniqueFileName), buffer);
+          publicUrl = `/uploads/flowcharts/${uniqueFileName}`;
+        } catch (fsWriteErr) {
+          console.warn("Filesystem read-only saat menulis flowchart, menggunakan Data URL fallback:", fsWriteErr);
+          publicUrl = `data:${mimeType};base64,${base64Data}`;
+        }
+      }
 
       // Baca dimensi gambar
       const dim = getPngDimensions(buffer);
@@ -109,7 +133,7 @@ export async function POST(req: Request) {
         base64Data,
         mimeType,
         fileName: originalName,
-        publicUrl: `/uploads/flowcharts/${uniqueFileName}`,
+        publicUrl,
         width,
         height,
       });
