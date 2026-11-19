@@ -24,6 +24,7 @@ import {
   ListOrdered,
   MessageSquare,
   Plus,
+  RefreshCw,
   RotateCcw,
   Settings2,
   SlidersHorizontal,
@@ -60,6 +61,28 @@ import {
   type ComponentWarningModalState,
   type ConflictModalState,
 } from "./ScheduleFeedbackModals";
+
+export interface LocalPendingCell {
+  action: "UPSERT" | "DELETE";
+  workItemId: string;
+  tanggal: string;
+  status?: ScheduleCellStatus;
+  warnaCustom?: string | null;
+  catatan?: string | null;
+  subScopeId?: string | null;
+  taskDetailId?: string | null;
+  allDetailIds?: string[] | null;
+  isShiftClick?: boolean;
+}
+
+function getCellKey(
+  workItemId: string,
+  tanggal: string,
+  subScopeId?: string | null,
+  taskDetailId?: string | null
+): string {
+  return `${workItemId}::${tanggal}::${subScopeId || ""}::${taskDetailId || ""}`;
+}
 
 interface WorkItemDTO {
   id: string;
@@ -163,6 +186,29 @@ export function LaneGridEditorClient({
   const [isDraggingBrush, setIsDraggingBrush] = useState(false);
   const [busy, setBusy] = useState(false);
   const [includeExportDates, setIncludeExportDates] = useState(false);
+
+  // Batch Mode: Simpan antrian perubahan sel warna / status secara lokal tanpa network roundtrip
+  const [pendingChanges, setPendingChanges] = useState<Map<string, LocalPendingCell>>(new Map());
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
+
+  // Stop dragging brush jika mouse dilepas di mana saja di window
+  useEffect(() => {
+    const handleMouseUp = () => setIsDraggingBrush(false);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  // Cegah tab tertutup tanpa sengaja jika ada draft yang belum di-update
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pendingChanges.size > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [pendingChanges.size]);
 
   // Conflict & Warning Modals
   const [conflictModal, setConflictModal] =
@@ -417,7 +463,7 @@ export function LaneGridEditorClient({
     [lane.tanggalMulai, lane.jumlahHari, customDates]
   );
 
-  // Set tanggal yang terisi sel pekerjaan pada lane ini
+  // Set tanggal yang terisi sel pekerjaan pada lane ini (termasuk draft perubahan lokal)
   const allLaneCellDates = useMemo(() => {
     const dates = new Set<string>();
     for (const wi of lane.workItems) {
@@ -425,8 +471,13 @@ export function LaneGridEditorClient({
         if (sc.tanggal) dates.add(sc.tanggal);
       }
     }
+    for (const item of pendingChanges.values()) {
+      if (item.action === "UPSERT" && item.tanggal) {
+        dates.add(item.tanggal);
+      }
+    }
     return dates;
-  }, [lane.workItems]);
+  }, [lane.workItems, pendingChanges]);
 
   // Tanggal yang sama sekali tidak memiliki pengerjaan di lane ini
   const emptyDates = useMemo(() => {
@@ -756,7 +807,8 @@ export function LaneGridEditorClient({
     }
   }
 
-  async function applyCellAction(
+  // Mode Batch / Draft: Perubahan warna / kuas langsung diaplikasikan ke pendingChanges (0ms latency, tanpa delay)
+  function applyCellAction(
     workItemId: string,
     tanggal: string,
     brush: ScheduleCellStatus | "ERASE",
@@ -766,114 +818,114 @@ export function LaneGridEditorClient({
       taskDetailId?: string | null;
       allDetailIds?: string[] | null;
       isShiftClick?: boolean;
-      acknowledgeComponentWarning?: boolean;
-      allowParallelOverride?: boolean;
       warnaCustomOverride?: string | null;
     }
   ) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      if (brush === "ERASE") {
-        const qs = new URLSearchParams({
-          workItemId,
-          tanggal,
-        });
-        if (options?.subScopeId) qs.set("subScopeId", options.subScopeId);
-        if (options?.taskDetailId) qs.set("taskDetailId", options.taskDetailId);
-        if (options?.allDetailIds && options.allDetailIds.length > 0) {
-          qs.set("allDetailIds", JSON.stringify(options.allDetailIds));
+    const subScopeId = options?.subScopeId || null;
+    const isShift = !!options?.isShiftClick || !options?.taskDetailId;
+    const taskDetailId = isShift ? null : (options?.taskDetailId || null);
+
+    setPendingChanges((prev) => {
+      const next = new Map(prev);
+
+      if (isShift) {
+        // Jika Shift Click pada subScope, hapus pending change individual detail di subScope ini agar konsisten
+        if (options?.allDetailIds) {
+          for (const detId of options.allDetailIds) {
+            next.delete(getCellKey(workItemId, tanggal, subScopeId, detId));
+          }
         }
-        if (options?.isShiftClick) qs.set("isShiftClick", "true");
-        await fetch(`/api/schedule?${qs.toString()}`, { method: "DELETE" });
-        router.refresh();
-        return;
+        const key = getCellKey(workItemId, tanggal, subScopeId, null);
+        if (brush === "ERASE") {
+          next.set(key, {
+            action: "DELETE",
+            workItemId,
+            tanggal,
+            subScopeId,
+            taskDetailId: null,
+            allDetailIds: options?.allDetailIds || null,
+            isShiftClick: true,
+          });
+        } else {
+          next.set(key, {
+            action: "UPSERT",
+            workItemId,
+            tanggal,
+            status: brush,
+            warnaCustom: options?.warnaCustomOverride ?? null,
+            subScopeId,
+            taskDetailId: null,
+            allDetailIds: options?.allDetailIds || null,
+            isShiftClick: true,
+          });
+        }
+      } else {
+        // Normal click pada taskDetailId tertentu
+        const key = getCellKey(workItemId, tanggal, subScopeId, taskDetailId);
+        if (brush === "ERASE") {
+          next.set(key, {
+            action: "DELETE",
+            workItemId,
+            tanggal,
+            subScopeId,
+            taskDetailId,
+            allDetailIds: options?.allDetailIds || null,
+            isShiftClick: false,
+          });
+        } else {
+          next.set(key, {
+            action: "UPSERT",
+            workItemId,
+            tanggal,
+            status: brush,
+            warnaCustom: options?.warnaCustomOverride ?? null,
+            subScopeId,
+            taskDetailId,
+            allDetailIds: options?.allDetailIds || null,
+            isShiftClick: false,
+          });
+        }
       }
 
-      const chosenCustomColor =
-        options?.warnaCustomOverride !== undefined
-          ? options.warnaCustomOverride
-          : null; // warna kustom bebas dihapus, selalu null kecuali override eksplisit
+      return next;
+    });
+  }
 
-      const res = await fetch("/api/schedule", {
+  // Simpan seluruh perubahan warna draft sekaligus ke database dalam 1 transaksi
+  async function handleSaveBatchChanges() {
+    if (pendingChanges.size === 0 || isSavingBatch) return;
+    setIsSavingBatch(true);
+    try {
+      const changes = Array.from(pendingChanges.values());
+      const res = await fetch("/api/schedule/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workItemId,
-          subScopeId: options?.subScopeId || null,
-          taskDetailId: options?.taskDetailId || null,
-          allDetailIds: options?.allDetailIds || null,
-          isShiftClick: options?.isShiftClick ?? false,
-          tanggal,
-          status: brush,
-          warnaCustom: chosenCustomColor,
-          acknowledgeComponentWarning:
-            options?.acknowledgeComponentWarning ?? false,
-          allowParallelOverride: options?.allowParallelOverride ?? false,
-        }),
+        body: JSON.stringify({ changes }),
       });
       const data = await res.json();
-
-      if (res.status === 409 && data.blocked) {
-        setIsDraggingBrush(false);
-        setConflictModal({
-          message: data.error,
-          suggestions: data.conflict?.suggestions ?? [],
-          onPickSuggestion: (suggestedDate) => {
-            setConflictModal(null);
-            void applyCellAction(workItemId, suggestedDate, brush, {
-              subScopeId: options?.subScopeId,
-              subScopeJudul: options?.subScopeJudul,
-              taskDetailId: options?.taskDetailId,
-              allDetailIds: options?.allDetailIds,
-              isShiftClick: options?.isShiftClick,
-              warnaCustomOverride: chosenCustomColor,
-            });
-          },
-          onForceParallel: () => {
-            setConflictModal(null);
-            void applyCellAction(workItemId, tanggal, brush, {
-              subScopeId: options?.subScopeId,
-              subScopeJudul: options?.subScopeJudul,
-              taskDetailId: options?.taskDetailId,
-              allDetailIds: options?.allDetailIds,
-              isShiftClick: options?.isShiftClick,
-              allowParallelOverride: true,
-              warnaCustomOverride: chosenCustomColor,
-            });
-          },
-        });
+      if (!res.ok) {
+        alert(`Gagal memperbarui jadwal: ${data.error || "Terjadi kesalahan."}`);
         return;
       }
-
-      if (data.requiresWarningConfirm && data.warning) {
-        setIsDraggingBrush(false);
-        setWarningModal({
-          message: data.warning.message,
-          scope: data.warning.scope,
-          missingComponents: data.warning.missingComponents,
-          onConfirmSave: () => {
-            setWarningModal(null);
-            void applyCellAction(workItemId, tanggal, brush, {
-              subScopeId: options?.subScopeId,
-              subScopeJudul: options?.subScopeJudul,
-              taskDetailId: options?.taskDetailId,
-              allDetailIds: options?.allDetailIds,
-              isShiftClick: options?.isShiftClick,
-              acknowledgeComponentWarning: true,
-              allowParallelOverride: options?.allowParallelOverride,
-              warnaCustomOverride: chosenCustomColor,
-            });
-          },
-        });
-        return;
-      }
-
-      if (res.ok) {
-        router.refresh();
-      }
+      setPendingChanges(new Map());
+      router.refresh();
+    } catch (err) {
+      console.error("Gagal menyimpan perubahan batch:", err);
+      alert("Terjadi kesalahan koneksi saat menyimpan perubahan jadwal.");
     } finally {
-      setBusy(false);
+      setIsSavingBatch(false);
+    }
+  }
+
+  // Batalkan seluruh antrian perubahan warna lokal
+  function handleCancelPendingChanges() {
+    if (pendingChanges.size === 0) return;
+    if (
+      confirm(
+        `Batalkan ${pendingChanges.size} perubahan warna/jadwal yang belum disimpan?`
+      )
+    ) {
+      setPendingChanges(new Map());
     }
   }
 
@@ -1288,9 +1340,62 @@ export function LaneGridEditorClient({
                 <strong>Shift + Klik:</strong> 1 grup sub-pekerjaan
               </span>
             </span>
+
+            {/* Tombol Simpan Batch / Update Jadwal jika ada perubahan lokal */}
+            {pendingChanges.size > 0 && (
+              <div className="inline-flex items-center gap-1.5 p-1 bg-emerald-50 border-2 border-emerald-500 rounded-xl animate-in zoom-in-95 duration-150 shadow-xs">
+                <button
+                  type="button"
+                  onClick={handleSaveBatchChanges}
+                  disabled={isSavingBatch}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition cursor-pointer disabled:opacity-50"
+                  title="Simpan seluruh perubahan warna tabel ke database"
+                >
+                  {isSavingBatch ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Update Jadwal</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-emerald-800 text-white text-[10px] font-black">
+                        {pendingChanges.size}
+                      </span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelPendingChanges}
+                  disabled={isSavingBatch}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                  title="Batalkan semua perubahan draft"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {pendingChanges.size > 0 && (
+              <button
+                type="button"
+                onClick={handleSaveBatchChanges}
+                disabled={isSavingBatch}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black shadow-sm transition cursor-pointer disabled:opacity-50 animate-pulse"
+                title="Simpan seluruh perubahan warna tabel ke database"
+              >
+                {isSavingBatch ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                <span>Update Jadwal ({pendingChanges.size} Perubahan)</span>
+              </button>
+            )}
             {lane.workItems.length > 0 && (
               <button
                 type="button"
@@ -1915,21 +2020,6 @@ export function LaneGridEditorClient({
                                 ? cellByDate.get(dtIso)
                                 : undefined;
 
-                            const scheduled =
-                              detailScheduled ??
-                              subScopeScheduled ??
-                              workItemScheduled;
-
-                            const bgHex = scheduled
-                              ? scheduled.warnaCustom ||
-                                `#${SCHEDULE_STATUS_RGB[scheduled.status]}`
-                              : undefined;
-                            const otherOcc = (
-                              globalOccupantsByDate[dtIso] ?? []
-                            ).filter((o) => o.workItemId !== wi.id);
-
-                            const tglMerah = isTanggalMerah(dtIso);
-
                             const subScopeIdParam =
                               ss.id && !ss.id.startsWith("empty-")
                                 ? ss.id
@@ -1944,13 +2034,84 @@ export function LaneGridEditorClient({
                               .map((d) => d.id)
                               .filter((id) => id && !id.startsWith("empty-"));
 
+                            // Resolusi pending change (perubahan lokal yang belum disimpan)
+                            const detailKey = getCellKey(wi.id, dtIso, subScopeIdParam, validDetailId);
+                            const ssKey = getCellKey(wi.id, dtIso, subScopeIdParam, null);
+                            const wiKey = getCellKey(wi.id, dtIso, null, null);
+
+                            const pendingDetail = pendingChanges.get(detailKey);
+                            const pendingSs = pendingChanges.get(ssKey);
+                            const pendingWi = pendingChanges.get(wiKey);
+
+                            let scheduled: {
+                              status: ScheduleCellStatus;
+                              warnaCustom?: string | null;
+                              catatan?: string | null;
+                            } | undefined = undefined;
+
+                            let isPendingDraft = false;
+                            let isPendingDeleted = false;
+
+                            if (pendingDetail) {
+                              isPendingDraft = true;
+                              if (pendingDetail.action === "UPSERT" && pendingDetail.status) {
+                                scheduled = {
+                                  status: pendingDetail.status,
+                                  warnaCustom: pendingDetail.warnaCustom,
+                                  catatan: pendingDetail.catatan ?? (detailScheduled?.catatan ?? null),
+                                };
+                              } else {
+                                scheduled = undefined;
+                                isPendingDeleted = true;
+                              }
+                            } else if (pendingSs) {
+                              isPendingDraft = true;
+                              if (pendingSs.action === "UPSERT" && pendingSs.status) {
+                                scheduled = {
+                                  status: pendingSs.status,
+                                  warnaCustom: pendingSs.warnaCustom,
+                                  catatan: pendingSs.catatan ?? (subScopeScheduled?.catatan ?? null),
+                                };
+                              } else {
+                                scheduled = undefined;
+                                isPendingDeleted = true;
+                              }
+                            } else if (pendingWi) {
+                              isPendingDraft = true;
+                              if (pendingWi.action === "UPSERT" && pendingWi.status) {
+                                scheduled = {
+                                  status: pendingWi.status,
+                                  warnaCustom: pendingWi.warnaCustom,
+                                  catatan: pendingWi.catatan ?? (workItemScheduled?.catatan ?? null),
+                                };
+                              } else {
+                                scheduled = undefined;
+                                isPendingDeleted = true;
+                              }
+                            } else {
+                              scheduled =
+                                detailScheduled ??
+                                subScopeScheduled ??
+                                workItemScheduled;
+                            }
+
+                            const bgHex = scheduled
+                              ? scheduled.warnaCustom ||
+                                `#${SCHEDULE_STATUS_RGB[scheduled.status]}`
+                              : undefined;
+                            const otherOcc = (
+                              globalOccupantsByDate[dtIso] ?? []
+                            ).filter((o) => o.workItemId !== wi.id);
+
+                            const tglMerah = isTanggalMerah(dtIso);
+
                             return (
                               <td
                                 key={dtIso}
                                 onMouseDown={(e) => {
                                   setIsDraggingBrush(true);
                                   const isShift = e.shiftKey;
-                                  void applyCellAction(
+                                  applyCellAction(
                                     wi.id,
                                     dtIso,
                                     activeBrush,
@@ -1968,7 +2129,7 @@ export function LaneGridEditorClient({
                                 onMouseEnter={(e) => {
                                   if (isDraggingBrush) {
                                     const isShift = e.shiftKey;
-                                    void applyCellAction(
+                                    applyCellAction(
                                       wi.id,
                                       dtIso,
                                       activeBrush,
@@ -1998,41 +2159,52 @@ export function LaneGridEditorClient({
                                       allDetailIds: allValidDetailIds,
                                       tanggal: dtIso,
                                       status: scheduled.status,
-                                      warnaCustom: scheduled.warnaCustom,
+                                      warnaCustom: scheduled.warnaCustom ?? null,
                                       catatan: scheduled.catatan ?? "",
                                     });
                                   }
                                 }}
                                 title={
-                                  scheduled
-                                    ? `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}${SCHEDULE_CELL_LABELS[scheduled.status]}${
-                                        scheduled.catatan
-                                          ? ` — Komentar: ${scheduled.catatan}`
-                                          : ""
-                                      } [${subScopeJudulParam || wi.judul} — ${det.teks.slice(0, 35)}] (Klik: ubah point ini, Shift+Klik: ubah 1 grup, Klik 2x: komentar)`
-                                    : otherOcc.length > 0
-                                      ? `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}Terisi: ${otherOcc
-                                          .map((o) => o.label)
-                                          .join(", ")}`
-                                      : `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}Klik: warnai point ini, Shift+Klik: warnai 1 grup [${
-                                          subScopeJudulParam || wi.judul
-                                        }] (${activeBrush})`
+                                  `${isPendingDraft ? "[DRAFT BELUM DI-UPDATE] " : ""}${
+                                    scheduled
+                                      ? `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}${SCHEDULE_CELL_LABELS[scheduled.status]}${
+                                          scheduled.catatan
+                                            ? ` — Komentar: ${scheduled.catatan}`
+                                            : ""
+                                        } [${subScopeJudulParam || wi.judul} — ${det.teks.slice(0, 35)}] (Klik: ubah point ini, Shift+Klik: ubah 1 grup, Klik 2x: komentar)`
+                                      : otherOcc.length > 0
+                                        ? `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}Terisi: ${otherOcc
+                                            .map((o) => o.label)
+                                            .join(", ")}`
+                                        : `${tglMerah.isRed ? `[Tanggal Merah: ${tglMerah.keterangan}] ` : ""}Klik: warnai point ini, Shift+Klik: warnai 1 grup [${
+                                            subScopeJudulParam || wi.judul
+                                          }] (${activeBrush})`
+                                  }`
                                 }
                                 className={`p-0.5 text-center cursor-pointer transition relative select-none group border-b border-r w-[76px] min-w-[76px] max-w-[78px] h-[30px] ${
-                                  !scheduled && tglMerah.isRed
-                                    ? "bg-rose-100/70 hover:bg-rose-200/80 border-rose-300/90"
-                                    : !scheduled && otherOcc.length > 0
-                                      ? "bg-rose-50/40 hover:bg-rose-100/50 border-slate-300"
-                                      : !scheduled
-                                        ? "hover:bg-blue-50 border-slate-300"
-                                        : tglMerah.isRed
-                                          ? "border-rose-400 hover:brightness-95"
-                                          : "border-slate-300 hover:brightness-95"
-                                }`}
+                                  isPendingDeleted
+                                    ? "bg-rose-50/70 border-dashed border-rose-400"
+                                    : !scheduled && tglMerah.isRed
+                                      ? "bg-rose-100/70 hover:bg-rose-200/80 border-rose-300/90"
+                                      : !scheduled && otherOcc.length > 0
+                                        ? "bg-rose-50/40 hover:bg-rose-100/50 border-slate-300"
+                                        : !scheduled
+                                          ? "hover:bg-blue-50 border-slate-300"
+                                          : tglMerah.isRed
+                                            ? "border-rose-400 hover:brightness-95"
+                                            : "border-slate-300 hover:brightness-95"
+                                } ${isPendingDraft && scheduled ? "ring-2 ring-amber-400 ring-inset" : ""}`}
                                 style={
                                   bgHex ? { backgroundColor: bgHex } : undefined
                                 }
                               >
+                                {/* Indikator Titik Emas untuk Perubahan Draft yang Belum Disimpan */}
+                                {isPendingDraft && (
+                                  <span
+                                    className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-400 ring-1 ring-slate-900 pointer-events-none shadow-xs z-10 animate-pulse"
+                                    title="Draft perubahan (klik tombol Update Jadwal untuk menyimpan ke server)"
+                                  />
+                                )}
                                 {scheduled && scheduled.catatan && (
                                   <div
                                     className="w-full rounded bg-white/95 text-slate-900 px-1 py-0.5 shadow-2xs border border-slate-900/15 text-left cursor-pointer hover:bg-white"
@@ -2049,7 +2221,7 @@ export function LaneGridEditorClient({
                                         allDetailIds: allValidDetailIds,
                                         tanggal: dtIso,
                                         status: scheduled.status,
-                                        warnaCustom: scheduled.warnaCustom,
+                                        warnaCustom: scheduled.warnaCustom ?? null,
                                         catatan: scheduled.catatan ?? "",
                                       });
                                     }}
@@ -3306,9 +3478,56 @@ export function LaneGridEditorClient({
         </div>
       )}
 
+      {/* Floating Action Banner: Selalu tampil saat ada pending changes agar user mudah menyimpan tanpa perlu scroll ke atas */}
+      {pendingChanges.size > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 p-3 bg-slate-900/95 backdrop-blur text-white rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2 pl-2 pr-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+            <div className="text-xs font-semibold">
+              <span className="font-extrabold text-amber-400">
+                {pendingChanges.size}
+              </span>{" "}
+              perubahan warna belum disimpan
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleCancelPendingChanges}
+              disabled={isSavingBatch}
+              className="px-3 py-1.5 rounded-xl border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveBatchChanges}
+              disabled={isSavingBatch}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg transition cursor-pointer disabled:opacity-50"
+            >
+              {isSavingBatch ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Update Jadwal Sekarang</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notifikasi Perubahan Tanggal Kolom Day */}
       {dateChangeToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3">
+        <div
+          className={`fixed ${
+            pendingChanges.size > 0 ? "bottom-24" : "bottom-6"
+          } right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3`}
+        >
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-sm font-semibold">{dateChangeToast}</span>
         </div>
