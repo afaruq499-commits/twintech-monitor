@@ -342,7 +342,7 @@ export function DashboardClient({
   const filteredTomorrow = filterTasks(tomorrowTasks);
 
   const checklistList = useMemo(
-    () => projectChecklists ?? [],
+    () => (projectChecklists ?? []).filter((p) => p.tipeProyek !== "AFTER_SALES"),
     [projectChecklists]
   );
 
@@ -377,7 +377,7 @@ export function DashboardClient({
   }, [checklistList, checklistSearch, checklistFilter]);
 
   const checklistStats = useMemo(() => {
-    const list = projectChecklists ?? [];
+    const list = checklistList;
     if (list.length === 0)
       return { completeProjects: 0, totalProjects: 0, avgPct: 0 };
     const completeProjects = list.filter(
@@ -387,7 +387,7 @@ export function DashboardClient({
       list.reduce((sum, p) => sum + p.progressPct, 0) / list.length
     );
     return { completeProjects, totalProjects: list.length, avgPct };
-  }, [projectChecklists]);
+  }, [checklistList]);
 
   function renderTaskCard(task: TaskItem) {
     const currentStatus = optimisticStatusMap[task.id] || task.status;

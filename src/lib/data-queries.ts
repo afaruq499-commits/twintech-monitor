@@ -366,6 +366,7 @@ export interface ProjectChecklistSummaryItem {
   warna: string;
   status: string;
   prioritas: string;
+  tipeProyek?: string;
   deadline: string | null;
   completedCount: number;
   totalCount: number;
@@ -742,7 +743,9 @@ export async function getDashboardSummary() {
     pemprograman: "Program",
   };
 
-  const projectChecklists: ProjectChecklistSummaryItem[] = projects.map((p) => {
+  const projectChecklists: ProjectChecklistSummaryItem[] = projects
+    .filter((p) => p.tipeProyek !== "AFTER_SALES")
+    .map((p) => {
     const activeComps = p.components.filter(
       (c) => c.statusImport !== "HILANG_DI_REVISI"
     );
@@ -785,6 +788,7 @@ export async function getDashboardSummary() {
       warna: p.warna,
       status: p.status,
       prioritas: p.prioritas,
+      tipeProyek: p.tipeProyek,
       deadline: toIsoDateStr(p.deadline),
       completedCount: progress.completedCount,
       totalCount: progress.totalCount,
