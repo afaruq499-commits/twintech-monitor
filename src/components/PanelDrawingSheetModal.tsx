@@ -909,13 +909,13 @@ export function PanelDrawingSheetModal({
                     const hmiW = plateWidth || 430;
                     const hmiH = plateHeight || 440;
                     const hmiD = plateDepth || 180;
-                    const gap = 70;
+                    const gap = 110;
                     const totalCadW = hmiW + gap + hmiD;
 
                     // Batas ruang gambar aman agar center dan tidak menabrak kop gambar di kanan bawah (Y=660)
-                    const maxDrawW = 620;
-                    const maxDrawH = 430;
-                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / hmiH, 1.15);
+                    const maxDrawW = 600;
+                    const maxDrawH = 410;
+                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / hmiH, 1.1);
                     const sw = hmiW * s;
                     const sh = hmiH * s;
                     const sd = hmiD * s;
@@ -923,8 +923,8 @@ export function PanelDrawingSheetModal({
                     const totalDrawingW = sw + sgap + sd;
 
                     // Posisi Center Horizontal (di area kerja sebelah kiri kop gambar X=30 s.d X=715)
-                    const centerAreaX = 385;
-                    const fx = Math.max(70, Math.round(centerAreaX - totalDrawingW / 2));
+                    const centerAreaX = 390;
+                    const fx = Math.max(80, Math.round(centerAreaX - totalDrawingW / 2));
                     const sx = fx + sw + sgap;
 
                     // Posisi Center Vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
@@ -1019,16 +1019,16 @@ export function PanelDrawingSheetModal({
                         {features.holes.length > 0 && features.holeLeaderText && (() => {
                           const target = features.holes.reduce((p, c) => (c.cx > p.cx ? c : p));
                           const tX = frontCadToX(target.cx) + (target.diameter / 2) * s * 0.7;
-                          const tY = frontCadToY(target.cy) - (target.diameter / 2) * s * 0.7;
-                          const elbX = tX + 35;
-                          const elbY = tY - 25;
-                          const endX = elbX + 80;
+                          const tY = frontCadToY(target.cy) + (target.diameter / 2) * s * 0.7;
+                          const elbX = tX + 16;
+                          const elbY = tY + 18;
+                          const endX = elbX + 70;
                           return (
                             <g id="hmi-hole-leader">
                               <line x1={tX} y1={tY} x2={elbX} y2={elbY} stroke="#000000" strokeWidth="1.2" />
                               <line x1={elbX} y1={elbY} x2={endX} y2={elbY} stroke="#000000" strokeWidth="1.2" />
-                              <polygon points={`${tX},${tY} ${tX + 7},${tY - 2} ${tX + 4},${tY - 5}`} fill="#000" />
-                              <text x={elbX + 4} y={elbY - 4} fontSize="10" fontWeight="bold" fill="#000">
+                              <polygon points={`${tX},${tY} ${tX + 6},${tY + 1} ${tX + 1},${tY + 6}`} fill="#000" />
+                              <text x={elbX + 3} y={elbY - 3} fontSize="9" fontWeight="bold" fill="#000">
                                 {features.holeLeaderText.replace("%%c", "⌀")}
                               </text>
                             </g>
@@ -1082,10 +1082,11 @@ export function PanelDrawingSheetModal({
                           const c = features.cutouts[0];
                           const topY = frontCadToY(c.maxY);
                           const cH = c.heightMm * s;
+                          const midY = topY + cH / 2;
                           return (
                             <g id="hmi-side-bezel">
                               <rect
-                                x={sx - 12 * s}
+                                x={sx - 10 * s}
                                 y={topY}
                                 width={6 * s}
                                 height={cH}
@@ -1094,8 +1095,9 @@ export function PanelDrawingSheetModal({
                                 stroke="#000000"
                                 strokeWidth="1.0"
                               />
-                              <line x1={sx - 12 * s} y1={topY + cH / 2} x2={sx - 24 * s} y2={topY + cH / 2} stroke="#000" strokeWidth="0.8" />
-                              <text x={sx - 28 * s} y={topY + cH / 2 + 3} textAnchor="end" fontSize="8" fontWeight="bold" fill="#0284c7">
+                              <line x1={sx - 10 * s} y1={midY} x2={sx - 32 * s} y2={midY} stroke="#0284c7" strokeWidth="0.8" />
+                              <polygon points={`${sx - 10 * s},${midY} ${sx - 14 * s},${midY - 2} ${sx - 14 * s},${midY + 2}`} fill="#0284c7" />
+                              <text x={sx - 36 * s} y={midY + 3} textAnchor="end" fontSize="8" fontWeight="bold" fill="#0284c7">
                                 HMI BEZEL
                               </text>
                             </g>
@@ -1108,21 +1110,23 @@ export function PanelDrawingSheetModal({
                           const maxHoleY = Math.max(...features.holes.map((h) => h.cy));
                           const topY = frontCadToY(maxHoleY + 11);
                           const pbH = (maxHoleY - minHoleY + 22) * s;
+                          const midY = topY + pbH / 2;
                           return (
                             <g id="hmi-side-push-buttons">
                               <rect
-                                x={sx - 18 * s}
+                                x={sx - 14 * s}
                                 y={topY}
-                                width={12 * s}
+                                width={10 * s}
                                 height={pbH}
                                 rx={2}
                                 fill="#ef4444"
                                 stroke="#000000"
                                 strokeWidth="1.0"
                               />
-                              <line x1={sx - 18 * s} y1={topY + pbH / 2} x2={sx - 28 * s} y2={topY + pbH / 2} stroke="#000" strokeWidth="0.8" />
-                              <text x={sx - 32 * s} y={topY + pbH / 2 + 3} textAnchor="end" fontSize="8" fontWeight="bold" fill="#ef4444">
-                                PUSH BUTTON / E-STOP
+                              <line x1={sx - 14 * s} y1={midY} x2={sx - 32 * s} y2={midY} stroke="#ef4444" strokeWidth="0.8" />
+                              <polygon points={`${sx - 14 * s},${midY} ${sx - 18 * s},${midY - 2} ${sx - 18 * s},${midY + 2}`} fill="#ef4444" />
+                              <text x={sx - 36 * s} y={midY + 3} textAnchor="end" fontSize="7.5" fontWeight="bold" fill="#ef4444">
+                                OPERATOR PB
                               </text>
                             </g>
                           );

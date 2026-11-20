@@ -3008,9 +3008,7 @@ export function ProjectControlPanelLayoutEditor({
         {/* Area Canvas Utama (Tinggi Tetap + Interactive SVG) */}
         <div
           ref={containerRef}
-          className={`flex-1 bg-slate-900 p-6 overflow-auto flex items-center justify-center relative select-none h-full transition-all duration-200 ${
-            hasSelection ? "lg:pr-84" : ""
-          }`}
+          className="flex-1 bg-slate-900 p-8 overflow-auto flex relative select-none h-full min-w-0"
           onClick={(e) => {
             if (e.target === containerRef.current && !e.ctrlKey && !e.metaKey) {
               clearSelection();
@@ -3097,7 +3095,7 @@ export function ProjectControlPanelLayoutEditor({
           {(() => {
             const isHmiDual = activePanelMode === "HMI" && showHmiSideView;
             const hmiDepthMm = layoutData.enclosure.depthMm || 180;
-            const hmiGap = 90;
+            const hmiGap = 120;
             const totalSvgWidth = isHmiDual
               ? layoutData.enclosure.widthMm + hmiGap + hmiDepthMm + 30
               : layoutData.enclosure.widthMm;
@@ -3112,7 +3110,7 @@ export function ProjectControlPanelLayoutEditor({
                   height: totalSvgHeight * zoom,
                   position: "relative",
                 }}
-                className="transition-transform duration-75 shadow-2xl shrink-0"
+                className="m-auto transition-transform duration-75 shadow-2xl shrink-0"
               >
                 <svg
                   ref={canvasRef}
@@ -5511,13 +5509,13 @@ export function ProjectControlPanelLayoutEditor({
                         <line
                           x1={sideX - 22}
                           y1={hmiIt.yMm + hmiIt.heightMm / 2}
-                          x2={sideX - 45}
+                          x2={sideX - 50}
                           y2={hmiIt.yMm + hmiIt.heightMm / 2}
                           stroke="#38bdf8"
                           strokeWidth={1.2}
                         />
                         <text
-                          x={sideX - 48}
+                          x={sideX - 54}
                           y={hmiIt.yMm + hmiIt.heightMm / 2 + 3}
                           textAnchor="end"
                           fontSize={9}
@@ -6297,6 +6295,42 @@ export function ProjectControlPanelLayoutEditor({
                             })
                           }
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-center font-bold text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Posisi Koordinat X & Y (mm) */}
+                    <div className="grid grid-cols-2 gap-2 bg-blue-50/60 p-2 rounded-xl border border-blue-200">
+                      <div>
+                        <label className="text-[10px] font-bold text-blue-700 block mb-0.5">
+                          Posisi X (mm):
+                        </label>
+                        <DeferredNumberInput
+                          min={0}
+                          max={layoutData.enclosure.widthMm}
+                          value={selectedItem.xMm}
+                          onCommit={(val) =>
+                            handleUpdateSelectedItem({
+                              xMm: val,
+                            })
+                          }
+                          className="w-full px-2 py-1 bg-white border border-blue-300 rounded text-center font-bold text-blue-900 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-blue-700 block mb-0.5">
+                          Posisi Y (mm):
+                        </label>
+                        <DeferredNumberInput
+                          min={0}
+                          max={layoutData.enclosure.heightMm}
+                          value={selectedItem.yMm}
+                          onCommit={(val) =>
+                            handleUpdateSelectedItem({
+                              yMm: val,
+                            })
+                          }
+                          className="w-full px-2 py-1 bg-white border border-blue-300 rounded text-center font-bold text-blue-900 text-xs"
                         />
                       </div>
                     </div>

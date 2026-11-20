@@ -529,9 +529,9 @@ export function generatePanelLayoutDxf(
       curr.cx > prev.cx ? curr : prev
     );
     const startX = targetHole.cx + targetHole.diameter / 2;
-    const startY = targetHole.cy + targetHole.diameter / 4;
-    const elbowX = startX + 25;
-    const elbowY = startY + 20;
+    const startY = targetHole.cy - targetHole.diameter / 4;
+    const elbowX = startX + 15;
+    const elbowY = startY - 18;
     const endX = elbowX + 35;
 
     // Garis panah leader

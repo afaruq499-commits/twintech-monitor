@@ -4092,16 +4092,19 @@ export function moveSelectedPanelItems(
   let minAllowedDy = -Infinity;
   let maxAllowedDy = Infinity;
 
-  const maxX = Math.max(5, enclosure.widthMm - 20);
-  const maxY = Math.max(5, enclosure.heightMm - 20);
-
   for (const id of dragIds) {
     const pos = initialPositions[id];
     if (!pos) continue;
+    const it = items.find((i) => i.id === id);
+    const itemW = it?.widthMm || 20;
+    const itemH = it?.heightMm || 20;
+    const itemMaxX = Math.max(5, enclosure.widthMm - itemW - 5);
+    const itemMaxY = Math.max(5, enclosure.heightMm - itemH - 5);
+
     minAllowedDx = Math.max(minAllowedDx, 5 - pos.xMm);
-    maxAllowedDx = Math.min(maxAllowedDx, maxX - pos.xMm);
+    maxAllowedDx = Math.min(maxAllowedDx, itemMaxX - pos.xMm);
     minAllowedDy = Math.max(minAllowedDy, 5 - pos.yMm);
-    maxAllowedDy = Math.min(maxAllowedDy, maxY - pos.yMm);
+    maxAllowedDy = Math.min(maxAllowedDy, itemMaxY - pos.yMm);
   }
 
   const clampedDx =
