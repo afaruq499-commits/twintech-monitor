@@ -39,6 +39,7 @@ import {
   Upload,
   User,
   Users,
+  Workflow,
   X,
 } from "lucide-react";
 
@@ -147,9 +148,9 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/convert-flowchart",
-        label: "Konversi Flowchart",
+        label: "Buat Flowchart",
         shortLabel: "Flowchart",
-        icon: GitFork,
+        icon: Workflow,
       },
     ],
   },
@@ -444,7 +445,7 @@ export function AppShell({
     if (pathname === "/convert-flowchart") {
       return [
         { label: "Workspace", href: "/" },
-        { label: "Konversi Flowchart" },
+        { label: "Studio Flowchart" },
       ];
     }
     if (pathname === "/pengaturan") {

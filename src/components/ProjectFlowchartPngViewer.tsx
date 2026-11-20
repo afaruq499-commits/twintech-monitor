@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
   FileImage,
   Upload,
@@ -19,6 +20,7 @@ import {
   Eye,
   FileCode,
   FileUp,
+  Workflow,
 } from "lucide-react";
 import {
   normalizeFlowchartPayload,
@@ -416,6 +418,16 @@ export function ProjectFlowchartPngViewer({
         <div className="flex flex-wrap items-center gap-2">
           {hasAnyFlowData ? (
             <>
+              {/* Buka & Edit di Studio Flowchart */}
+              <Link
+                href={`/convert-flowchart?projectId=${projectId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                title="Buka dan edit flowchart ini di Studio Flowchart"
+              >
+                <Workflow className="w-3.5 h-3.5" />
+                <span>Edit di Studio Flowchart</span>
+              </Link>
+
               {/* Tombol Import / Ganti PNG */}
               <button
                 type="button"
@@ -481,6 +493,15 @@ export function ProjectFlowchartPngViewer({
             </>
           ) : (
             <>
+              <Link
+                href={`/convert-flowchart?projectId=${projectId}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer shadow-sm"
+                title="Rancang flowchart alur sekuens mesin di Studio Flowchart"
+              >
+                <Workflow className="w-4 h-4" />
+                <span>Buat Flowchart di Studio</span>
+              </Link>
+
               <button
                 type="button"
                 onClick={() => {
@@ -488,9 +509,9 @@ export function ProjectFlowchartPngViewer({
                   setUploadError(null);
                   setShowUploadModal(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer shadow-xs"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4 text-slate-500" />
                 <span>Import Gambar PNG</span>
               </button>
 

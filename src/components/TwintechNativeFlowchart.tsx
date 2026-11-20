@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   ZoomIn,
   ZoomOut,
@@ -20,21 +20,32 @@ import {
   FileCode,
   X,
   Move,
+  Copy,
+  LayoutGrid,
+  Columns,
+  Square,
+  Eye,
 } from "lucide-react";
 import { FlowStepItem, generateDrawioXml } from "@/lib/flowchart-converter";
 
-interface TwintechNativeFlowchartProps {
+export interface TwintechNativeFlowchartProps {
   initialSteps: FlowStepItem[];
   projectName?: string;
-  onSave?: (steps: FlowStepItem[], xml: string) => Promise<void> | void;
+  projectClient?: string;
+  onSave?: (steps: FlowStepItem[], xml: string, svgDataUrl: string) => Promise<void> | void;
   isSaving?: boolean;
+  onStepsChange?: (steps: FlowStepItem[]) => void;
+  forceLayoutMode?: "auto" | "single" | "dual";
 }
 
 export function TwintechNativeFlowchart({
   initialSteps,
   projectName = "Twintech",
+  projectClient = "PT Twintech Precision",
   onSave,
   isSaving = false,
+  onStepsChange,
+  forceLayoutMode = "auto",
 }: TwintechNativeFlowchartProps) {
   const [steps, setSteps] = useState<FlowStepItem[]>(() =>
     initialSteps && initialSteps.length > 0 ? initialSteps : []
@@ -47,6 +58,17 @@ export function TwintechNativeFlowchart({
     }
   }, [initialSteps]);
 
+  // Notify parent on steps change
+  const updateSteps = useCallback(
+    (newSteps: FlowStepItem[]) => {
+      setSteps(newSteps);
+      if (onStepsChange) {
+        onStepsChange(newSteps);
+      }
+    },
+    [onStepsChange]
+  );
+
   // Selected node for editing
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
@@ -58,6 +80,8 @@ export function TwintechNativeFlowchart({
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [canvasTheme, setCanvasTheme] = useState<"dark" | "light">("dark");
+  const [userLayoutChoice, setUserLayoutChoice] = useState<"auto" | "single" | "dual">(forceLayoutMode);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -94,11 +118,13 @@ export function TwintechNativeFlowchart({
 
   // Periksa apakah ini alur 2-kolom (Safety Relay di kiri & Machine Running di kanan)
   const isTwintechDualColumn = useMemo(() => {
+    if (userLayoutChoice === "single") return false;
+    if (userLayoutChoice === "dual") return true;
     if (steps.length < 6) return false;
     const hasSafety = steps.some((s) => /safety|emg|power on/i.test(s.judul + s.deskripsi));
     const hasMachine = steps.some((s) => /inspect|homing|mesin ready|2 pb/i.test(s.judul + s.deskripsi));
     return hasSafety && hasMachine;
-  }, [steps]);
+  }, [steps, userLayoutChoice]);
 
   // Pisahkan langkah untuk mode 2 kolom
   const { columnLeftSteps, columnRightSteps } = useMemo(() => {
@@ -126,9 +152,8 @@ export function TwintechNativeFlowchart({
 
   const updateSelectedStep = (field: keyof FlowStepItem, value: string) => {
     if (!selectedNodeId) return;
-    setSteps((prev) =>
-      prev.map((s) => (s.id === selectedNodeId ? { ...s, [field]: value } : s))
-    );
+    const next = steps.map((s) => (s.id === selectedNodeId ? { ...s, [field]: value } : s));
+    updateSteps(next);
   };
 
   // Pindahkan urutan langkah
@@ -140,16 +165,37 @@ export function TwintechNativeFlowchart({
     const copy = [...steps];
     const [item] = copy.splice(idx, 1);
     copy.splice(targetIdx, 0, item);
-    setSteps(copy);
+    updateSteps(copy);
   };
 
   // Hapus langkah
   const handleDeleteStep = (id: string) => {
-    setSteps((prev) => prev.filter((s) => s.id !== id));
+    const next = steps.filter((s) => s.id !== id);
+    updateSteps(next);
     if (selectedNodeId === id) {
       setSelectedNodeId(null);
       setShowEditDrawer(false);
     }
+    showToast("Langkah berhasil dihapus");
+  };
+
+  // Duplikasi langkah
+  const handleDuplicateStep = (id: string) => {
+    const idx = steps.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const item = steps[idx];
+    const newId = `step-${Date.now().toString(36)}`;
+    const duplicate: FlowStepItem = {
+      ...item,
+      id: newId,
+      nomor: `${item.nomor}B`,
+      judul: `${item.judul} (Salinan)`,
+    };
+    const copy = [...steps];
+    copy.splice(idx + 1, 0, duplicate);
+    updateSteps(copy);
+    setSelectedNodeId(newId);
+    showToast("Langkah berhasil disalin");
   };
 
   // Tambah langkah baru
@@ -168,25 +214,33 @@ export function TwintechNativeFlowchart({
       if (idx >= 0) {
         const copy = [...steps];
         copy.splice(idx + 1, 0, newStep);
-        setSteps(copy);
+        updateSteps(copy);
         setSelectedNodeId(newId);
         setShowEditDrawer(true);
         return;
       }
     }
 
-    setSteps((prev) => [...prev, newStep]);
+    updateSteps([...steps, newStep]);
     setSelectedNodeId(newId);
     setShowEditDrawer(true);
+  };
+
+  // Helper untuk membuat SVG Data URL
+  const generateSvgDataUrl = (): string => {
+    if (!svgRef.current) return "";
+    const svgData = new XMLSerializer().serializeToString(svgRef.current);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
   };
 
   // Simpan perubahan ke database proyek
   const handleTriggerSave = async () => {
     const xml = generateDrawioXml(steps, { diagramName: `Flowchart ${projectName}` });
+    const svgDataUrl = generateSvgDataUrl();
     if (onSave) {
-      await onSave(steps, xml);
+      await onSave(steps, xml, svgDataUrl);
     }
-    showToast("Flowchart berhasil disimpan!");
+    showToast("Flowchart berhasil disimpan & diaplikasikan ke proyek!");
   };
 
   // Unduh Berkas SVG
@@ -203,11 +257,19 @@ export function TwintechNativeFlowchart({
     showToast("Berkas SVG berhasil diunduh!");
   };
 
-  // Unduh Berkas PNG (High-DPI Canvas Rendering)
+  // Unduh Berkas PNG (Resolusi Tinggi 2x Retina + Title Block Twintech)
   const handleDownloadPng = () => {
     if (!svgRef.current) return;
     const svgElement = svgRef.current;
-    const svgString = new XMLSerializer().serializeToString(svgElement);
+    const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+    const svgWidth = canvasWidth;
+    const svgHeight = canvasHeight;
+    clonedSvg.setAttribute("width", String(svgWidth));
+    clonedSvg.setAttribute("height", String(svgHeight));
+
+    const svgString = new XMLSerializer().serializeToString(clonedSvg);
     const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const URLObject = window.URL || window.webkitURL || window;
     const blobURL = URLObject.createObjectURL(svgBlob);
@@ -215,15 +277,50 @@ export function TwintechNativeFlowchart({
     const image = new Image();
     image.onload = () => {
       const canvas = document.createElement("canvas");
-      // Skala 2x untuk ketajaman retina HD
-      const scale = 2;
-      canvas.width = (svgElement.viewBox.baseVal.width || 1200) * scale;
-      canvas.height = (svgElement.viewBox.baseVal.height || 900) * scale;
+      const scale = 2; // Skala 2x Retina HD
+      const headerHeight = 90 * scale;
+      canvas.width = svgWidth * scale;
+      canvas.height = svgHeight * scale + headerHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.fillStyle = "#ffffff";
+        // Latar Belakang Kanvas
+        ctx.fillStyle = canvasTheme === "dark" ? "#0b0f19" : "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        // Header Title Block Resmi Twintech Precision
+        ctx.fillStyle = canvasTheme === "dark" ? "#1e293b" : "#f8fafc";
+        ctx.fillRect(0, 0, canvas.width, headerHeight);
+
+        ctx.strokeStyle = canvasTheme === "dark" ? "#334155" : "#cbd5e1";
+        ctx.lineWidth = 2 * scale;
+        ctx.strokeRect(10 * scale, 10 * scale, canvas.width - 20 * scale, canvas.height - 20 * scale);
+        ctx.beginPath();
+        ctx.moveTo(10 * scale, headerHeight);
+        ctx.lineTo(canvas.width - 10 * scale, headerHeight);
+        ctx.stroke();
+
+        // Teks Judul
+        ctx.fillStyle = canvasTheme === "dark" ? "#ffffff" : "#0f172a";
+        ctx.font = `bold ${14 * scale}px sans-serif`;
+        ctx.fillText("PT. TWINTECH PRECISION — ENGINEERING FLOWCHART DOKUMENTASI MESIN", 24 * scale, 36 * scale);
+
+        // Teks Informasi Tambahan
+        ctx.fillStyle = canvasTheme === "dark" ? "#94a3b8" : "#475569";
+        ctx.font = `${10 * scale}px sans-serif`;
+        const dateStr = new Date().toLocaleDateString("id-ID", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        ctx.fillText(
+          `PROYEK: ${projectName.toUpperCase()}  |  CLIENT: ${projectClient.toUpperCase()}  |  TANGGAL: ${dateStr}  |  TOTAL LANGKAH: ${steps.length} STEP`,
+          24 * scale,
+          62 * scale
+        );
+
+        // Gambar Vektor Flowchart
+        ctx.drawImage(image, 0, headerHeight, svgWidth * scale, svgHeight * scale);
+
         const pngUrl = canvas.toDataURL("image/png");
         const a = document.createElement("a");
         a.href = pngUrl;
@@ -282,13 +379,50 @@ export function TwintechNativeFlowchart({
               </span>
             </div>
             <div className="text-[11px] text-slate-400">
-              {steps.length} langkah diagram terstruktur • Klik kotak alur untuk mengedit langsung
+              {steps.length} langkah alur • Klik kotak alur untuk mengedit langsung
             </div>
           </div>
         </div>
 
         {/* Action Controls & Export Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Layout Mode Switcher */}
+          <div className="flex items-center bg-slate-800/80 border border-slate-700/60 rounded-xl p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setUserLayoutChoice("single")}
+              className={`p-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition ${
+                !isTwintechDualColumn ? "bg-indigo-600 text-white font-bold" : "text-slate-400 hover:text-white"
+              }`}
+              title="Tata Letak Kolom Tunggal (Linear)"
+            >
+              <Square className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">1 Kolom</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setUserLayoutChoice("dual")}
+              className={`p-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition ${
+                isTwintechDualColumn ? "bg-indigo-600 text-white font-bold" : "text-slate-400 hover:text-white"
+              }`}
+              title="Tata Letak Kolom Ganda (Safety + Machine Running)"
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">2 Kolom</span>
+            </button>
+          </div>
+
+          {/* Canvas Theme Toggle */}
+          <button
+            type="button"
+            onClick={() => setCanvasTheme((prev) => (prev === "dark" ? "light" : "dark"))}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white cursor-pointer text-xs flex items-center gap-1"
+            title={`Ubah tema kanvas ke ${canvasTheme === "dark" ? "Terang (White)" : "Gelap (Dark)"}`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{canvasTheme === "dark" ? "Dark" : "Light"}</span>
+          </button>
+
           {/* Zoom Controls */}
           <div className="flex items-center bg-slate-800/80 border border-slate-700/60 rounded-xl p-1 text-xs">
             <button
@@ -335,10 +469,10 @@ export function TwintechNativeFlowchart({
           <button
             type="button"
             onClick={handleDownloadPng}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-blue-900/30"
             title="Unduh diagram beresolusi tinggi (PNG)"
           >
-            <Download className="w-3.5 h-3.5 text-blue-400" />
+            <Download className="w-3.5 h-3.5" />
             <span>Unduh PNG</span>
           </button>
 
@@ -350,7 +484,7 @@ export function TwintechNativeFlowchart({
             title="Unduh vektor SVG tajam"
           >
             <Layers className="w-3.5 h-3.5 text-purple-400" />
-            <span>Unduh SVG</span>
+            <span>SVG</span>
           </button>
 
           {/* Unduh .drawio (Opsional) */}
@@ -407,19 +541,21 @@ export function TwintechNativeFlowchart({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className={`flex-1 overflow-hidden relative bg-[#0b0f19] flex items-center justify-center select-none ${
-            isPanning ? "cursor-grabbing" : "cursor-grab"
-          }`}
+          className={`flex-1 overflow-hidden relative flex items-center justify-center select-none ${
+            canvasTheme === "dark" ? "bg-[#0b0f19]" : "bg-slate-100"
+          } ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
           style={{
             backgroundImage:
-              "radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px)",
+              canvasTheme === "dark"
+                ? "radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px)"
+                : "radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px)",
             backgroundSize: "24px 24px",
           }}
         >
           {/* Instruksi Geser & Zoom */}
           <div className="absolute top-4 left-4 z-10 pointer-events-none bg-slate-900/80 border border-slate-800 text-slate-400 px-3 py-1.5 rounded-xl text-[11px] flex items-center gap-1.5 backdrop-blur-xs">
             <Move className="w-3 h-3 text-indigo-400" />
-            <span>Klik &amp; tarik kanvas untuk menggeser • Scroll / gunakan tombol untuk zoom</span>
+            <span>Klik &amp; tarik kanvas untuk geser • Scroll untuk zoom • Klik kotak alur untuk edit</span>
           </div>
 
           <div
@@ -492,8 +628,8 @@ export function TwintechNativeFlowchart({
                 width={canvasWidth - 20}
                 height={canvasHeight - 20}
                 rx="24"
-                fill="#0f172a"
-                stroke="#1e293b"
+                fill={canvasTheme === "dark" ? "#0f172a" : "#ffffff"}
+                stroke={canvasTheme === "dark" ? "#1e293b" : "#cbd5e1"}
                 strokeWidth="2"
               />
 
@@ -501,28 +637,70 @@ export function TwintechNativeFlowchart({
               {isTwintechDualColumn ? (
                 <>
                   {/* Kolom Kiri Header: Safety Relay */}
-                  <rect x="40" y="30" width="760" height="40" rx="10" fill="#1e293b" />
-                  <text x="420" y="55" fill="#93c5fd" fontSize="13" fontWeight="bold" textAnchor="middle">
+                  <rect
+                    x="40"
+                    y="30"
+                    width="760"
+                    height="40"
+                    rx="10"
+                    fill={canvasTheme === "dark" ? "#1e293b" : "#f1f5f9"}
+                  />
+                  <text
+                    x="420"
+                    y="55"
+                    fill={canvasTheme === "dark" ? "#93c5fd" : "#1e40af"}
+                    fontSize="13"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >
                     BAGIAN 1: SAFETY RELAY &amp; POWER-UP SEQUENCE
                   </text>
 
                   {/* Kolom Kanan Header: Machine Running */}
-                  <rect x="880" y="30" width="760" height="40" rx="10" fill="#1e293b" />
-                  <text x="1260" y="55" fill="#a7f3d0" fontSize="13" fontWeight="bold" textAnchor="middle">
+                  <rect
+                    x="880"
+                    y="30"
+                    width="760"
+                    height="40"
+                    rx="10"
+                    fill={canvasTheme === "dark" ? "#1e293b" : "#f1f5f9"}
+                  />
+                  <text
+                    x="1260"
+                    y="55"
+                    fill={canvasTheme === "dark" ? "#a7f3d0" : "#065f46"}
+                    fontSize="13"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >
                     BAGIAN 2: MACHINE RUNNING &amp; INSPECTION SEQUENCE
                   </text>
 
                   {/* Render Node Kolom Kiri */}
-                  {renderStepList(columnLeftSteps, 420, 100, selectedNodeId, (id) => {
-                    setSelectedNodeId(id);
-                    setShowEditDrawer(true);
-                  })}
+                  {renderStepList(
+                    columnLeftSteps,
+                    420,
+                    100,
+                    selectedNodeId,
+                    (id) => {
+                      setSelectedNodeId(id);
+                      setShowEditDrawer(true);
+                    },
+                    canvasTheme
+                  )}
 
                   {/* Render Node Kolom Kanan */}
-                  {renderStepList(columnRightSteps, 1260, 100, selectedNodeId, (id) => {
-                    setSelectedNodeId(id);
-                    setShowEditDrawer(true);
-                  })}
+                  {renderStepList(
+                    columnRightSteps,
+                    1260,
+                    100,
+                    selectedNodeId,
+                    (id) => {
+                      setSelectedNodeId(id);
+                      setShowEditDrawer(true);
+                    },
+                    canvasTheme
+                  )}
 
                   {/* Panah Interkoneksi Kolom Kiri ke Kolom Kanan [A] */}
                   <path
@@ -540,7 +718,9 @@ export function TwintechNativeFlowchart({
 
                   {/* Panah Loopback dari Kolom Kanan kembali ke Safety Check [B] */}
                   <path
-                    d={`M 1260 ${columnRightSteps.length * 115 + 130} V ${canvasHeight - 60} H 420 V ${columnLeftSteps.length * 115 + 85}`}
+                    d={`M 1260 ${columnRightSteps.length * 115 + 130} V ${canvasHeight - 60} H 420 V ${
+                      columnLeftSteps.length * 115 + 85
+                    }`}
                     fill="none"
                     stroke="#ef4444"
                     strokeWidth="2.5"
@@ -569,10 +749,17 @@ export function TwintechNativeFlowchart({
                 </>
               ) : (
                 /* Render Kolom Tunggal Linear */
-                renderStepList(steps, canvasWidth / 2, 70, selectedNodeId, (id) => {
-                  setSelectedNodeId(id);
-                  setShowEditDrawer(true);
-                })
+                renderStepList(
+                  steps,
+                  canvasWidth / 2,
+                  70,
+                  selectedNodeId,
+                  (id) => {
+                    setSelectedNodeId(id);
+                    setShowEditDrawer(true);
+                  },
+                  canvasTheme
+                )
               )}
             </svg>
           </div>
@@ -651,12 +838,12 @@ export function TwintechNativeFlowchart({
                   />
                 </div>
 
-                {/* Tombol Pindah Urutan & Tambah di Bawah */}
+                {/* Tombol Pindah Urutan & Duplikat */}
                 <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleMoveStep(selectedStep.id, "up")}
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1 cursor-pointer"
+                    className="flex-1 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
                     <span>Ke Atas</span>
@@ -664,10 +851,18 @@ export function TwintechNativeFlowchart({
                   <button
                     type="button"
                     onClick={() => handleMoveStep(selectedStep.id, "down")}
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1 cursor-pointer"
+                    className="flex-1 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <ArrowDown className="w-3.5 h-3.5" />
                     <span>Ke Bawah</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicateStep(selectedStep.id)}
+                    className="py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1 cursor-pointer"
+                    title="Duplikat Langkah Ini"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-blue-400" />
                   </button>
                 </div>
 
@@ -708,7 +903,8 @@ function renderStepList(
   centerX: number,
   startY: number,
   selectedId: string | null,
-  onSelectNode: (id: string) => void
+  onSelectNode: (id: string) => void,
+  theme: "dark" | "light" = "dark"
 ) {
   return stepItems.map((step, idx) => {
     const yPos = startY + idx * 115;
@@ -731,15 +927,15 @@ function renderStepList(
             width={width}
             height={height}
             rx="28"
-            fill="#1e3a8a"
-            stroke={isSelected ? "#818cf8" : "#3b82f6"}
+            fill={theme === "dark" ? "#1e3a8a" : "#2563eb"}
+            stroke={isSelected ? "#818cf8" : theme === "dark" ? "#3b82f6" : "#1d4ed8"}
             strokeWidth={isSelected ? "3" : "2"}
             filter={isSelected ? "url(#glow-selected)" : undefined}
           />
           <text x={centerX} y={yPos + 24} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">
             {step.judul}
           </text>
-          <text x={centerX} y={yPos + 42} fill="#93c5fd" fontSize="10" textAnchor="middle">
+          <text x={centerX} y={yPos + 42} fill="#bfdbfe" fontSize="10" textAnchor="middle">
             {step.deskripsi}
           </text>
           {idx < stepItems.length - 1 && (
@@ -774,8 +970,8 @@ function renderStepList(
         >
           <polygon
             points={`${pTop} ${pRight} ${pBottom} ${pLeft}`}
-            fill="#312e81"
-            stroke={isSelected ? "#c7d2fe" : "#818cf8"}
+            fill={theme === "dark" ? "#312e81" : "#4f46e5"}
+            stroke={isSelected ? "#c7d2fe" : theme === "dark" ? "#818cf8" : "#4338ca"}
             strokeWidth={isSelected ? "3" : "2"}
             filter={isSelected ? "url(#glow-selected)" : undefined}
           />
@@ -792,7 +988,7 @@ function renderStepList(
           <text
             x={centerX}
             y={yPos + dHeight / 2 + 13}
-            fill="#c7d2fe"
+            fill="#e0e7ff"
             fontSize="10"
             textAnchor="middle"
           >
@@ -830,15 +1026,15 @@ function renderStepList(
             width={width}
             height={height}
             rx="12"
-            fill="#064e3b"
-            stroke={isSelected ? "#6ee7b7" : "#10b981"}
+            fill={theme === "dark" ? "#064e3b" : "#059669"}
+            stroke={isSelected ? "#6ee7b7" : theme === "dark" ? "#10b981" : "#047857"}
             strokeWidth={isSelected ? "3" : "2"}
             filter={isSelected ? "url(#glow-selected)" : undefined}
           />
           <text x={centerX} y={yPos + 23} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">
             {step.judul}
           </text>
-          <text x={centerX} y={yPos + 40} fill="#6ee7b7" fontSize="10" textAnchor="middle">
+          <text x={centerX} y={yPos + 40} fill="#a7f3d0" fontSize="10" textAnchor="middle">
             {step.deskripsi}
           </text>
           {idx < stepItems.length - 1 && (
@@ -873,8 +1069,8 @@ function renderStepList(
             width={width}
             height={height}
             rx="12"
-            fill="#7f1d1d"
-            stroke={isSelected ? "#fca5a5" : "#ef4444"}
+            fill={theme === "dark" ? "#7f1d1d" : "#dc2626"}
+            stroke={isSelected ? "#fca5a5" : theme === "dark" ? "#ef4444" : "#b91c1c"}
             strokeWidth={isSelected ? "3" : "2"}
             filter={isSelected ? "url(#glow-selected)" : undefined}
           />
@@ -899,10 +1095,27 @@ function renderStepList(
       );
     }
 
-    // 5. Tipe STEP Standar (Rounded Rect)
+    // 5. Tipe STEP Standar & FINISH (Rounded Rect)
+    const isFinish = step.tipe === "FINISH";
     const width = 260;
     const height = 56;
     const x = centerX - width / 2;
+    const rx = isFinish ? "28" : "12";
+    const fill = isFinish
+      ? theme === "dark"
+        ? "#1e3a8a"
+        : "#1d4ed8"
+      : theme === "dark"
+      ? "#1e293b"
+      : "#f8fafc";
+    const stroke = isSelected
+      ? "#818cf8"
+      : isFinish
+      ? "#3b82f6"
+      : theme === "dark"
+      ? "#475569"
+      : "#cbd5e1";
+
     return (
       <g
         key={step.id}
@@ -914,18 +1127,25 @@ function renderStepList(
           y={yPos}
           width={width}
           height={height}
-          rx="12"
-          fill="#1e293b"
-          stroke={isSelected ? "#818cf8" : "#475569"}
+          rx={rx}
+          fill={fill}
+          stroke={stroke}
           strokeWidth={isSelected ? "3" : "1.5"}
           filter={isSelected ? "url(#glow-selected)" : undefined}
         />
         {/* Badge Nomor Langkah */}
-        <rect x={x + 10} y={yPos + 12} width={26} height={20} rx="5" fill="#334155" />
+        <rect
+          x={x + 10}
+          y={yPos + 12}
+          width={28}
+          height={20}
+          rx="5"
+          fill={theme === "dark" ? "#334155" : "#e2e8f0"}
+        />
         <text
-          x={x + 23}
+          x={x + 24}
           y={yPos + 26}
-          fill="#94a3b8"
+          fill={theme === "dark" ? "#94a3b8" : "#475569"}
           fontSize="10"
           fontWeight="bold"
           textAnchor="middle"
@@ -933,10 +1153,21 @@ function renderStepList(
           {step.nomor}
         </text>
 
-        <text x={x + 45} y={yPos + 26} fill="#ffffff" fontSize="12" fontWeight="bold">
+        <text
+          x={x + 46}
+          y={yPos + 26}
+          fill={theme === "dark" ? "#ffffff" : "#0f172a"}
+          fontSize="12"
+          fontWeight="bold"
+        >
           {step.judul.length > 24 ? step.judul.slice(0, 24) + "..." : step.judul}
         </text>
-        <text x={x + 12} y={yPos + 44} fill="#94a3b8" fontSize="10">
+        <text
+          x={x + 12}
+          y={yPos + 44}
+          fill={theme === "dark" ? "#94a3b8" : "#64748b"}
+          fontSize="10"
+        >
           {step.deskripsi.length > 35 ? step.deskripsi.slice(0, 35) + "..." : step.deskripsi}
         </text>
         {idx < stepItems.length - 1 && (
