@@ -611,7 +611,9 @@ export function isHmiPanelComponent(
     t.includes("G2110") ||
     t.includes("GS2110") ||
     t.includes("GT2110") ||
+    t.includes("GT2510") ||
     t.includes("GT2710") ||
+    t.includes("VTBD") ||
     t.includes("GS2107") ||
     t.includes("GS2104") ||
     t.includes("NB7W") ||
@@ -977,7 +979,9 @@ export function classifyHmiPrComponent(
     t.includes("G2110") ||
     t.includes("GS2110") ||
     t.includes("GT2110") ||
+    t.includes("GT2510") ||
     t.includes("GT2710") ||
+    t.includes("VTBD") ||
     t.includes("GS2107") ||
     t.includes("GS2104") ||
     t.includes("NB7W")
@@ -1796,12 +1800,14 @@ export function inferComponentVisual(
     };
   }
 
-  // 8. HMI TOUCHSCREEN (G2110 / GS2110 / GT2710 / GS2107 / NB7W)
+  // 8. HMI TOUCHSCREEN (GT2510 / G2110 / GS2110 / GT2710 / GS2107 / NB7W)
   if (
     combined.includes("G2110") ||
     combined.includes("GS2110") ||
     combined.includes("GT2110") ||
+    combined.includes("GT2510") ||
     combined.includes("GT2710") ||
+    combined.includes("VTBD") ||
     combined.includes("10INCH") ||
     combined.includes("10.4")
   ) {
@@ -1809,7 +1815,7 @@ export function inferComponentVisual(
       category: "HMI",
       widthMm: 272,
       heightMm: 206,
-      defaultTag: combined.includes("G2110") ? "G2110 10\"" : "GS2110 10\"",
+      defaultTag: combined.includes("GT2510") ? "GT2510 10.4\"" : combined.includes("G2110") ? "G2110 10\"" : "GS2110 10\"",
       specificModel: "HMI_10INCH",
     };
   }
