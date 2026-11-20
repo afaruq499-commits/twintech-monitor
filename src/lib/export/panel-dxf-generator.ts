@@ -156,11 +156,12 @@ export function extractPanelFeatures(
       if (modelUp.includes("16MM") || (it.name || "").includes("16mm")) diameter = 16;
 
       const cxSvg = it.xMm + it.widthMm / 2;
-      // Di layout editor: jika komponen bertipe tombol berlegend plate (tinggi >= 45), pusat lubang di Y = yMm + 18
+      // Di layout editor: label nameplate tombol ditaruh di atas (yMm s.d yMm+14),
+      // sehingga pusat lubang bor tombol berada di Y = yMm + (it.heightMm - 18)
       const cySvg =
         it.category === "EMERGENCY_STOP" || it.heightMm <= 40
           ? it.yMm + it.heightMm / 2
-          : it.yMm + 18;
+          : it.yMm + (it.heightMm - 18);
 
       const cadX = Math.round(cxSvg * 10) / 10;
       const cadY = Math.round((plateHeight - cySvg) * 10) / 10;

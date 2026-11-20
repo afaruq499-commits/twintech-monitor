@@ -860,6 +860,7 @@ export function ProjectControlPanelLayoutEditor({
   const [showRuler, setShowRuler] = useState<boolean>(true);
   const [smartSnapEnabled, setSmartSnapEnabled] = useState<boolean>(true);
   const [showHmiSideView, setShowHmiSideView] = useState<boolean>(true);
+  const [customPbGap, setCustomPbGap] = useState<number>(23);
   const [activeGuides, setActiveGuides] = useState<MagneticGuide[]>([]);
 
   const toggleCategory = (catKey: string) => {
@@ -1526,6 +1527,46 @@ export function ProjectControlPanelLayoutEditor({
       ),
     }));
   }, [selectedItemIds, setLayoutData]);
+
+  // 1-Klik Ratakan Simetris (Symmetrical Auto-Center & Spasi Rata)
+  // Menjajarkan sumbu Y tombol secara horizontal dan mengatur jarak antar PB persis sama (misal 23 mm)
+  // serta memposisikan seluruh deretan tombol simetris di tengah plat/pintu panel
+  const handleSymmetricalDistribution = useCallback(
+    (gapMm?: number) => {
+      const effGap = typeof gapMm === "number" ? gapMm : customPbGap;
+      setLayoutData((prev) => {
+        let targetIds = selectedItemIds;
+        // Jika item yang dipilih kurang dari 2, otomatis targetkan semua tombol di panel door
+        if (targetIds.length < 2) {
+          const doorBtnCats = [
+            "PUSH_BUTTON",
+            "EMERGENCY_STOP",
+            "SELECTOR_SWITCH",
+            "PILOT_LAMP",
+            "BUZZER",
+          ];
+          const doorButtons = prev.items.filter(
+            (it) => it.type === "COMPONENT" && doorBtnCats.includes(it.category)
+          );
+          if (doorButtons.length < 2) return prev;
+          targetIds = doorButtons.map((b) => b.id);
+        }
+
+        return {
+          ...prev,
+          items: distributeSelectedItemsHorizontally(
+            prev.items,
+            targetIds,
+            prev.enclosure,
+            true, // sejajarkan sumbu Y
+            effGap, // jarak antar PB (misal 23 mm)
+            true // simetris di tengah enclosure
+          ),
+        };
+      });
+    },
+    [selectedItemIds, customPbGap, setLayoutData]
+  );
 
   // Simpan Semua Layout (Panel Dalam, Panel Luar, HMI, & Mounting OP) ke Proyek
   const handleSave = async () => {
@@ -2986,19 +3027,69 @@ export function ProjectControlPanelLayoutEditor({
             </div>
 
             {activePanelMode === "HMI" && (
-              <button
-                type="button"
-                onClick={() => setShowHmiSideView((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer border ${
-                  showHmiSideView
-                    ? "bg-blue-600 border-blue-500 text-white"
-                    : "bg-slate-800/90 border-slate-700 text-slate-300 hover:text-white"
-                }`}
-                title="Tampilkan / Sembunyikan Gambar DWG Sisi Samping (Side View) untuk Panel HMI"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Tampak Samping DWG: {showHmiSideView ? "Aktif" : "Nonaktif"}</span>
-              </button>
+              <>
+                {/* Tombol Fitur Simetris & Jarak Antar PB Sejajar */}
+                <div className="bg-slate-800/90 border border-slate-700 px-2 py-1 rounded-xl flex items-center gap-1.5 shadow-md backdrop-blur-xs text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleSymmetricalDistribution(customPbGap)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg cursor-pointer transition shadow-xs text-xs"
+                    title={`Ratakan & Sejajarkan Tombol PB Simetris di Tengah Pintu dengan Jarak Antar PB ${customPbGap} mm`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>Simetris PB ({customPbGap} mm)</span>
+                  </button>
+
+                  <div className="flex items-center gap-1 pl-1 border-l border-slate-600 text-slate-300 text-[11px]">
+                    <span>Jarak:</span>
+                    <input
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={customPbGap}
+                      onChange={(e) => setCustomPbGap(Math.max(5, Number(e.target.value) || 23))}
+                      className="w-11 px-1 py-0.5 bg-slate-900 border border-slate-600 rounded text-center text-white font-bold outline-none focus:border-emerald-400"
+                      title="Ketik jarak spasi antar PB (mm)"
+                    />
+                    <span>mm</span>
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-1 pl-1">
+                    {[20, 23, 25, 30].map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => {
+                          setCustomPbGap(g);
+                          handleSymmetricalDistribution(g);
+                        }}
+                        className={`px-1.5 py-0.5 text-[10px] rounded cursor-pointer transition ${
+                          customPbGap === g
+                            ? "bg-emerald-500 text-white font-extrabold"
+                            : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                        }`}
+                        title={`Set jarak ${g} mm & simetriskan`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowHmiSideView((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer border ${
+                    showHmiSideView
+                      ? "bg-blue-600 border-blue-500 text-white"
+                      : "bg-slate-800/90 border-slate-700 text-slate-300 hover:text-white"
+                  }`}
+                  title="Tampilkan / Sembunyikan Gambar DWG Sisi Samping (Side View) untuk Panel HMI"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Tampak Samping DWG: {showHmiSideView ? "Aktif" : "Nonaktif"}</span>
+                </button>
+              </>
             )}
           </div>
 
@@ -4494,12 +4585,15 @@ export function ProjectControlPanelLayoutEditor({
                                       ? "#ef4444"
                                       : "#475569";
 
+                        const btnCenterY =
+                          it.heightMm > 40 ? Math.round(it.heightMm - 18) : it.heightMm / 2;
+
                         return (
                           <>
-                            {/* Legend Nameplate Plate Hitam di Bawah Tombol */}
+                            {/* Legend Nameplate Plate Hitam di Atas Tombol */}
                             <rect
                               x="3"
-                              y={it.heightMm - 16}
+                              y="2"
                               width={it.widthMm - 6}
                               height="14"
                               fill="#0f172a"
@@ -4509,7 +4603,7 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <text
                               x={it.widthMm / 2}
-                              y={it.heightMm - 6}
+                              y="11.5"
                               textAnchor="middle"
                               fontSize="6"
                               fill="#ffffff"
@@ -4521,7 +4615,7 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Bezel Ring Chrome Ø22mm Luar */}
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={btnCenterY}
                               r="15"
                               fill="#e2e8f0"
                               stroke="#64748b"
@@ -4529,7 +4623,7 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={btnCenterY}
                               r="12"
                               fill="#94a3b8"
                             />
@@ -4537,7 +4631,7 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Tombol Bundar Flush Actuator */}
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={btnCenterY}
                               r="10"
                               fill={btnColor}
                               stroke="#0f172a"
@@ -4545,7 +4639,7 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={btnCenterY}
                               r="7"
                               fill={innerGlow}
                             />
@@ -4553,14 +4647,14 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Simbol Ikon Tengah */}
                             {isStart && (
                               <polygon
-                                points={`${it.widthMm / 2 - 2},14 ${it.widthMm / 2 - 2},22 ${it.widthMm / 2 + 3},18`}
+                                points={`${it.widthMm / 2 - 2},${btnCenterY - 4} ${it.widthMm / 2 - 2},${btnCenterY + 4} ${it.widthMm / 2 + 3},${btnCenterY}`}
                                 fill="#ffffff"
                               />
                             )}
                             {isStop && (
                               <rect
                                 x={it.widthMm / 2 - 3}
-                                y="15"
+                                y={btnCenterY - 3}
                                 width="6"
                                 height="6"
                                 fill="#ffffff"
@@ -4570,7 +4664,7 @@ export function ProjectControlPanelLayoutEditor({
                             {isReset && (
                               <text
                                 x={it.widthMm / 2}
-                                y="20.5"
+                                y={btnCenterY + 2.5}
                                 textAnchor="middle"
                                 fontSize="7"
                                 fill="#ffffff"
@@ -4586,13 +4680,15 @@ export function ProjectControlPanelLayoutEditor({
                       {/* Detail Visual: SELECTOR SWITCH & KEY SWITCH (FUJI / IDEC Ø22mm) */}
                       {it.category === "SELECTOR_SWITCH" && (() => {
                         const isKey = it.specificModel?.includes("KEY") || it.name.toLowerCase().includes("key");
+                        const switchCenterY =
+                          it.heightMm > 40 ? Math.round(it.heightMm - 18) : it.heightMm / 2;
 
                         return (
                           <>
-                            {/* Plat Nama Label Posisi */}
+                            {/* Plat Nama Label Posisi di Atas */}
                             <rect
                               x="3"
-                              y={it.heightMm - 16}
+                              y="2"
                               width={it.widthMm - 6}
                               height="14"
                               fill="#0f172a"
@@ -4602,7 +4698,7 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <text
                               x={it.widthMm / 2}
-                              y={it.heightMm - 6}
+                              y="11.5"
                               textAnchor="middle"
                               fontSize="6"
                               fill="#ffffff"
@@ -4614,7 +4710,7 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Bezel Ring Logam Ø22mm */}
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={switchCenterY}
                               r="15"
                               fill="#cbd5e1"
                               stroke="#475569"
@@ -4624,43 +4720,43 @@ export function ProjectControlPanelLayoutEditor({
                             {isKey ? (
                               /* Key Switch Silinder Kunci Kuningan + Slot & Anak Kunci */
                               <>
-                                <circle cx={it.widthMm / 2} cy={18} r="10" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
-                                <rect x={it.widthMm / 2 - 1.5} y="12" width="3" height="12" fill="#1e293b" rx="1" />
+                                <circle cx={it.widthMm / 2} cy={switchCenterY} r="10" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
+                                <rect x={it.widthMm / 2 - 1.5} y={switchCenterY - 6} width="3" height="12" fill="#1e293b" rx="1" />
                                 {/* Anak Kunci Menggantung */}
-                                <g transform={`translate(${it.widthMm / 2}, 18)`}>
+                                <g transform={`translate(${it.widthMm / 2}, ${switchCenterY})`}>
                                   <rect x="-1" y="0" width="2" height="10" fill="#94a3b8" />
                                   <circle cx="0" cy="12" r="4" fill="#cbd5e1" stroke="#475569" strokeWidth="1" />
-                                  <circle cx="0" cy="12" r="1.5" fill="#1e293b" />
+                                  <circle cx="0" cy="1.5" fill="#1e293b" />
                                 </g>
                               </>
                             ) : (
                               /* Selector Switch Rotary Lever Tuas Hitam */
                               <>
-                                <circle cx={it.widthMm / 2} cy={18} r="11" fill="#1e293b" />
+                                <circle cx={it.widthMm / 2} cy={switchCenterY} r="11" fill="#1e293b" />
                                 {/* Tanda Penunjuk Posisi Sudut */}
-                                <circle cx={it.widthMm / 2 - 9} cy={12} r="1" fill="#94a3b8" />
-                                <circle cx={it.widthMm / 2 + 9} cy={12} r="1" fill="#94a3b8" />
+                                <circle cx={it.widthMm / 2 - 9} cy={switchCenterY - 6} r="1" fill="#94a3b8" />
+                                <circle cx={it.widthMm / 2 + 9} cy={switchCenterY - 6} r="1" fill="#94a3b8" />
                                 {/* Tuas Putar Hitam Tebal */}
                                 <rect
                                   x={it.widthMm / 2 - 3.5}
-                                  y="8"
+                                  y={switchCenterY - 10}
                                   width="7"
                                   height="20"
                                   fill="#0f172a"
                                   stroke="#334155"
                                   strokeWidth="1"
                                   rx="2"
-                                  transform={`rotate(-25, ${it.widthMm / 2}, 18)`}
+                                  transform={`rotate(-25, ${it.widthMm / 2}, ${switchCenterY})`}
                                 />
                                 <line
                                   x1={it.widthMm / 2}
-                                  y1="10"
+                                  y1={switchCenterY - 8}
                                   x2={it.widthMm / 2}
-                                  y2="17"
+                                  y2={switchCenterY - 1}
                                   stroke="#ffffff"
                                   strokeWidth="1.5"
                                   strokeLinecap="round"
-                                  transform={`rotate(-25, ${it.widthMm / 2}, 18)`}
+                                  transform={`rotate(-25, ${it.widthMm / 2}, ${switchCenterY})`}
                                 />
                               </>
                             )}
@@ -4717,13 +4813,15 @@ export function ProjectControlPanelLayoutEditor({
                               : isBlue
                                 ? "#7dd3fc"
                                 : "#4ade80";
+                        const lampCenterY =
+                          it.heightMm > 40 ? Math.round(it.heightMm - 18) : it.heightMm / 2;
 
                         return (
                           <>
-                            {/* Plat Nama Bawah */}
+                            {/* Plat Nama Atas */}
                             <rect
                               x="3"
-                              y={it.heightMm - 16}
+                              y="2"
                               width={it.widthMm - 6}
                               height="14"
                               fill="#0f172a"
@@ -4733,7 +4831,7 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <text
                               x={it.widthMm / 2}
-                              y={it.heightMm - 6}
+                              y="11.5"
                               textAnchor="middle"
                               fontSize="6.5"
                               fill="#ffffff"
@@ -4745,7 +4843,7 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Bezel Ring Logam Chrome Ø22mm */}
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={lampCenterY}
                               r="15"
                               fill="#cbd5e1"
                               stroke="#64748b"
@@ -4754,7 +4852,7 @@ export function ProjectControlPanelLayoutEditor({
                             {/* Lensa Fresnel Kubah Bersinar */}
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={lampCenterY}
                               r="11"
                               fill={lampColor}
                               stroke="#ffffff"
@@ -4762,62 +4860,67 @@ export function ProjectControlPanelLayoutEditor({
                             />
                             <circle
                               cx={it.widthMm / 2}
-                              cy={18}
+                              cy={lampCenterY}
                               r="7"
                               fill={glowFilter}
                               opacity="0.85"
                             />
                             {/* Garis Diamond Facet Fresnel */}
-                            <line x1={it.widthMm / 2 - 8} y1="18" x2={it.widthMm / 2 + 8} y2="18" stroke="#ffffff" strokeWidth="0.6" opacity="0.7" />
-                            <line x1={it.widthMm / 2} y1="10" x2={it.widthMm / 2} y2="26" stroke="#ffffff" strokeWidth="0.6" opacity="0.7" />
+                            <line x1={it.widthMm / 2 - 8} y1={lampCenterY} x2={it.widthMm / 2 + 8} y2={lampCenterY} stroke="#ffffff" strokeWidth="0.6" opacity="0.7" />
+                            <line x1={it.widthMm / 2} y1={lampCenterY - 8} x2={it.widthMm / 2} y2={lampCenterY + 8} stroke="#ffffff" strokeWidth="0.6" opacity="0.7" />
                           </>
                         );
                       })()}
 
                       {/* Detail Visual: BUZZER ALARM (FORT / OMRON Ø22mm) */}
-                      {it.category === "BUZZER" && (
-                        <>
-                          {/* Plat Nama Bawah */}
-                          <rect
-                            x="3"
-                            y={it.heightMm - 16}
-                            width={it.widthMm - 6}
-                            height="14"
-                            fill="#0f172a"
-                            stroke="#475569"
-                            strokeWidth="1"
-                            rx="2"
-                          />
-                          <text
-                            x={it.widthMm / 2}
-                            y={it.heightMm - 6}
-                            textAnchor="middle"
-                            fontSize="6.5"
-                            fill="#ffffff"
-                            fontWeight="extrabold"
-                          >
-                            {it.tagLabel || "BUZZER"}
-                          </text>
+                      {it.category === "BUZZER" && (() => {
+                        const buzzerCenterY =
+                          it.heightMm > 40 ? Math.round(it.heightMm - 18) : it.heightMm / 2;
 
-                          {/* Bodi Silinder Hitam Akustik Ø22mm */}
-                          <circle
-                            cx={it.widthMm / 2}
-                            cy={18}
-                            r="15"
-                            fill="#0f172a"
-                            stroke="#334155"
-                            strokeWidth="2"
-                          />
-                          {/* Grill Lubang Suara Konsentris */}
-                          <circle cx={it.widthMm / 2} cy={18} r="11" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="3,2" />
-                          <circle cx={it.widthMm / 2} cy={18} r="7" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="2,2" />
-                          <circle cx={it.widthMm / 2} cy={18} r="3" fill="#ef4444" />
-                          {/* Teks 90dB */}
-                          <text x={it.widthMm / 2} y="19.5" textAnchor="middle" fontSize="4.5" fill="#f8fafc" fontWeight="bold">
-                            90dB
-                          </text>
-                        </>
-                      )}
+                        return (
+                          <>
+                            {/* Plat Nama Atas */}
+                            <rect
+                              x="3"
+                              y="2"
+                              width={it.widthMm - 6}
+                              height="14"
+                              fill="#0f172a"
+                              stroke="#475569"
+                              strokeWidth="1"
+                              rx="2"
+                            />
+                            <text
+                              x={it.widthMm / 2}
+                              y="11.5"
+                              textAnchor="middle"
+                              fontSize="6.5"
+                              fill="#ffffff"
+                              fontWeight="extrabold"
+                            >
+                              {it.tagLabel || "BUZZER"}
+                            </text>
+
+                            {/* Bodi Silinder Hitam Akustik Ø22mm */}
+                            <circle
+                              cx={it.widthMm / 2}
+                              cy={buzzerCenterY}
+                              r="15"
+                              fill="#0f172a"
+                              stroke="#334155"
+                              strokeWidth="2"
+                            />
+                            {/* Grill Lubang Suara Konsentris */}
+                            <circle cx={it.widthMm / 2} cy={buzzerCenterY} r="11" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="3,2" />
+                            <circle cx={it.widthMm / 2} cy={buzzerCenterY} r="7" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="2,2" />
+                            <circle cx={it.widthMm / 2} cy={buzzerCenterY} r="3" fill="#ef4444" />
+                            {/* Teks 90dB */}
+                            <text x={it.widthMm / 2} y={buzzerCenterY + 1.5} textAnchor="middle" fontSize="4.5" fill="#f8fafc" fontWeight="bold">
+                              90dB
+                            </text>
+                          </>
+                        );
+                      })()}
 
                       {/* Detail Visual: METER & TEMPERATURE CONTROLLER 48x48 */}
                       {it.category === "METER_DISPLAY" && (
@@ -5583,15 +5686,40 @@ export function ProjectControlPanelLayoutEditor({
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleDistributeHorizontal}
-                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[10px] font-extrabold cursor-pointer transition flex items-center justify-center gap-1.5 mt-1 shadow-2xs"
-                  title="Bagi rata jarak spasi horizontal antar tombol dan luruskan sumbu Y agar baris tombol simetris rapi"
-                >
-                  <Sparkles className="w-3 h-3 text-emerald-600" />
-                  <span>Bagi Rata Spasi &amp; Luruskan Baris</span>
-                </button>
+                <div className="pt-1 border-t border-slate-200 mt-1 space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-600 font-semibold">
+                    <span>Jarak Spasi Antar PB:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={5}
+                        max={120}
+                        value={customPbGap}
+                        onChange={(e) => setCustomPbGap(Math.max(5, Number(e.target.value) || 23))}
+                        className="w-10 px-1 py-0.5 bg-white border border-slate-300 rounded text-center text-slate-800 font-bold outline-none focus:border-emerald-500"
+                        title="Atur jarak spasi antar tombol (mm)"
+                      />
+                      <span className="text-[9px] text-slate-400">mm</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSymmetricalDistribution(customPbGap)}
+                    className="w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-extrabold cursor-pointer transition flex items-center justify-center gap-1.5 shadow-2xs"
+                    title={`Sejajarkan baris tombol dan beri jarak antar PB persis ${customPbGap} mm secara simetris di tengah`}
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-200" />
+                    <span>Ratakan &amp; Jarak Simetris ({customPbGap} mm)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDistributeHorizontal}
+                    className="w-full py-1 px-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-medium cursor-pointer transition flex items-center justify-center gap-1"
+                    title="Bagi rata spasi horizontal di rentang posisi tombol saat ini"
+                  >
+                    <span>Bagi Rata Posisi Saat Ini</span>
+                  </button>
+                </div>
               </div>
 
               {/* Geser Serentak (Nudge) */}

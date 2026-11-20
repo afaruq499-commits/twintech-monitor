@@ -451,43 +451,85 @@ export function centerItemUnderHmi(
 }
 
 /**
- * 1-Klik membagi rata jarak spasi horizontal (Equal Horizontal Distribution)
+ * 1-Klik membagi rata jarak spasi horizontal (Equal Horizontal Distribution / Symmetrical Align)
  * untuk grup tombol terpilih agar simetris sempurna di baris horizontal.
+ *
+ * @param customGap Jika diisi angka (misal 23 mm), jarak antar tombol diset persis angka tersebut.
+ * @param centerOnEnclosure Jika true, seluruh baris dipusatkan secara simetris di tengah lebar plat panel/door.
  */
 export function distributeSelectedItemsHorizontally(
   items: PanelLayoutItem[],
   selectedIds: string[],
   enclosure: PanelEnclosure,
-  alignCenterY = true
+  alignCenterY = true,
+  customGap?: number,
+  centerOnEnclosure = false
 ): PanelLayoutItem[] {
   const selectedSet = new Set(selectedIds);
   const targets = items.filter((it) => selectedSet.has(it.id));
   if (targets.length < 2) return items;
 
-  // Urutkan item dari kiri ke kanan
+  // Urutkan item dari kiri ke kanan berdasarkan xMm
   const sorted = [...targets].sort((a, b) => a.xMm - b.xMm);
 
-  const minX = sorted[0].xMm;
-  const last = sorted[sorted.length - 1];
-  const maxRight = last.xMm + last.widthMm;
-  const totalSpan = maxRight - minX;
-
   const totalItemWidths = sorted.reduce((sum, it) => sum + it.widthMm, 0);
-  const totalGap = totalSpan - totalItemWidths;
+  const count = sorted.length;
 
-  const gap = sorted.length > 1 ? totalGap / (sorted.length - 1) : 0;
+  let gap = 0;
+  let startX = sorted[0].xMm;
 
-  // Hitung rata-rata center Y jika alignCenterY aktif
-  const avgCenterY =
-    sorted.reduce((sum, it) => sum + (it.yMm + it.heightMm / 2), 0) / sorted.length;
+  if (typeof customGap === "number" && customGap >= 0) {
+    gap = customGap;
+    if (centerOnEnclosure) {
+      const totalSpan = totalItemWidths + (count - 1) * gap;
+      startX = Math.max(5, Math.round((enclosure.widthMm - totalSpan) / 2));
+    }
+  } else if (centerOnEnclosure) {
+    const minMargin = 20;
+    const availWidth = enclosure.widthMm - 2 * minMargin;
+    gap = count > 1 ? Math.max(5, Math.round((availWidth - totalItemWidths) / (count - 1))) : 0;
+    const totalSpan = totalItemWidths + (count - 1) * gap;
+    startX = Math.max(5, Math.round((enclosure.widthMm - totalSpan) / 2));
+  } else {
+    // Mode bawaan (preserve batas minX sampai maxRight)
+    const minX = sorted[0].xMm;
+    const last = sorted[count - 1];
+    const maxRight = last.xMm + last.widthMm;
+    const totalSpan = maxRight - minX;
+    const totalGap = totalSpan - totalItemWidths;
+    gap = count > 1 ? totalGap / (count - 1) : 0;
+    startX = minX;
+  }
+
+  // Hitung target Center Y (atau Hole Center Y)
+  // Untuk tombol pintu panel bertipe operator device (tinggi > 40mm) dengan label nameplate di atas:
+  // Titik tengah lubang bor & lingkaran tombol berada di yMm + (heightMm - 18).
+  // Untuk EMERGENCY STOP atau komponen tanpa nameplate tinggi, berada di yMm + heightMm / 2.
+  const isDoorBtnCat = (cat: string) =>
+    ["PUSH_BUTTON", "SELECTOR_SWITCH", "PILOT_LAMP", "BUZZER"].includes(cat);
+
+  const getHoleCenterY = (it: PanelLayoutItem) => {
+    if (isDoorBtnCat(it.category) && it.heightMm > 40) {
+      return it.yMm + (it.heightMm - 18);
+    }
+    return it.yMm + it.heightMm / 2;
+  };
+
+  const avgHoleCenterY =
+    sorted.reduce((sum, it) => sum + getHoleCenterY(it), 0) / count;
 
   const newPositions = new Map<string, { x: number; y: number }>();
-  let currentX = minX;
+  let currentX = startX;
 
   sorted.forEach((it) => {
-    const y = alignCenterY
-      ? Math.round(avgCenterY - it.heightMm / 2)
-      : it.yMm;
+    let y = it.yMm;
+    if (alignCenterY) {
+      if (isDoorBtnCat(it.category) && it.heightMm > 40) {
+        y = Math.round(avgHoleCenterY - (it.heightMm - 18));
+      } else {
+        y = Math.round(avgHoleCenterY - it.heightMm / 2);
+      }
+    }
     newPositions.set(it.id, {
       x: Math.round(currentX),
       y: Math.max(5, Math.min(enclosure.heightMm - it.heightMm - 5, y)),

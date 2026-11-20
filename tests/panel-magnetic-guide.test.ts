@@ -219,4 +219,116 @@ describe("panel-magnetic-guide - Smart Alignment & Center Snapping", () => {
     expect(b1.yMm).toBe(b2.yMm);
     expect(b2.yMm).toBe(b3.yMm);
   });
+
+  it("distributes 5 door buttons symmetrically with exact 23mm gap and centers on 350mm door", () => {
+    // Skenario nyata permintaan user: Box Door 350mm, 5 tombol (E-Stop 50mm + 4 PB 40mm)
+    const doorItems: PanelLayoutItem[] = [
+      {
+        id: "estop",
+        type: "COMPONENT",
+        category: "EMERGENCY_STOP",
+        tagLabel: "E-STOP",
+        name: "Emergency Stop",
+        xMm: 30,
+        yMm: 200,
+        widthMm: 50,
+        heightMm: 65,
+        rotation: 0,
+      },
+      {
+        id: "keysw",
+        type: "COMPONENT",
+        category: "SELECTOR_SWITCH",
+        tagLabel: "KEY SW",
+        name: "Key Switch",
+        xMm: 90,
+        yMm: 210,
+        widthMm: 40,
+        heightMm: 55,
+        rotation: 0,
+      },
+      {
+        id: "start",
+        type: "COMPONENT",
+        category: "PUSH_BUTTON",
+        tagLabel: "START",
+        name: "PB Start",
+        xMm: 150,
+        yMm: 212,
+        widthMm: 40,
+        heightMm: 55,
+        rotation: 0,
+      },
+      {
+        id: "reset",
+        type: "COMPONENT",
+        category: "PUSH_BUTTON",
+        tagLabel: "RESET",
+        name: "PB Reset",
+        xMm: 210,
+        yMm: 205,
+        widthMm: 40,
+        heightMm: 55,
+        rotation: 0,
+      },
+      {
+        id: "buzzer",
+        type: "COMPONENT",
+        category: "BUZZER",
+        tagLabel: "BUZZER",
+        name: "Buzzer Alarm",
+        xMm: 270,
+        yMm: 215,
+        widthMm: 40,
+        heightMm: 55,
+        rotation: 0,
+      },
+    ];
+
+    const result = distributeSelectedItemsHorizontally(
+      doorItems,
+      ["estop", "keysw", "start", "reset", "buzzer"],
+      enclosure, // widthMm: 350
+      true, // alignCenterY
+      23, // exact gap 23mm
+      true // centerOnEnclosure
+    );
+
+    const estop = result.find((i) => i.id === "estop")!;
+    const keysw = result.find((i) => i.id === "keysw")!;
+    const start = result.find((i) => i.id === "start")!;
+    const reset = result.find((i) => i.id === "reset")!;
+    const buzzer = result.find((i) => i.id === "buzzer")!;
+
+    // Total width = 50 + 40*4 = 210. 4 gaps * 23 = 92. Total = 302.
+    // Margin start = (350 - 302) / 2 = 24 mm.
+    expect(estop.xMm).toBe(24);
+    expect(keysw.xMm).toBe(24 + 50 + 23); // 97
+    expect(start.xMm).toBe(97 + 40 + 23); // 160
+    expect(reset.xMm).toBe(160 + 40 + 23); // 223
+    expect(buzzer.xMm).toBe(223 + 40 + 23); // 286
+
+    // Gap antar PB semuanya tepat 23 mm
+    expect(keysw.xMm - (estop.xMm + estop.widthMm)).toBe(23);
+    expect(start.xMm - (keysw.xMm + keysw.widthMm)).toBe(23);
+    expect(reset.xMm - (start.xMm + start.widthMm)).toBe(23);
+    expect(buzzer.xMm - (reset.xMm + reset.widthMm)).toBe(23);
+
+    // Margin kanan juga tepat 24 mm (simetris sempurna kiri & kanan)
+    expect(enclosure.widthMm - (buzzer.xMm + buzzer.widthMm)).toBe(24);
+
+    // Titik tengah lubang bor (hole center Y) semuanya sejajar persis
+    // Untuk PB/Key/Buzzer (height 55): hole center di y + (55 - 18) = y + 37
+    // Untuk E-Stop (height 65): hole center di y + 65/2 = y + 32.5
+    const holeEstop = estop.yMm + estop.heightMm / 2;
+    const holeStart = start.yMm + (start.heightMm - 18);
+    const holeReset = reset.yMm + (reset.heightMm - 18);
+    const holeKeysw = keysw.yMm + (keysw.heightMm - 18);
+    const holeBuzzer = buzzer.yMm + (buzzer.heightMm - 18);
+
+    expect(Math.abs(holeEstop - holeStart)).toBeLessThanOrEqual(1);
+    expect(holeStart).toBe(holeReset);
+    expect(holeReset).toBe(holeKeysw);
+    expect(holeKeysw).toBe(holeBuzzer);
+  });
 });
