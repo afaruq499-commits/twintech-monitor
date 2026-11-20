@@ -1036,7 +1036,7 @@ export function generateOuterPanelDxf(
   const tbHeight = 65;
   const totalW = sideX + D;
   const tbX = Math.max(totalW - tbWidth, 0);
-  const tbY = -tbHeight - 20;
+  const tbY = -tbHeight - 85;
 
   addRect("7_TITLE_BLOCK", tbX, tbY, tbX + tbWidth, tbY + tbHeight, 7);
 

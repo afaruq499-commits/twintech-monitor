@@ -137,26 +137,32 @@ export function PanelDrawingSheetModal({
   const sheetH = 840;
 
   // Area gambar mekanik (antara margin kiri dan tabel kop kanan)
-  const drawAreaX = 100;
-  const drawAreaY = 80;
-  const drawAreaW = 680;
-  const drawAreaH = 680;
+  const drawAreaX = 75;
+  const maxAvailW = 630;
+  const maxAvailH = 480;
 
   // Margin plat di dalam area gambar (memberikan ruang untuk garis dimensi atas & kiri)
-  const dimMarginLeft = 70;
-  const dimMarginTop = 60;
-  const usableW = drawAreaW - dimMarginLeft - 20;
-  const usableH = drawAreaH - dimMarginTop - 20;
+  const dimMarginLeft = 60;
+  const dimMarginTop = 45;
+  const usableW = maxAvailW - dimMarginLeft;
+  const usableH = maxAvailH - dimMarginTop;
 
   // Skala visual agar plat fit di dalam area gambar
   const scale = Math.min(usableW / plateWidth, usableH / plateHeight, 1.6);
   const scaledPlateW = plateWidth * scale;
   const scaledPlateH = plateHeight * scale;
 
-  // Posisi pojok kiri-bawah plat di sheet SVG
-  const plateOriginX = drawAreaX + dimMarginLeft;
-  // Di SVG, Y bertambah ke bawah: titik datum bawah plat berada di:
-  const plateBottomY = drawAreaY + dimMarginTop + scaledPlateH;
+  // Centering posisi plat di sheet SVG
+  const centerAreaX = 385;
+  const plateOriginX = Math.max(
+    75 + dimMarginLeft,
+    Math.round(centerAreaX - scaledPlateW / 2 + dimMarginLeft / 2)
+  );
+
+  // Center vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
+  const centerAreaY = 365;
+  const plateTopY = Math.max(120, Math.round(centerAreaY - scaledPlateH / 2));
+  const plateBottomY = plateTopY + scaledPlateH;
 
   // Helper konversi koordinat CAD (origin bottom-left) ke koordinat SVG Sheet
   const cadToSheetX = (cadX: number) => plateOriginX + cadX * scale;
@@ -470,18 +476,29 @@ export function PanelDrawingSheetModal({
                       fanY: 90,
                     };
 
-                    const outerGap = 90;
+                    const outerGap = 70;
                     const totalCadW = outerW + outerGap + outerD;
-                    const s = Math.min(usableW / totalCadW, usableH / outerH, 0.95);
+
+                    // Batas ruang gambar aman agar center dan tidak menabrak kop gambar di kanan bawah (Y=660)
+                    const maxDrawW = 620;
+                    const maxDrawH = 430;
+                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / outerH, 0.85);
                     const sw = outerW * s;
                     const sh = outerH * s;
                     const sd = outerD * s;
                     const sgap = outerGap * s;
+                    const totalDrawingW = sw + sgap + sd;
 
-                    const fx = plateOriginX;
-                    const fy = plateBottomY;
+                    // Posisi Center Horizontal (di area kerja sebelah kiri kop gambar X=30 s.d X=715)
+                    const centerAreaX = 385;
+                    const fx = Math.max(70, Math.round(centerAreaX - totalDrawingW / 2));
                     const sx = fx + sw + sgap;
-                    const sy = plateBottomY;
+
+                    // Posisi Center Vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
+                    const centerAreaY = 350;
+                    const boxTopY = Math.round(centerAreaY - sh / 2);
+                    const fy = boxTopY + sh;
+                    const sy = fy;
 
                     const effectiveLockDoorY = feat.hasLoto
                       ? (feat.lockDoorY ?? Math.round(outerH * 0.58))
@@ -892,18 +909,29 @@ export function PanelDrawingSheetModal({
                     const hmiW = plateWidth || 430;
                     const hmiH = plateHeight || 440;
                     const hmiD = plateDepth || 180;
-                    const gap = 80;
+                    const gap = 70;
                     const totalCadW = hmiW + gap + hmiD;
-                    const s = Math.min(usableW / totalCadW, usableH / hmiH, 1.15);
+
+                    // Batas ruang gambar aman agar center dan tidak menabrak kop gambar di kanan bawah (Y=660)
+                    const maxDrawW = 620;
+                    const maxDrawH = 430;
+                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / hmiH, 1.15);
                     const sw = hmiW * s;
                     const sh = hmiH * s;
                     const sd = hmiD * s;
                     const sgap = gap * s;
+                    const totalDrawingW = sw + sgap + sd;
 
-                    const fx = plateOriginX;
-                    const fy = plateBottomY;
+                    // Posisi Center Horizontal (di area kerja sebelah kiri kop gambar X=30 s.d X=715)
+                    const centerAreaX = 385;
+                    const fx = Math.max(70, Math.round(centerAreaX - totalDrawingW / 2));
                     const sx = fx + sw + sgap;
-                    const sy = plateBottomY;
+
+                    // Posisi Center Vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
+                    const centerAreaY = 350;
+                    const boxTopY = Math.round(centerAreaY - sh / 2);
+                    const fy = boxTopY + sh;
+                    const sy = fy;
 
                     const frontCadToX = (cadX: number) => fx + cadX * s;
                     const frontCadToY = (cadY: number) => fy - cadY * s;
