@@ -2732,6 +2732,41 @@ export function buildStandardPanelLayoutFromComponents(
     }
   }
 
+  // Hitung socket relay yang tidak berpasangan (misal ada pesanan soket cadangan melebihi jumlah relay)
+  let totalRelaysToPair = row3Items.filter((u) => u.isRelayUnit).length;
+  for (const sock of mainSockets) {
+    const paired = Math.min(totalRelaysToPair, sock.remaining);
+    totalRelaysToPair -= paired;
+    const unpaired = sock.remaining - paired;
+    for (let sIdx = 0; sIdx < unpaired; sIdx++) {
+      row3Items.push({
+        comp: sock.comp,
+        visual: sock.visual,
+        instanceIdx: 100 + sIdx,
+        rowHint: 3,
+        subOrder: 25,
+      });
+    }
+  }
+
+  // Rebalance Noise Filter antara Row 1 dan Row 2:
+  // Jika Baris 2 memiliki PLC CPU/Base (lebar >= 100mm) dan ada lebih dari 1 Noise Filter,
+  // alirkan filter tambahan (misal untuk AC Power Supply) ke Baris 1 setelah Power Supply (subOrder 35),
+  // sehingga Baris 1 dan Baris 2 sama-sama seimbang dan tidak ada yang over range.
+  if (
+    row2Filters.length > 1 &&
+    (row2OtherPlc.length > 0 || row2RackBases.length > 0 || row2RackModules.length > 0)
+  ) {
+    const filtersForPsu = row2Filters.splice(1);
+    filtersForPsu.forEach((f, idx) => {
+      row1Items.push({
+        ...f,
+        rowHint: 1,
+        subOrder: 35 + idx,
+      });
+    });
+  }
+
   // Sort masing-masing grup secara stabil
   row1Items.sort((a, b) => a.subOrder - b.subOrder);
   row2RackModules.sort((a, b) => a.subOrder - b.subOrder);
@@ -2777,46 +2812,76 @@ export function buildStandardPanelLayoutFromComponents(
   // -------------------------------------------------------------------------
   const ductConfig = detectPrDuctProfile(components);
 
-  // Hitung lebar total masing-masing baris agar panel melebar otomatis bila melebihi kapasitas standar
-  const calcGroupWidth = (list: QueuedMainUnit[], defaultGap = 6): number => {
+  // Helper jarak antar komponen: komponen modular sejenis diberi gap 4mm (terminal 1mm),
+  // antar kategori berbeda diberi jarak ventilasi/bernapas aman 10mm agar tidak menempel/benturan.
+  const getComponentGap = (curr: QueuedMainUnit, next?: QueuedMainUnit): number => {
+    if (!next) return 0;
+    const cCat = curr.visual.category;
+    const nCat = next.visual.category;
+
+    // MCCB dan Main Switch rotary handle adalah satu kesatuan switchboard interlock
+    if (
+      (cCat === "MCCB" && nCat === "MAIN_SWITCH") ||
+      (cCat === "MAIN_SWITCH" && nCat === "MCCB")
+    ) {
+      return 4;
+    }
+
+    // Modul rack PLC yang terpasang di base rack tersusun rapat berdampingan
+    if (curr.isRackModule && next.isRackModule) {
+      return 1;
+    }
+
+    if (cCat !== nCat) {
+      if (cCat === "TERMINAL" && nCat === "TERMINAL") return 2;
+      return 10;
+    }
+
+    if (cCat === "TERMINAL") return 1;
+    if (cCat === "MCB") return 4;
+    if (cCat === "RELAY") return 4;
+    if (cCat === "NOISE_FILTER") return 6;
+    if (cCat === "SOCKET_OUTLET") return 6;
+    return 6;
+  };
+
+  // Hitung lebar total masing-masing baris dengan jarak aman antar-komponen
+  const calcGroupWidth = (list: QueuedMainUnit[]): number => {
     if (list.length === 0) return 0;
     return list.reduce((sum, u, idx) => {
       const next = list[idx + 1];
-      const tight =
-        next &&
-        u.visual.category === next.visual.category &&
-        (u.visual.category === "TERMINAL" || u.visual.category === "RELAY" || u.visual.category === "MCB");
-      const gap = next ? (tight ? (u.visual.category === "TERMINAL" ? 1 : 2) : defaultGap) : 0;
+      const gap = getComponentGap(u, next);
       return sum + u.visual.widthMm + gap;
     }, 0);
   };
 
-  const rackModulesW = calcGroupWidth(row2RackModules, 1);
+  const rackModulesW = calcGroupWidth(row2RackModules);
   const rackTotalW =
     row2RackBases.length > 0
       ? Math.max(row2RackBases[0].visual.widthMm, rackModulesW + 10) * row2RackBases.length +
         (row2RackBases.length - 1) * 8
       : rackModulesW;
 
-  const row2TotalW =
-    rackTotalW +
-    (rackTotalW > 0 && row2OtherPlc.length > 0 ? 8 : 0) +
-    calcGroupWidth(row2OtherPlc, 4) +
-    ((rackTotalW > 0 || row2OtherPlc.length > 0) && row2Filters.length > 0 ? 12 : 0) +
-    calcGroupWidth(row2Filters, 6) +
-    ((rackTotalW > 0 || row2OtherPlc.length > 0 || row2Filters.length > 0) && row2Switches.length > 0
-      ? 10
-      : 0) +
-    calcGroupWidth(row2Switches, 6);
+  const row2StandaloneItems = [
+    ...(row2RackBases.length === 0 ? row2RackModules : []),
+    ...row2OtherPlc,
+    ...row2Filters,
+    ...row2Switches,
+  ];
 
-  const row1TotalW = calcGroupWidth(row1Items, 8);
-  const row3TotalW = calcGroupWidth(row3Items, 6);
-  const row4TotalW = calcGroupWidth(row4Items, 6);
+  const row2TotalW =
+    row2RackBases.length > 0
+      ? rackTotalW + (row2StandaloneItems.length > 0 ? 14 : 0) + calcGroupWidth(row2StandaloneItems)
+      : calcGroupWidth(row2StandaloneItems);
+
+  const row1TotalW = calcGroupWidth(row1Items);
+  const row3TotalW = calcGroupWidth(row3Items);
+  const row4TotalW = calcGroupWidth(row4Items);
 
   // Deteksi tinggi maksimum komponen pada setiap baris untuk menghitung clearance kabel duct yang cukup
   const getRowMaxH = (list: QueuedMainUnit[], fallback: number): number => {
     if (list.length === 0) return fallback;
-    return Math.max(...list.map((u) => u.visual.heightMm), fallback);
+    return Math.max(...list.map((u) => u.visual.heightMm));
   };
 
   const r2AllHeights = [
@@ -2826,20 +2891,26 @@ export function buildStandardPanelLayoutFromComponents(
     ...row2Filters.map((f) => f.visual.heightMm),
     ...row2Switches.map((s) => s.visual.heightMm),
   ];
-  const r2MaxH = r2AllHeights.length > 0 ? Math.max(...r2AllHeights, 90) : 90;
-  const r1MaxH = getRowMaxH(row1Items, 85);
-  const r3MaxH = getRowMaxH(row3Items, 85);
-  const r4MaxH = getRowMaxH(row4Items, 55);
+  const r2MaxH = r2AllHeights.length > 0 ? Math.max(...r2AllHeights) : 80;
+  const r1MaxH = getRowMaxH(row1Items, 80);
+  const r3MaxH = getRowMaxH(row3Items, 70);
+  const r4MaxH = getRowMaxH(row4Items, 45);
 
   // Deteksi box panel dari PR jika ada (misal "BOX PANEL_550 x 450 x 200")
   const prBox = detectPrMainBoxPanel(components);
 
-  // Clearance adaptif yang NGEPRESS: cukup memberi celah kawat 10-14mm dari ujung komponen ke bibir kabel duct
-  // Tanpa jarak raksasa / spare kosong melompong yang berlebihan.
-  const r1ClearanceReq = r1MaxH > 0 ? r1MaxH + 20 : 80;
-  const r2ClearanceReq = r2MaxH > 0 ? r2MaxH + 20 : 80;
+  // Clearance adaptif anti-benturan: wajib memiliki celah kawat & ventilasi minimal 10-12mm dari ujung komponen ke kabel duct
+  const r1ClearanceReq = row1Items.length > 0 ? r1MaxH + 20 : 60;
+  const r2ClearanceReq =
+    row2RackBases.length > 0 ||
+    row2RackModules.length > 0 ||
+    row2OtherPlc.length > 0 ||
+    row2Filters.length > 0 ||
+    row2Switches.length > 0
+      ? r2MaxH + 20
+      : 60;
   const r3ClearanceReq = row3Items.length > 0 ? r3MaxH + 18 : 50;
-  const r4ClearanceReq = row4Items.length > 0 ? r4MaxH + 16 : 50;
+  const r4ClearanceReq = row4Items.length > 0 ? r4MaxH + 16 : 45;
 
   const topDuctH = ductConfig.horizontalHeightMm;
   const midDuctH = ductConfig.horizontalHeightMm;
@@ -2847,25 +2918,21 @@ export function buildStandardPanelLayoutFromComponents(
   const leftDuctW = ductConfig.verticalLeftWidthMm;
   const rightDuctW = ductConfig.verticalRightWidthMm;
 
+  const minClearanceSum =
+    r1ClearanceReq + r2ClearanceReq + r3ClearanceReq + r4ClearanceReq;
+
   const minTotalNeededH =
     topDuctH +
-    r1ClearanceReq +
-    midDuctH +
-    r2ClearanceReq +
-    midDuctH +
-    r3ClearanceReq +
-    midDuctH +
-    r4ClearanceReq +
-    bottomDuctH;
+    midDuctH * 3 +
+    bottomDuctH +
+    minClearanceSum;
 
   // Ukuran plat dasar (Tinggi):
-  // 1. Jika pengguna telah menentukan ukuran (targetDimensions.main.heightMm), selalu patuhi ukuran tersebut!
-  // 2. Jika ada box panel di PR yang ukurannya lebih kecil dari standar (misal MTM 550x450),
-  //    gunakan plat kompak yang pas di dalam box (misal 500 atau 450 mm).
-  // 3. Jika tidak ada box atau box standar (>= 800mm), gunakan standar 800mm atau membesar jika komponen banyak.
+  // Harus cukup menampung seluruh baris komponen + kabel ducting tanpa bertabrakan.
+  // Jika targetDimensions lebih kecil dari kebutuhan fisik minimal, otomatis lebarkan agar tidak benturan!
   let targetPlateH: number;
   if (targetDimensions?.main?.heightMm && targetDimensions.main.heightMm > 0) {
-    targetPlateH = targetDimensions.main.heightMm;
+    targetPlateH = Math.max(targetDimensions.main.heightMm, Math.ceil(minTotalNeededH / 50) * 50);
   } else if (prBox && prBox.boxHeightMm < 800) {
     targetPlateH = Math.max(prBox.suggestedPlateHeightMm, Math.ceil(minTotalNeededH / 50) * 50);
   } else {
@@ -2873,15 +2940,13 @@ export function buildStandardPanelLayoutFromComponents(
   }
 
   // Lebar plat dasar (Lebar):
-  // 1. Jika pengguna telah menentukan ukuran (targetDimensions.main.widthMm), selalu patuhi ukuran tersebut!
-  // 2. Jika box di PR lebih sempit dari 600mm (misal MTM 450mm), gunakan plat kompak (misal 400mm).
-  // 3. Standar 600mm, atau melebar otomatis jika komponen melimpah.
+  // Menjamin seluruh komponen muat di dalam rel DIN dan tidak menabrak kabel duct kanan.
   const maxNeededRowW = Math.max(row1TotalW, row2TotalW, row3TotalW, row4TotalW);
   const rawNeededPlateW = leftDuctW + rightDuctW + maxNeededRowW + 28;
 
   let targetPlateW: number;
   if (targetDimensions?.main?.widthMm && targetDimensions.main.widthMm > 0) {
-    targetPlateW = targetDimensions.main.widthMm;
+    targetPlateW = Math.max(targetDimensions.main.widthMm, Math.ceil(rawNeededPlateW / 50) * 50);
   } else if (prBox && prBox.boxWidthMm < 600) {
     targetPlateW = Math.max(prBox.suggestedPlateWidthMm, Math.ceil(rawNeededPlateW / 50) * 50);
   } else {
@@ -2895,19 +2960,21 @@ export function buildStandardPanelLayoutFromComponents(
 
   const mainDepthMm = targetDimensions?.main?.depthMm || 200;
 
-  // Distribusikan sisa ketinggian secukupnya saja agar celah antar kabel duct tetap ngepress dan rapi
+  // Distribusikan sisa ketinggian proporsional di atas minClearance agar setiap baris selalu memiliki ruang aman
   // Pastikan r1Clearance + r2Clearance + r3Clearance + r4Clearance tepat sama dengan availH
-  const availH = Math.max(80, targetPlateH - topDuctH - bottomDuctH - 3 * midDuctH);
-  const r1Weight = Math.max(r1MaxH + 12, 60);
-  const r2Weight = Math.max(r2MaxH + 12, 60);
-  const r3Weight = Math.max(r3MaxH + 12, 50);
-  const r4Weight = Math.max(r4MaxH + 10, 40);
+  const availH = Math.max(minClearanceSum, targetPlateH - topDuctH - bottomDuctH - 3 * midDuctH);
+  const extraH = Math.max(0, availH - minClearanceSum);
+
+  const r1Weight = Math.max(r1MaxH, 50);
+  const r2Weight = Math.max(r2MaxH, 50);
+  const r3Weight = Math.max(r3MaxH, 40);
+  const r4Weight = Math.max(r4MaxH, 30);
   const totalWeight = r1Weight + r2Weight + r3Weight + r4Weight;
 
-  const r1Clearance = Math.round((availH * r1Weight) / totalWeight);
-  const r2Clearance = Math.round((availH * r2Weight) / totalWeight);
-  const r3Clearance = Math.round((availH * r3Weight) / totalWeight);
-  const r4Clearance = Math.max(30, availH - (r1Clearance + r2Clearance + r3Clearance));
+  const r1Clearance = r1ClearanceReq + Math.round((extraH * r1Weight) / totalWeight);
+  const r2Clearance = r2ClearanceReq + Math.round((extraH * r2Weight) / totalWeight);
+  const r3Clearance = r3ClearanceReq + Math.round((extraH * r3Weight) / totalWeight);
+  const r4Clearance = availH - (r1Clearance + r2Clearance + r3Clearance);
 
   const rightDuctX = targetPlateW - rightDuctW;
   const innerSpan = rightDuctX - leftDuctW;
@@ -3091,32 +3158,48 @@ export function buildStandardPanelLayoutFromComponents(
     railCenterY: number,
     zoneTopY: number,
     zoneBottomY: number,
-    defaultGap = 6,
     idPrefix: string
-  ) => {
-    const availRowW = Math.max(50, railSpan - 12);
+  ): number => {
+    if (itemsList.length === 0) return startX;
+
+    const maxAllowedX = targetPlateW - rightDuctW - 8;
+    const availRowW = Math.max(30, maxAllowedX - startX);
     const sumUnitW = itemsList.reduce((acc, u) => acc + u.visual.widthMm, 0);
-    let effectiveDefaultGap = defaultGap;
-    if (itemsList.length > 1 && sumUnitW + (itemsList.length - 1) * defaultGap > availRowW) {
-      effectiveDefaultGap = Math.max(1, Math.floor((availRowW - sumUnitW) / (itemsList.length - 1)));
+
+    const naturalGaps = itemsList.slice(0, -1).map((u, idx) => getComponentGap(u, itemsList[idx + 1]));
+    const totalNaturalGap = naturalGaps.reduce((acc, g) => acc + g, 0);
+
+    let gapScale = 1;
+    if (itemsList.length > 1 && sumUnitW + totalNaturalGap > availRowW) {
+      const minPossibleGapSum = itemsList
+        .slice(0, -1)
+        .reduce((acc, u) => acc + (u.visual.category === "TERMINAL" ? 1 : 2), 0);
+      const compressibleGap = totalNaturalGap - minPossibleGapSum;
+      if (compressibleGap > 0) {
+        gapScale = Math.max(0, (availRowW - sumUnitW - minPossibleGapSum) / compressibleGap);
+      } else {
+        gapScale = 0;
+      }
     }
 
     let cursorX = startX;
     itemsList.forEach((u, idx) => {
       const v = u.visual;
       const rawY = railCenterY - v.heightMm / 2;
-      const clampedY = Math.max(
-        zoneTopY + 3,
-        Math.min(zoneBottomY - v.heightMm - 3, rawY)
-      );
-      const xMm = Math.round(cursorX);
+      const minY = zoneTopY + 6;
+      const maxY = zoneBottomY - v.heightMm - 6;
+      const clampedY = maxY >= minY ? Math.max(minY, Math.min(maxY, rawY)) : zoneTopY + 2;
+
+      // Proteksi over-range horizontal: tidak boleh menembus ducting kanan
+      const clampedX = Math.min(cursorX, maxAllowedX - v.widthMm);
+      const xMm = Math.round(clampedX);
       const yMm = Math.round(clampedY);
 
       // Jika ini Relay dan ada Socket PR terpisah yang cocok, pasang socket di bawah relay pada x/y yang sama
       if (u.isRelayUnit) {
-        const preferredSocket = mainSockets.find(
-          (s) => s.remaining > 0 && Math.abs(s.visual.widthMm - v.widthMm) <= 5
-        ) || mainSockets.find((s) => s.remaining > 0);
+        const preferredSocket =
+          mainSockets.find((s) => s.remaining > 0 && Math.abs(s.visual.widthMm - v.widthMm) <= 5) ||
+          mainSockets.find((s) => s.remaining > 0);
         if (preferredSocket) {
           preferredSocket.remaining -= 1;
           mainLayout.items.push({
@@ -3154,19 +3237,21 @@ export function buildStandardPanelLayoutFromComponents(
       });
 
       const next = itemsList[idx + 1];
-      const tight =
-        next &&
-        v.category === next.visual.category &&
-        (v.category === "TERMINAL" || v.category === "RELAY" || v.category === "MCB");
-      const gap = tight ? (v.category === "TERMINAL" ? 1 : Math.min(2, effectiveDefaultGap)) : effectiveDefaultGap;
-      cursorX += v.widthMm + gap;
+      if (next) {
+        const natGap = naturalGaps[idx];
+        const minGap = v.category === "TERMINAL" ? 1 : v.category === next.visual.category ? 2 : 6;
+        const actualGap = Math.max(minGap, Math.round(minGap + (natGap - minGap) * gapScale));
+        cursorX += v.widthMm + actualGap;
+      } else {
+        cursorX += v.widthMm;
+      }
     });
 
     return cursorX;
   };
 
-  // Zona 1 (MCCB, MCB, PSU 24V, Filter 3P)
-  placeHorizontalSequence(row1Items, startComponentX, r1RailCenterY, r1ZoneTop, ductMid1Y, 8, "auto-r1");
+  // Zona 1 (MCCB, MCB, PSU 24V, Filter AC)
+  placeHorizontalSequence(row1Items, startComponentX, r1RailCenterY, r1ZoneTop, ductMid1Y, "auto-r1");
 
   // Zona 2 (PLC Rack, Modul IO, Filter PLC, Hub Switch)
   let r2CursorX = startComponentX;
@@ -3189,9 +3274,9 @@ export function buildStandardPanelLayoutFromComponents(
       tagLabel: base.visual.defaultTag,
     });
     if (row2RackModules.length > 0) {
-      placeHorizontalSequence(row2RackModules, r2CursorX + 5, r2RailCenterY, r2ZoneTop, ductMid2Y, 1, "auto-r2-mod");
+      placeHorizontalSequence(row2RackModules, r2CursorX + 5, r2RailCenterY, r2ZoneTop, ductMid2Y, "auto-r2-mod");
     }
-    r2CursorX += baseW + 12;
+    r2CursorX += baseW + 14;
 
     for (let bi = 1; bi < row2RackBases.length; bi++) {
       const extraBase = row2RackBases[bi];
@@ -3210,44 +3295,26 @@ export function buildStandardPanelLayoutFromComponents(
         heightMm: extraBase.visual.heightMm,
         tagLabel: extraBase.visual.defaultTag,
       });
-      r2CursorX += extraBase.visual.widthMm + 10;
+      r2CursorX += extraBase.visual.widthMm + 14;
     }
-  } else if (row2RackModules.length > 0) {
-    r2CursorX =
-      placeHorizontalSequence(row2RackModules, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 1, "auto-r2-mod") + 10;
-  }
 
-  if (row2OtherPlc.length > 0) {
-    r2CursorX =
-      placeHorizontalSequence(row2OtherPlc, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 4, "auto-r2-plc") + 10;
-  }
-  if (row2Filters.length > 0) {
-    r2CursorX =
-      placeHorizontalSequence(row2Filters, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 6, "auto-r2-flt") + 10;
-  }
-  if (row2Switches.length > 0) {
-    placeHorizontalSequence(row2Switches, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, 6, "auto-r2-sw");
-  }
-
-  // Jika masih ada Socket Relay yang tidak berpasangan (tanpa item Relay di PR), taruh di Baris 3
-  for (const sock of mainSockets) {
-    for (let sIdx = 0; sIdx < sock.remaining; sIdx++) {
-      row3Items.push({
-        comp: sock.comp,
-        visual: sock.visual,
-        instanceIdx: 100 + sIdx,
-        rowHint: 3,
-        subOrder: 25,
-      });
+    const remainingRow2Items = [...row2OtherPlc, ...row2Filters, ...row2Switches];
+    if (remainingRow2Items.length > 0) {
+      placeHorizontalSequence(remainingRow2Items, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, "auto-r2-extra");
+    }
+  } else {
+    // Tanpa base rack (Compact PLC seperti FX5U, Filter, Hub Switch)
+    const allRow2Standalone = [...row2RackModules, ...row2OtherPlc, ...row2Filters, ...row2Switches];
+    if (allRow2Standalone.length > 0) {
+      placeHorizontalSequence(allRow2Standalone, r2CursorX, r2RailCenterY, r2ZoneTop, ductMid2Y, "auto-r2");
     }
   }
-  row3Items.sort((a, b) => a.subOrder - b.subOrder);
 
-  // Zona 3 (Safety, Relay, Contactor, 2-Step Terminal)
-  placeHorizontalSequence(row3Items, startComponentX, r3RailCenterY, r3ZoneTop, ductMid3Y, 6, "auto-r3");
+  // Zona 3 (Safety, Relay, Contactor, Stop Kontak Uticon, 2-Step Terminal)
+  placeHorizontalSequence(row3Items, startComponentX, r3RailCenterY, r3ZoneTop, ductMid3Y, "auto-r3");
 
-  // Zona 4 (Terminal Blok Daya & Distribusi)
-  placeHorizontalSequence(row4Items, startComponentX, r4RailCenterY, r4ZoneTop, ductBottomY, 6, "auto-r4");
+  // Zona 4 (Terminal Blok Daya & Distribusi Bawah)
+  placeHorizontalSequence(row4Items, startComponentX, r4RailCenterY, r4ZoneTop, ductBottomY, "auto-r4");
 
   // -------------------------------------------------------------------------
   // BAGIAN 2: PANEL OPERATOR / HMI FRONT DOOR (FR-EG-EP-006 Hal. 3: 430 × 440 mm)

@@ -752,5 +752,92 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(ductRight!.xMm + ductRight!.widthMm).toBe(500);
       expect(ductBottom!.yMm + ductBottom!.heightMm).toBe(600);
     });
+
+    it("menjamin tidak ada benturan vertikal, tidak over range ke duct kanan, dan ada space aman antar-komponen", () => {
+      // BOM seperti pada screenshot pengguna (Jig Insert Collar / Box Panel kompak)
+      const userScreenshotBom: PanelComponentInput[] = [
+        makeComp("mcb-4a-1", "Schneider Acti9 iC60N 2P 4A", "MCB 4A", 1),
+        makeComp("mcb-4a-2", "Schneider Acti9 iC60N 2P 4A", "MCB 4A", 1),
+        makeComp("mcb-6a-1", "Schneider Acti9 iC60N 2P 6A", "MCB 6A", 1),
+        makeComp("mcb-6a-2", "Schneider Acti9 iC60N 2P 6A", "MCB 6A", 1),
+        makeComp("psu", "Omron S8VK-C12024", "S8VK 120W POWER", 1),
+        makeComp("plc", "Mitsubishi FX5U-32MR/ES", "Mitsubishi FX5U-32MR/ES", 1),
+        makeComp("nf1", "TDK RSAL-2006", "RSAL 6A FILTER 6A", 1),
+        makeComp("nf2", "TDK RSAL-2006", "RSAL 6A FILTER 6A", 1),
+        makeComp("nf3", "TDK RSAL-2006", "RSAL 6A FILTER 6A", 1),
+        makeComp("rel1", "Omron MY2N-GS-24VDC", "Relay MY2N", 5),
+        makeComp("uticon", "Stop Kontak Uticon 2 Lubang SN-016", "UTICON STOP KONTAK", 2),
+        makeComp("tb", "FORT TBD-10A", "Terminal Block TBD-10A", 1),
+        makeComp("duct", "PVC Wiring Duct 40x60 mm (per 2m)", "Kabel Duct PVC 40x60", 4),
+      ];
+
+      const layout = buildStandardPanelLayoutFromComponents(userScreenshotBom, {
+        main: { widthMm: 400, heightMm: 500 },
+      });
+
+      const items = layout.main.items;
+      const ductTop = items.find((i) => i.id === "duct-top")!;
+      const ductMid1 = items.find((i) => i.id === "duct-mid-1")!;
+      const ductMid2 = items.find((i) => i.id === "duct-mid-2")!;
+      const ductMid3 = items.find((i) => i.id === "duct-mid-3")!;
+      const ductBottom = items.find((i) => i.id === "duct-bottom")!;
+      const ductRight = items.find((i) => i.id === "duct-right")!;
+
+      expect(ductTop).toBeDefined();
+      expect(ductMid1).toBeDefined();
+      expect(ductMid2).toBeDefined();
+      expect(ductMid3).toBeDefined();
+      expect(ductBottom).toBeDefined();
+      expect(ductRight).toBeDefined();
+
+      const psuItem = items.find((i) => i.componentId === "psu")!;
+      const plcItem = items.find((i) => i.componentId === "plc")!;
+      const relayItems = items.filter((i) => i.componentId === "rel1");
+      const uticonItems = items.filter((i) => i.componentId === "uticon");
+
+      expect(psuItem).toBeDefined();
+      expect(plcItem).toBeDefined();
+      expect(relayItems.length).toBe(5);
+      expect(uticonItems.length).toBe(2);
+
+      // 1. Verifikasi Vertikal: Komponen TIDAK MENEMBUS DUCTING (Celah aman >= 6mm)
+      // Baris 1: S8VK (125mm) harus pas di antara duct-top dan duct-mid-1
+      expect(psuItem.yMm).toBeGreaterThanOrEqual(ductTop.yMm + ductTop.heightMm + 6);
+      expect(psuItem.yMm + psuItem.heightMm).toBeLessThanOrEqual(ductMid1.yMm - 6);
+
+      // Baris 2: PLC FX5U (90mm) harus pas di antara duct-mid-1 dan duct-mid-2
+      expect(plcItem.yMm).toBeGreaterThanOrEqual(ductMid1.yMm + ductMid1.heightMm + 6);
+      expect(plcItem.yMm + plcItem.heightMm).toBeLessThanOrEqual(ductMid2.yMm - 6);
+
+      // Baris 3: Relay & Uticon harus pas di antara duct-mid-2 dan duct-mid-3
+      for (const rel of relayItems) {
+        expect(rel.yMm).toBeGreaterThanOrEqual(ductMid2.yMm + ductMid2.heightMm + 6);
+        expect(rel.yMm + rel.heightMm).toBeLessThanOrEqual(ductMid3.yMm - 6);
+      }
+      for (const ut of uticonItems) {
+        expect(ut.yMm).toBeGreaterThanOrEqual(ductMid2.yMm + ductMid2.heightMm + 6);
+        expect(ut.yMm + ut.heightMm).toBeLessThanOrEqual(ductMid3.yMm - 6);
+      }
+
+      // 2. Verifikasi Horizontal: TIDAK OVER RANGE KE DUCTING KANAN
+      const rightBoundary = ductRight.xMm;
+      const comps = items.filter((i) => i.type === "COMPONENT");
+      for (const c of comps) {
+        expect(c.xMm + c.widthMm).toBeLessThanOrEqual(rightBoundary);
+      }
+
+      // 3. Verifikasi Spacing: Ada Space yang rapi antar part (tidak menempel 0/2mm)
+      // Antar Relay sejenis: gap >= 4mm
+      for (let i = 0; i < relayItems.length - 1; i++) {
+        const gap = relayItems[i + 1].xMm - (relayItems[i].xMm + relayItems[i].widthMm);
+        expect(gap).toBeGreaterThanOrEqual(4);
+      }
+
+      // Antar Relay ke Uticon (beda kategori): gap >= 10mm
+      const lastRelay = relayItems[relayItems.length - 1];
+      const firstUticon = uticonItems[0];
+      const interCatGap = firstUticon.xMm - (lastRelay.xMm + lastRelay.widthMm);
+      expect(interCatGap).toBeGreaterThanOrEqual(10);
+    });
   });
 });
