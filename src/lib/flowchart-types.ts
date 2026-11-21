@@ -70,6 +70,13 @@ export interface AlignmentGuide {
   end: number;
 }
 
+export interface SelectionBox {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
+
 export interface CanvasViewport {
   zoom: number;
   panX: number;

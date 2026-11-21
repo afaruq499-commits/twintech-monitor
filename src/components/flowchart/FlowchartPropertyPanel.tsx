@@ -21,6 +21,7 @@ import {
   Paintbrush,
   Type,
   Maximize,
+  Layers,
 } from "lucide-react";
 import type {
   FlowchartNode,
@@ -34,9 +35,10 @@ import type {
 interface FlowchartPropertyPanelProps {
   selectedNode: FlowchartNode | null;
   selectedEdge: FlowchartEdge | null;
+  selectedCount?: number;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  // Handler untuk Node (Tahap 3)
+  // Handler untuk Node (Tahap 3 & 4)
   onUpdateNodeFillColor?: (id: string, color: string) => void;
   onUpdateNodeStrokeColor?: (id: string, color: string) => void;
   onUpdateNodeStrokeWidth?: (id: string, width: number) => void;
@@ -47,6 +49,8 @@ interface FlowchartPropertyPanelProps {
   onBringToFront?: (id: string) => void;
   onSendToBack?: (id: string) => void;
   onDeleteNode?: (id: string) => void;
+  onBatchUpdateFillColor?: (color: string) => void;
+  onBatchDelete?: () => void;
   // Handler untuk Garis / Edge (Tahap 2 & 3)
   onUpdateEdgeRouting?: (id: string, routing: EdgeRoutingType) => void;
   onUpdateEdgeStyle?: (id: string, style: EdgeStyle) => void;
@@ -57,7 +61,6 @@ interface FlowchartPropertyPanelProps {
   onDeleteEdge?: (id: string) => void;
 }
 
-// Palet warna standar Twintech
 const COLOR_PRESETS = [
   { name: "Blue", hex: "#2563eb" },
   { name: "Indigo", hex: "#4f46e5" },
@@ -83,6 +86,7 @@ const TEXT_COLOR_PRESETS = [
 export function FlowchartPropertyPanel({
   selectedNode,
   selectedEdge,
+  selectedCount = 0,
   isCollapsed,
   onToggleCollapse,
   onUpdateNodeFillColor,
@@ -95,6 +99,8 @@ export function FlowchartPropertyPanel({
   onBringToFront,
   onSendToBack,
   onDeleteNode,
+  onBatchUpdateFillColor,
+  onBatchDelete,
   onUpdateEdgeRouting,
   onUpdateEdgeStyle,
   onUpdateEdgeMarker,
@@ -141,9 +147,64 @@ export function FlowchartPropertyPanel({
       {/* Konten Properti */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {/* ======================================================== */}
-        {/* KONDISI 1: NODE / SIMBOL TERPILIH (TAHAP 3)              */}
+        {/* KONDISI 0: MULTI-SELECT (> 1 ELEMEN TERPILIH) (TAHAP 4)   */}
         {/* ======================================================== */}
-        {selectedNode ? (
+        {selectedCount > 1 ? (
+          <div className="space-y-4">
+            <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-indigo-600 text-white">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  Multi-Seleksi Aktif
+                </div>
+                <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                  {selectedCount} item dipilih
+                </div>
+              </div>
+            </div>
+
+            {/* Ubah Warna Isi Serentak */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Paintbrush className="w-3.5 h-3.5 text-indigo-500" />
+                Ubah Warna Isi Serentak
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => onBatchUpdateFillColor?.(preset.hex)}
+                    style={{ backgroundColor: preset.hex }}
+                    className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 transition cursor-pointer hover:scale-110 shadow-2xs"
+                    title={preset.name}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              💡 <strong>Tips Shortcut:</strong> Tekan <code>Ctrl+C</code> untuk menyalin, <code>Ctrl+X</code> untuk memotong, atau <code>Delete</code> untuk menghapus semua item terpilih.
+            </div>
+
+            {/* Hapus Semua Terpilih */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onBatchDelete}
+                className="w-full py-2 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus {selectedCount} Item Terpilih (Delete)
+              </button>
+            </div>
+          </div>
+        ) : selectedNode ? (
+          /* ======================================================== */
+          /* KONDISI 1: SATU NODE / SIMBOL TERPILIH                   */
+          /* ======================================================== */
           <div className="space-y-4">
             {/* Header Status Node */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -204,7 +265,6 @@ export function FlowchartPropertyPanel({
                     title={preset.name}
                   />
                 ))}
-                {/* Custom Color Input */}
                 <label
                   className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 flex items-center justify-center cursor-pointer hover:scale-110 overflow-hidden bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500"
                   title="Warna Khusus"
@@ -278,9 +338,7 @@ export function FlowchartPropertyPanel({
                 Format Teks
               </label>
 
-              {/* Ukuran Font & Perataan */}
               <div className="flex items-center gap-2">
-                {/* Perataan Teks (Align Left, Center, Right) */}
                 <div className="flex items-center bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
                   <button
                     type="button"
@@ -320,7 +378,6 @@ export function FlowchartPropertyPanel({
                   </button>
                 </div>
 
-                {/* Pilihan Ukuran Font */}
                 <select
                   value={selectedNode.fontSize || 11}
                   onChange={(e) => onUpdateNodeFontSize?.(selectedNode.id, Number(e.target.value))}
@@ -396,10 +453,9 @@ export function FlowchartPropertyPanel({
           </div>
         ) : selectedEdge ? (
           /* ======================================================== */
-          /* KONDISI 2: GARIS ALUR TERPILIH (TAHAP 2 & 3)             */
+          /* KONDISI 2: SATU GARIS ALUR TERPILIH                      */
           /* ======================================================== */
           <div className="space-y-4">
-            {/* Header Status Garis */}
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
                 <GitFork className="w-4 h-4" />
@@ -414,7 +470,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 1. Tipe Jalur Garis (Routing) */}
+            {/* Tipe Garis */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                 Tipe Garis
@@ -462,7 +518,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 2. Bentuk Garis & Ketebalan Garis (Tahap 3) */}
+            {/* Bentuk & Ketebalan Garis */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                 Bentuk & Ketebalan Garis
@@ -494,7 +550,6 @@ export function FlowchartPropertyPanel({
                 </button>
               </div>
 
-              {/* Selector Ketebalan Garis (Tahap 3) */}
               <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
                 {[1, 2, 3, 4].map((width) => (
                   <button
@@ -513,7 +568,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 3. Warna Garis (Tahap 3) */}
+            {/* Warna Garis */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                 Warna Garis
@@ -547,7 +602,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 4. Pilihan Ujung Panah (Marker) */}
+            {/* Ujung Panah */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                 Ujung Panah
@@ -600,7 +655,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 5. Label Garis (e.g. "Ya" / "Tidak") */}
+            {/* Label Garis */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -621,7 +676,6 @@ export function FlowchartPropertyPanel({
                 className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:border-indigo-500"
               />
 
-              {/* Tombol Preset Cepat */}
               <div className="flex flex-wrap gap-1">
                 {["Ya", "Tidak", "True", "False", "OK", "Batal"].map((preset) => (
                   <button
@@ -645,7 +699,6 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 6. Tombol Hapus Garis */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
@@ -669,7 +722,7 @@ export function FlowchartPropertyPanel({
               Belum Ada Elemen Terpilih
             </div>
             <p className="text-[11px] text-slate-400 max-w-[210px] mx-auto leading-relaxed">
-              Klik salah satu simbol atau garis alur pada kanvas untuk mengubah warna, ukuran, gaya, atau susunannya.
+              Klik salah satu simbol, tahan <code>Shift</code> untuk memilih banyak, atau drag kanvas untuk seleksi kotak.
             </p>
           </div>
         )}

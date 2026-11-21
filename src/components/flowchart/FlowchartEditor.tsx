@@ -2,15 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import type {
-  FlowchartNode,
-  FlowchartEdge,
   CanvasViewport,
   PaletteShapeDefinition,
-  EdgeRoutingType,
-  EdgeStyle,
-  EdgeMarker,
-  TextAlign,
 } from "@/lib/flowchart-types";
+import { useFlowchartEditor } from "@/hooks/useFlowchartEditor";
 import { FlowchartToolbar } from "./FlowchartToolbar";
 import { FlowchartShapePalette } from "./FlowchartShapePalette";
 import { FlowchartCanvas } from "./FlowchartCanvas";
@@ -18,10 +13,10 @@ import { FlowchartMinimap } from "./FlowchartMinimap";
 import { FlowchartPropertyPanel } from "./FlowchartPropertyPanel";
 
 // Diagram starter awal dengan 4 simbol
-const INITIAL_STARTER_NODES: FlowchartNode[] = [
+const INITIAL_STARTER_NODES = [
   {
     id: "node-start",
-    type: "start_end",
+    type: "start_end" as const,
     x: 280,
     y: 80,
     width: 140,
@@ -32,11 +27,11 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     strokeWidth: 2,
     textColor: "#ffffff",
     fontSize: 11,
-    textAlign: "center",
+    textAlign: "center" as const,
   },
   {
     id: "node-process-1",
-    type: "process",
+    type: "process" as const,
     x: 275,
     y: 180,
     width: 150,
@@ -47,11 +42,11 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     strokeWidth: 2,
     textColor: "#ffffff",
     fontSize: 11,
-    textAlign: "center",
+    textAlign: "center" as const,
   },
   {
     id: "node-decision-1",
-    type: "decision",
+    type: "decision" as const,
     x: 285,
     y: 300,
     width: 130,
@@ -62,11 +57,11 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     strokeWidth: 2,
     textColor: "#ffffff",
     fontSize: 11,
-    textAlign: "center",
+    textAlign: "center" as const,
   },
   {
     id: "node-process-2",
-    type: "process",
+    type: "process" as const,
     x: 275,
     y: 440,
     width: 150,
@@ -77,21 +72,21 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     strokeWidth: 2,
     textColor: "#ffffff",
     fontSize: 11,
-    textAlign: "center",
+    textAlign: "center" as const,
   },
 ];
 
 // Garis alur starter yang menghubungkan simbol awal (Tahap 2 & 3)
-const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
+const INITIAL_STARTER_EDGES = [
   {
     id: "edge-1",
     sourceNodeId: "node-start",
-    sourcePort: "bottom",
+    sourcePort: "bottom" as const,
     targetNodeId: "node-process-1",
-    targetPort: "top",
-    routing: "orthogonal",
-    style: "solid",
-    marker: "arrow",
+    targetPort: "top" as const,
+    routing: "orthogonal" as const,
+    style: "solid" as const,
+    marker: "arrow" as const,
     label: "",
     color: "#64748b",
     strokeWidth: 2,
@@ -99,12 +94,12 @@ const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
   {
     id: "edge-2",
     sourceNodeId: "node-process-1",
-    sourcePort: "bottom",
+    sourcePort: "bottom" as const,
     targetNodeId: "node-decision-1",
-    targetPort: "top",
-    routing: "orthogonal",
-    style: "solid",
-    marker: "arrow",
+    targetPort: "top" as const,
+    routing: "orthogonal" as const,
+    style: "solid" as const,
+    marker: "arrow" as const,
     label: "",
     color: "#64748b",
     strokeWidth: 2,
@@ -112,12 +107,12 @@ const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
   {
     id: "edge-3",
     sourceNodeId: "node-decision-1",
-    sourcePort: "bottom",
+    sourcePort: "bottom" as const,
     targetNodeId: "node-process-2",
-    targetPort: "top",
-    routing: "orthogonal",
-    style: "solid",
-    marker: "arrow",
+    targetPort: "top" as const,
+    routing: "orthogonal" as const,
+    style: "solid" as const,
+    marker: "arrow" as const,
     label: "Ya",
     color: "#64748b",
     strokeWidth: 2,
@@ -125,12 +120,12 @@ const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
   {
     id: "edge-4",
     sourceNodeId: "node-decision-1",
-    sourcePort: "right",
+    sourcePort: "right" as const,
     targetNodeId: "node-process-1",
-    targetPort: "right",
-    routing: "orthogonal",
-    style: "dashed",
-    marker: "arrow",
+    targetPort: "right" as const,
+    routing: "orthogonal" as const,
+    style: "dashed" as const,
+    marker: "arrow" as const,
     label: "Tidak",
     color: "#64748b",
     strokeWidth: 2,
@@ -138,11 +133,10 @@ const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
 ];
 
 export function FlowchartEditor() {
-  const [nodes, setNodes] = useState<FlowchartNode[]>(INITIAL_STARTER_NODES);
-  const [edges, setEdges] = useState<FlowchartEdge[]>(INITIAL_STARTER_EDGES);
-
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const editor = useFlowchartEditor({
+    initialNodes: INITIAL_STARTER_NODES,
+    initialEdges: INITIAL_STARTER_EDGES,
+  });
 
   // Viewport Kanvas: Zoom & Panning
   const [viewport, setViewport] = useState<CanvasViewport>({
@@ -200,7 +194,7 @@ export function FlowchartEditor() {
 
   // Fit To Screen
   const handleFitToScreen = useCallback(() => {
-    if (nodes.length === 0) {
+    if (editor.nodes.length === 0) {
       setViewport({ zoom: 1.0, panX: 40, panY: 20 });
       return;
     }
@@ -210,7 +204,7 @@ export function FlowchartEditor() {
     let minY = Infinity;
     let maxY = -Infinity;
 
-    for (const n of nodes) {
+    for (const n of editor.nodes) {
       if (n.x < minX) minX = n.x;
       if (n.x + n.width > maxX) maxX = n.x + n.width;
       if (n.y < minY) minY = n.y;
@@ -235,13 +229,15 @@ export function FlowchartEditor() {
     const panY = availableHeight / 2 - centerY * idealZoom;
 
     setViewport({ zoom: idealZoom, panX, panY });
-  }, [nodes, centerDimensions]);
+  }, [editor.nodes, centerDimensions]);
 
-  // Tambah shape dari palette (klik tombol)
+  // Tambah shape dari palette (klik tombol di sidebar palet)
   const handleAddShapeFromPalette = useCallback(
     (def: PaletteShapeDefinition) => {
-      const centerX = (centerDimensions.width / 2 - viewport.panX) / viewport.zoom - def.defaultWidth / 2;
-      const centerY = (centerDimensions.height / 2 - viewport.panY) / viewport.zoom - def.defaultHeight / 2;
+      const centerX =
+        (centerDimensions.width / 2 - viewport.panX) / viewport.zoom - def.defaultWidth / 2;
+      const centerY =
+        (centerDimensions.height / 2 - viewport.panY) / viewport.zoom - def.defaultHeight / 2;
 
       let targetX = centerX;
       let targetY = centerY;
@@ -251,228 +247,31 @@ export function FlowchartEditor() {
         targetY = Math.round(targetY / 10) * 10;
       }
 
-      const newNode: FlowchartNode = {
-        id: `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-        type: def.type,
-        x: targetX,
-        y: targetY,
-        width: def.defaultWidth,
-        height: def.defaultHeight,
-        label: def.defaultLabel,
-      };
-
-      setNodes((prev) => [...prev, newNode]);
-      setSelectedNodeId(newNode.id);
-      setSelectedEdgeId(null);
+      editor.addNode(def, targetX, targetY);
     },
-    [centerDimensions, viewport, snapToGrid]
+    [centerDimensions, viewport, snapToGrid, editor]
   );
 
-  // Drop shape dari palette (drag & drop koordinat)
+  // Drop shape dari palette (drag & drop koordinat kanvas)
   const handleDropNewShape = useCallback(
     (def: PaletteShapeDefinition, x: number, y: number) => {
-      const newNode: FlowchartNode = {
-        id: `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-        type: def.type,
-        x,
-        y,
-        width: def.defaultWidth,
-        height: def.defaultHeight,
-        label: def.defaultLabel,
-      };
-
-      setNodes((prev) => [...prev, newNode]);
-      setSelectedNodeId(newNode.id);
-      setSelectedEdgeId(null);
+      editor.addNode(def, x, y);
     },
-    []
+    [editor]
   );
 
-  // Update posisi node
-  const handleUpdateNodePosition = useCallback((id: string, x: number, y: number) => {
-    setNodes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, x, y } : n))
-    );
-  }, []);
-
-  // Update geometri node (x, y, width, height) saat di-resize (Tahap 3)
-  const handleUpdateNodeGeometry = useCallback(
-    (id: string, x: number, y: number, width: number, height: number) => {
-      setNodes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, x, y, width, height } : n))
-      );
-    },
-    []
-  );
-
-  // Update label node
-  const handleUpdateNodeLabel = useCallback((id: string, newLabel: string) => {
-    setNodes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, label: newLabel } : n))
-    );
-  }, []);
-
-  // =====================================================================
-  // PENGATURAN PROPERTI NODE (TAHAP 3)
-  // =====================================================================
-
-  const handleUpdateNodeFillColor = useCallback((id: string, color: string) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, fillColor: color } : n)));
-  }, []);
-
-  const handleUpdateNodeStrokeColor = useCallback((id: string, color: string) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, strokeColor: color } : n)));
-  }, []);
-
-  const handleUpdateNodeStrokeWidth = useCallback((id: string, width: number) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, strokeWidth: width } : n)));
-  }, []);
-
-  const handleUpdateNodeFontSize = useCallback((id: string, size: number) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, fontSize: size } : n)));
-  }, []);
-
-  const handleUpdateNodeTextColor = useCallback((id: string, color: string) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, textColor: color } : n)));
-  }, []);
-
-  const handleUpdateNodeTextAlign = useCallback((id: string, align: TextAlign) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, textAlign: align } : n)));
-  }, []);
-
-  // Duplikat Simbol (Tahap 3)
-  const handleDuplicateNode = useCallback((id: string) => {
-    setNodes((prev) => {
-      const target = prev.find((n) => n.id === id);
-      if (!target) return prev;
-      const duplicated: FlowchartNode = {
-        ...target,
-        id: `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-        x: target.x + 30,
-        y: target.y + 30,
-        label: `${target.label} (Salinan)`,
-      };
-      setSelectedNodeId(duplicated.id);
-      setSelectedEdgeId(null);
-      return [...prev, duplicated];
-    });
-  }, []);
-
-  // Bring to Front (Bawa ke Depan)
-  const handleBringToFront = useCallback((id: string) => {
-    setNodes((prev) => {
-      const idx = prev.findIndex((n) => n.id === id);
-      if (idx === -1 || idx === prev.length - 1) return prev;
-      const item = prev[idx];
-      const rest = prev.filter((_, i) => i !== idx);
-      return [...rest, item];
-    });
-  }, []);
-
-  // Send to Back (Kirim ke Belakang)
-  const handleSendToBack = useCallback((id: string) => {
-    setNodes((prev) => {
-      const idx = prev.findIndex((n) => n.id === id);
-      if (idx <= 0) return prev;
-      const item = prev[idx];
-      const rest = prev.filter((_, i) => i !== idx);
-      return [item, ...rest];
-    });
-  }, []);
-
-  // Hapus Node
-  const handleDeleteNode = useCallback((id: string) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id));
-    setEdges((prev) => prev.filter((e) => e.sourceNodeId !== id && e.targetNodeId !== id));
-    if (selectedNodeId === id) {
-      setSelectedNodeId(null);
-    }
-  }, [selectedNodeId]);
-
-  // =====================================================================
-  // OPERASI GARIS ALUR (EDGES) - TAHAP 2 & 3
-  // =====================================================================
-
-  const handleCreateEdge = useCallback((newEdgeData: Omit<FlowchartEdge, "id">) => {
-    const newEdge: FlowchartEdge = {
-      ...newEdgeData,
-      id: `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-      color: "#64748b",
-      strokeWidth: 2,
-    };
-
-    setEdges((prev) => [...prev, newEdge]);
-    setSelectedEdgeId(newEdge.id);
-    setSelectedNodeId(null);
-    setPropertyPanelCollapsed(false);
-  }, []);
-
-  const handleUpdateEdgeRouting = useCallback((id: string, routing: EdgeRoutingType) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, routing } : e))
-    );
-  }, []);
-
-  const handleUpdateEdgeStyle = useCallback((id: string, style: EdgeStyle) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, style } : e))
-    );
-  }, []);
-
-  const handleUpdateEdgeMarker = useCallback((id: string, marker: EdgeMarker) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, marker } : e))
-    );
-  }, []);
-
-  const handleUpdateEdgeLabel = useCallback((id: string, label: string) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, label } : e))
-    );
-  }, []);
-
-  const handleUpdateEdgeColor = useCallback((id: string, color: string) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, color } : e))
-    );
-  }, []);
-
-  const handleUpdateEdgeStrokeWidth = useCallback((id: string, strokeWidth: number) => {
-    setEdges((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, strokeWidth } : e))
-    );
-  }, []);
-
-  const handleDeleteEdge = useCallback((id: string) => {
-    setEdges((prev) => prev.filter((e) => e.id !== id));
-    if (selectedEdgeId === id) {
-      setSelectedEdgeId(null);
-    }
-  }, [selectedEdgeId]);
-
-  // Hapus elemen terpilih
-  const handleDeleteSelected = useCallback(() => {
-    if (selectedEdgeId) {
-      handleDeleteEdge(selectedEdgeId);
-      return;
-    }
-
-    if (selectedNodeId) {
-      handleDeleteNode(selectedNodeId);
-    }
-  }, [selectedEdgeId, selectedNodeId, handleDeleteEdge, handleDeleteNode]);
-
-  // Hapus semua
+  // Hapus semua (Clear All)
   const handleClearAll = useCallback(() => {
-    if (window.confirm("Apakah Anda yakin ingin mengosongkan seluruh kanvas flowchart dan semua garis?")) {
-      setNodes([]);
-      setEdges([]);
-      setSelectedNodeId(null);
-      setSelectedEdgeId(null);
+    if (
+      window.confirm(
+        "Apakah Anda yakin ingin mengosongkan seluruh kanvas flowchart dan semua garis?"
+      )
+    ) {
+      editor.clearAll();
     }
-  }, []);
+  }, [editor]);
 
-  // Keyboard shortcut (Delete / Backspace / Ctrl+D Duplicate)
+  // Keyboard Shortcuts Lengkap (Tahap 4)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -483,27 +282,83 @@ export function FlowchartEditor() {
 
       if (isInput) return;
 
-      if ((e.key === "Delete" || e.key === "Backspace") && (selectedNodeId || selectedEdgeId)) {
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // Undo / Redo
+      if (isCtrl && key === "z") {
         e.preventDefault();
-        handleDeleteSelected();
+        if (e.shiftKey) {
+          editor.redo();
+        } else {
+          editor.undo();
+        }
+        return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && selectedNodeId) {
+      if (isCtrl && key === "y") {
         e.preventDefault();
-        handleDuplicateNode(selectedNodeId);
+        editor.redo();
+        return;
+      }
+
+      // Copy / Cut / Paste
+      if (isCtrl && key === "c") {
+        e.preventDefault();
+        editor.copy();
+        return;
+      }
+
+      if (isCtrl && key === "x") {
+        e.preventDefault();
+        editor.cut();
+        return;
+      }
+
+      if (isCtrl && key === "v") {
+        e.preventDefault();
+        editor.paste();
+        return;
+      }
+
+      // Select All
+      if (isCtrl && key === "a") {
+        e.preventDefault();
+        editor.selectAll();
+        return;
+      }
+
+      // Duplicate (Ctrl+D)
+      if (isCtrl && key === "d") {
+        e.preventDefault();
+        editor.duplicateSelection();
+        return;
+      }
+
+      // Delete / Backspace
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        editor.deleteSelection();
+        return;
+      }
+
+      // Escape -> Bersihkan Seleksi
+      if (e.key === "Escape") {
+        e.preventDefault();
+        editor.clearSelection();
+        return;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNodeId, selectedEdgeId, handleDeleteSelected, handleDuplicateNode]);
+  }, [editor]);
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
-  const selectedEdge = edges.find((e) => e.id === selectedEdgeId) || null;
+  const selectedCount = editor.selectedNodeIds.length + editor.selectedEdgeIds.length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
-      {/* 1. Toolbar Atas */}
+      {/* 1. Toolbar Atas (Tahap 4: Undo, Redo, Copy, Cut, Paste, Select All) */}
       <FlowchartToolbar
         viewport={viewport}
         onZoomIn={handleZoomIn}
@@ -514,15 +369,24 @@ export function FlowchartEditor() {
         onToggleGrid={() => setShowGrid((prev) => !prev)}
         snapToGrid={snapToGrid}
         onToggleSnap={() => setSnapToGrid((prev) => !prev)}
-        hasSelection={Boolean(selectedNodeId || selectedEdgeId)}
-        hasSelectedNode={Boolean(selectedNodeId)}
-        onDuplicateSelected={() => selectedNodeId && handleDuplicateNode(selectedNodeId)}
-        onBringToFront={() => selectedNodeId && handleBringToFront(selectedNodeId)}
-        onSendToBack={() => selectedNodeId && handleSendToBack(selectedNodeId)}
-        onDeleteSelected={handleDeleteSelected}
+        hasSelection={editor.hasSelection}
+        hasSelectedNode={editor.selectedNodeIds.length > 0}
+        canUndo={editor.canUndo}
+        canRedo={editor.canRedo}
+        canPaste={editor.canPaste}
+        onUndo={editor.undo}
+        onRedo={editor.redo}
+        onCopy={editor.copy}
+        onCut={editor.cut}
+        onPaste={editor.paste}
+        onSelectAll={editor.selectAll}
+        onDuplicateSelected={editor.duplicateSelection}
+        onBringToFront={() => editor.selectedNode && editor.bringToFront(editor.selectedNode.id)}
+        onSendToBack={() => editor.selectedNode && editor.sendToBack(editor.selectedNode.id)}
+        onDeleteSelected={editor.deleteSelection}
         onClearAll={handleClearAll}
-        nodeCount={nodes.length}
-        edgeCount={edges.length}
+        nodeCount={editor.nodes.length}
+        edgeCount={editor.edges.length}
       />
 
       {/* 2. Workspace: Sidebar Palet Kiri, Kanvas Tengah, Panel Kanan */}
@@ -533,26 +397,22 @@ export function FlowchartEditor() {
         {/* Kanvas Tengah */}
         <div ref={mainCenterRef} className="flex-1 relative flex overflow-hidden">
           <FlowchartCanvas
-            nodes={nodes}
-            edges={edges}
-            selectedNodeId={selectedNodeId}
-            selectedEdgeId={selectedEdgeId}
-            onSelectNode={(id) => {
-              setSelectedNodeId(id);
-              if (id) setSelectedEdgeId(null);
-            }}
-            onSelectEdge={(id) => {
-              setSelectedEdgeId(id);
-              if (id) setSelectedNodeId(null);
-            }}
-            onUpdateNodePosition={handleUpdateNodePosition}
-            onUpdateNodeGeometry={handleUpdateNodeGeometry}
-            onUpdateNodeLabel={handleUpdateNodeLabel}
+            nodes={editor.nodes}
+            edges={editor.edges}
+            selectedNodeIds={editor.selectedNodeIds}
+            selectedEdgeIds={editor.selectedEdgeIds}
+            onSelectNode={editor.selectNode}
+            onSelectEdge={editor.selectEdge}
+            onSelectNodesInBox={editor.selectNodesInBox}
+            onStartDragAction={editor.startDragAction}
+            onEndDragAction={editor.endDragAction}
+            onUpdateNodePosition={editor.updateNodePosition}
+            onUpdateNodeGeometry={editor.updateNodeGeometry}
+            onUpdateNodeLabel={editor.updateNodeLabel}
             onDropNewShape={handleDropNewShape}
-            onCreateEdge={handleCreateEdge}
+            onCreateEdge={editor.createEdge}
             onDoubleClickEdgeLabel={(id) => {
-              setSelectedEdgeId(id);
-              setSelectedNodeId(null);
+              editor.selectEdge(id);
               setPropertyPanelCollapsed(false);
             }}
             viewport={viewport}
@@ -563,7 +423,7 @@ export function FlowchartEditor() {
 
           {/* Minimap di Pojok Kanan Bawah Kanvas */}
           <FlowchartMinimap
-            nodes={nodes}
+            nodes={editor.nodes}
             viewport={viewport}
             containerWidth={centerDimensions.width}
             containerHeight={centerDimensions.height}
@@ -575,27 +435,30 @@ export function FlowchartEditor() {
 
         {/* Panel Properti Kanan */}
         <FlowchartPropertyPanel
-          selectedNode={selectedNode}
-          selectedEdge={selectedEdge}
+          selectedNode={editor.selectedNode}
+          selectedEdge={editor.selectedEdge}
+          selectedCount={selectedCount}
           isCollapsed={propertyPanelCollapsed}
           onToggleCollapse={() => setPropertyPanelCollapsed((prev) => !prev)}
-          onUpdateNodeFillColor={handleUpdateNodeFillColor}
-          onUpdateNodeStrokeColor={handleUpdateNodeStrokeColor}
-          onUpdateNodeStrokeWidth={handleUpdateNodeStrokeWidth}
-          onUpdateNodeFontSize={handleUpdateNodeFontSize}
-          onUpdateNodeTextColor={handleUpdateNodeTextColor}
-          onUpdateNodeTextAlign={handleUpdateNodeTextAlign}
-          onDuplicateNode={handleDuplicateNode}
-          onBringToFront={handleBringToFront}
-          onSendToBack={handleSendToBack}
-          onDeleteNode={handleDeleteNode}
-          onUpdateEdgeRouting={handleUpdateEdgeRouting}
-          onUpdateEdgeStyle={handleUpdateEdgeStyle}
-          onUpdateEdgeMarker={handleUpdateEdgeMarker}
-          onUpdateEdgeLabel={handleUpdateEdgeLabel}
-          onUpdateEdgeColor={handleUpdateEdgeColor}
-          onUpdateEdgeStrokeWidth={handleUpdateEdgeStrokeWidth}
-          onDeleteEdge={handleDeleteEdge}
+          onUpdateNodeFillColor={editor.updateNodeFillColor}
+          onUpdateNodeStrokeColor={editor.updateNodeStrokeColor}
+          onUpdateNodeStrokeWidth={editor.updateNodeStrokeWidth}
+          onUpdateNodeFontSize={editor.updateNodeFontSize}
+          onUpdateNodeTextColor={editor.updateNodeTextColor}
+          onUpdateNodeTextAlign={editor.updateNodeTextAlign}
+          onDuplicateNode={editor.duplicateSelection}
+          onBringToFront={editor.bringToFront}
+          onSendToBack={editor.sendToBack}
+          onDeleteNode={() => editor.deleteSelection()}
+          onBatchUpdateFillColor={editor.batchUpdateFillColor}
+          onBatchDelete={editor.deleteSelection}
+          onUpdateEdgeRouting={editor.updateEdgeRouting}
+          onUpdateEdgeStyle={editor.updateEdgeStyle}
+          onUpdateEdgeMarker={editor.updateEdgeMarker}
+          onUpdateEdgeLabel={editor.updateEdgeLabel}
+          onUpdateEdgeColor={editor.updateEdgeColor}
+          onUpdateEdgeStrokeWidth={editor.updateEdgeStrokeWidth}
+          onDeleteEdge={() => editor.deleteSelection()}
         />
       </div>
     </div>

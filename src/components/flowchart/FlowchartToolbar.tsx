@@ -10,6 +10,11 @@ import {
   Magnet,
   Trash,
   Copy,
+  Scissors,
+  ClipboardPaste,
+  Undo2,
+  Redo2,
+  CheckSquare,
   BringToFront,
   SendToBack,
 } from "lucide-react";
@@ -27,6 +32,15 @@ interface FlowchartToolbarProps {
   onToggleSnap: () => void;
   hasSelection: boolean;
   hasSelectedNode: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  canPaste: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
+  onSelectAll: () => void;
   onDuplicateSelected: () => void;
   onBringToFront: () => void;
   onSendToBack: () => void;
@@ -48,6 +62,15 @@ export function FlowchartToolbar({
   onToggleSnap,
   hasSelection,
   hasSelectedNode,
+  canUndo,
+  canRedo,
+  canPaste,
+  onUndo,
+  onRedo,
+  onCopy,
+  onCut,
+  onPaste,
+  onSelectAll,
   onDuplicateSelected,
   onBringToFront,
   onSendToBack,
@@ -69,18 +92,110 @@ export function FlowchartToolbar({
               Flowchart Studio
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              Tahap 3
+              Tahap 4
             </span>
           </div>
           <div className="text-[11px] text-slate-400">
-            {nodeCount} simbol • {edgeCount} garis • Snap & Smart Guides aktif
+            {nodeCount} simbol • {edgeCount} garis • Multi-select & Undo/Redo aktif
           </div>
         </div>
       </div>
 
-      {/* Tengah / Kanan: Kontrol Zoom, Grid, Snap, Aksi */}
+      {/* Tengah / Kanan: Kontrol Undo/Redo, Clipboard, Zoom, Grid, Snap, Aksi */}
       <div className="flex items-center gap-2">
-        {/* Toggle Grid & Magnet Snap */}
+        {/* 1. Kontrol Undo & Redo (Tahap 4) */}
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Urungkan / Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Ulangi / Redo (Ctrl+Y / Ctrl+Shift+Z)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* 2. Kontrol Clipboard & Edit (Tahap 4) */}
+        <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
+          <button
+            type="button"
+            onClick={onCut}
+            disabled={!hasSelection}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Potong / Cut (Ctrl+X)"
+          >
+            <Scissors className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onCopy}
+            disabled={!hasSelection}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Salin / Copy (Ctrl+C)"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onPaste}
+            disabled={!canPaste}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Tempel / Paste (Ctrl+V)"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onSelectAll}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+            title="Pilih Semua / Select All (Ctrl+A)"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* 3. Kontrol Susunan & Duplikat */}
+        <div className="hidden lg:flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
+          <button
+            type="button"
+            onClick={onDuplicateSelected}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Duplikat Simbol Terpilih (Ctrl+D)"
+          >
+            <Copy className="w-3.5 h-3.5 text-indigo-500" />
+          </button>
+          <button
+            type="button"
+            onClick={onBringToFront}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Bawa ke Paling Depan"
+          >
+            <BringToFront className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onSendToBack}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Kirim ke Paling Belakang"
+          >
+            <SendToBack className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* 4. Toggle Grid & Magnet Snap */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
           <button
             type="button"
@@ -93,7 +208,7 @@ export function FlowchartToolbar({
             title="Tampilkan / Sembunyikan Grid"
           >
             <Grid className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline text-[11px]">Grid</span>
+            <span className="hidden xl:inline text-[11px]">Grid</span>
           </button>
           <button
             type="button"
@@ -106,42 +221,11 @@ export function FlowchartToolbar({
             title="Snap ke Grid & Alignment Guides"
           >
             <Magnet className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline text-[11px]">Snap</span>
+            <span className="hidden xl:inline text-[11px]">Snap</span>
           </button>
         </div>
 
-        {/* Kontrol Susunan & Duplikat (Tahap 3) */}
-        <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
-          <button
-            type="button"
-            onClick={onDuplicateSelected}
-            disabled={!hasSelectedNode}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Duplikat Simbol Terpilih (Ctrl+D)"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onBringToFront}
-            disabled={!hasSelectedNode}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Bawa ke Paling Depan"
-          >
-            <BringToFront className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onSendToBack}
-            disabled={!hasSelectedNode}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Kirim ke Paling Belakang"
-          >
-            <SendToBack className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Kontrol Zoom & Fit */}
+        {/* 5. Kontrol Zoom & Fit */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
           <button
             type="button"
@@ -172,13 +256,13 @@ export function FlowchartToolbar({
             type="button"
             onClick={onFitToScreen}
             className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
-            title="Pas ke Layar (Fit to Screen)"
+            title="Pas ke Layar / Fit to Screen"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Tombol Hapus Elemen Terpilih */}
+        {/* 6. Tombol Hapus Elemen Terpilih */}
         <button
           type="button"
           onClick={onDeleteSelected}
@@ -191,10 +275,10 @@ export function FlowchartToolbar({
           title="Hapus Simbol atau Garis Terpilih (Delete / Backspace)"
         >
           <Trash2 className="w-4 h-4" />
-          <span className="hidden md:inline">Hapus</span>
+          <span className="hidden sm:inline">Hapus</span>
         </button>
 
-        {/* Tombol Clear All Canvas */}
+        {/* 7. Tombol Clear All Canvas */}
         <button
           type="button"
           onClick={onClearAll}
