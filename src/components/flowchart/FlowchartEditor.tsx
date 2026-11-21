@@ -11,6 +11,8 @@ import { FlowchartShapePalette } from "./FlowchartShapePalette";
 import { FlowchartCanvas } from "./FlowchartCanvas";
 import { FlowchartMinimap } from "./FlowchartMinimap";
 import { FlowchartPropertyPanel } from "./FlowchartPropertyPanel";
+import { FlowchartExportModal } from "./FlowchartExportModal";
+import { importDiagramFromJson } from "@/lib/flowchart-export";
 
 // Diagram starter awal dengan 4 simbol
 const INITIAL_STARTER_NODES = [
@@ -155,6 +157,39 @@ export function FlowchartEditor({
   const lastSavedPayloadRef = useRef<string>("");
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Modal Ekspor & Impor JSON (Tahap 6)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const handleImportJsonFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          const data = importDiagramFromJson(content);
+          editor.loadDiagram(data.nodes, data.edges);
+          if (data.viewport) {
+            setViewport(data.viewport);
+          }
+          alert(
+            `Berhasil mengimpor diagram! (${data.nodes.length} simbol, ${data.edges.length} garis alur)`
+          );
+        } catch (err: unknown) {
+          alert(
+            "Gagal mengimpor berkas JSON: " +
+              (err instanceof Error ? err.message : String(err))
+          );
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    },
+    [editor]
+  );
+
   // Viewport Kanvas: Zoom & Panning
   const [viewport, setViewport] = useState<CanvasViewport>({
     zoom: 1.0,
@@ -282,7 +317,7 @@ export function FlowchartEditor({
     return () => {
       isMounted = false;
     };
-  }, [diagramId]);
+  }, [diagramId, editor]);
 
   // Debounced Auto-Save (1500ms) saat diagram berubah
   useEffect(() => {
@@ -500,13 +535,15 @@ export function FlowchartEditor({
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
-      {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status) */}
+      {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status, Export/Import) */}
       <FlowchartToolbar
         viewport={viewport}
         diagramTitle={diagramTitle}
         onBackToList={onBackToList}
         saveStatus={saveStatus}
         onManualSave={performSave}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onImportJsonFile={handleImportJsonFile}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
@@ -607,6 +644,16 @@ export function FlowchartEditor({
           onDeleteEdge={() => editor.deleteSelection()}
         />
       </div>
+
+      {/* Modal Ekspor (Tahap 6: PNG, SVG, PDF, JSON, XML mxGraph) */}
+      <FlowchartExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        nodes={editor.nodes}
+        edges={editor.edges}
+        viewport={viewport}
+        defaultTitle={diagramTitle}
+      />
     </div>
   );
 }
