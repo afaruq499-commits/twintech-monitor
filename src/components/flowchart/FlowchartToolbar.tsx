@@ -17,11 +17,17 @@ import {
   CheckSquare,
   BringToFront,
   SendToBack,
+  ArrowLeft,
+  Save,
 } from "lucide-react";
 import type { CanvasViewport } from "@/lib/flowchart-types";
 
 interface FlowchartToolbarProps {
   viewport: CanvasViewport;
+  diagramTitle?: string;
+  onBackToList?: () => void;
+  saveStatus?: "idle" | "saving" | "saved" | "error";
+  onManualSave?: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
@@ -52,6 +58,10 @@ interface FlowchartToolbarProps {
 
 export function FlowchartToolbar({
   viewport,
+  diagramTitle,
+  onBackToList,
+  saveStatus,
+  onManualSave,
   onZoomIn,
   onZoomOut,
   onZoomReset,
@@ -81,28 +91,73 @@ export function FlowchartToolbar({
 }: FlowchartToolbarProps) {
   return (
     <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between gap-4 shrink-0 select-none transition-colors">
-      {/* Kiri: Judul & Status */}
+      {/* Kiri: Tombol Back, Judul & Status Save */}
       <div className="flex items-center gap-3">
+        {onBackToList && (
+          <button
+            type="button"
+            onClick={onBackToList}
+            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 transition cursor-pointer"
+            title="Kembali ke Daftar Diagram"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
+
         <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-xs">
           <Workflow className="w-4 h-4" />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
-              Flowchart Studio
+            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight truncate max-w-[180px] sm:max-w-[280px]">
+              {diagramTitle || "Flowchart Studio"}
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              Tahap 4
-            </span>
+
+            {/* Indikator Status Auto-Save (Tahap 5) */}
+            {saveStatus === "saving" && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Menyimpan...
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Tersimpan
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <button
+                type="button"
+                onClick={onManualSave}
+                className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition cursor-pointer"
+                title="Gagal menyimpan ke cloud. Klik untuk coba lagi."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Gagal Simpan (Coba Lagi)
+              </button>
+            )}
           </div>
           <div className="text-[11px] text-slate-400">
-            {nodeCount} simbol • {edgeCount} garis • Multi-select & Undo/Redo aktif
+            {nodeCount} simbol • {edgeCount} garis • Auto-save aktif
           </div>
         </div>
       </div>
 
       {/* Tengah / Kanan: Kontrol Undo/Redo, Clipboard, Zoom, Grid, Snap, Aksi */}
       <div className="flex items-center gap-2">
+        {/* Tombol Simpan Manual (Ctrl+S) */}
+        {onManualSave && (
+          <button
+            type="button"
+            onClick={onManualSave}
+            disabled={saveStatus === "saving"}
+            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 disabled:opacity-40 transition cursor-pointer"
+            title="Simpan Sekarang (Ctrl+S)"
+          >
+            <Save className="w-3.5 h-3.5" />
+          </button>
+        )}
         {/* 1. Kontrol Undo & Redo (Tahap 4) */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
           <button

@@ -76,7 +76,7 @@ const INITIAL_STARTER_NODES = [
   },
 ];
 
-// Garis alur starter yang menghubungkan simbol awal (Tahap 2 & 3)
+// Garis alur starter yang menghubungkan simbol awal
 const INITIAL_STARTER_EDGES = [
   {
     id: "edge-1",
@@ -132,11 +132,28 @@ const INITIAL_STARTER_EDGES = [
   },
 ];
 
-export function FlowchartEditor() {
+export interface FlowchartEditorProps {
+  diagramId?: string;
+  initialTitle?: string;
+  onBackToList?: () => void;
+}
+
+export function FlowchartEditor({
+  diagramId,
+  initialTitle = "Diagram Alur Mesin",
+  onBackToList,
+}: FlowchartEditorProps) {
   const editor = useFlowchartEditor({
     initialNodes: INITIAL_STARTER_NODES,
     initialEdges: INITIAL_STARTER_EDGES,
   });
+
+  // Judul & Status Auto-Save (Tahap 5)
+  const [diagramTitle, setDiagramTitle] = useState<string>(initialTitle);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("saved");
+  const isInitialLoadingRef = useRef(true);
+  const lastSavedPayloadRef = useRef<string>("");
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Viewport Kanvas: Zoom & Panning
   const [viewport, setViewport] = useState<CanvasViewport>({
@@ -169,6 +186,123 @@ export function FlowchartEditor() {
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
   }, []);
+
+  // Simpan perubahan ke Database Cloud / API (dengan backup LocalStorage)
+  const performSave = useCallback(async () => {
+    const payload = {
+      nama: diagramTitle,
+      nodes: editor.nodes,
+      edges: editor.edges,
+      viewport,
+    };
+    const payloadStr = JSON.stringify(payload);
+
+    if (payloadStr === lastSavedPayloadRef.current) {
+      setSaveStatus("saved");
+      return;
+    }
+
+    setSaveStatus("saving");
+    try {
+      if (diagramId) {
+        const res = await fetch(`/api/flowchart/diagrams/${diagramId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: payloadStr,
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Gagal menyimpan diagram ke Supabase");
+        }
+      }
+      // Backup lokal selalu disimpan
+      localStorage.setItem(`twintech_flowchart_backup_${diagramId || "default"}`, payloadStr);
+      lastSavedPayloadRef.current = payloadStr;
+      setSaveStatus("saved");
+    } catch (err) {
+      console.warn("Auto-save ke cloud gagal, menyimpan ke backup lokal:", err);
+      localStorage.setItem(`twintech_flowchart_backup_${diagramId || "default"}`, payloadStr);
+      setSaveStatus("error");
+    }
+  }, [diagramId, diagramTitle, editor.nodes, editor.edges, viewport]);
+
+  // Load Diagram dari Cloud Database saat diagramId tersedia
+  useEffect(() => {
+    if (!diagramId) {
+      isInitialLoadingRef.current = false;
+      return;
+    }
+
+    let isMounted = true;
+    isInitialLoadingRef.current = true;
+
+    async function loadDiagram() {
+      try {
+        const res = await fetch(`/api/flowchart/diagrams/${diagramId}`);
+        const result = await res.json();
+        if (res.ok && result.success && isMounted) {
+          const d = result.diagram;
+          if (d.nama) setDiagramTitle(d.nama);
+          if (d.data?.nodes) {
+            editor.loadDiagram(d.data.nodes, d.data.edges || []);
+          }
+          if (d.data?.viewport) {
+            setViewport(d.data.viewport);
+          }
+          lastSavedPayloadRef.current = JSON.stringify({
+            nama: d.nama,
+            nodes: d.data?.nodes || [],
+            edges: d.data?.edges || [],
+            viewport: d.data?.viewport || { zoom: 1, panX: 40, panY: 20 },
+          });
+        }
+      } catch (err) {
+        console.warn("Gagal memuat diagram dari cloud, mencoba backup lokal:", err);
+        const local = localStorage.getItem(`twintech_flowchart_backup_${diagramId}`);
+        if (local && isMounted) {
+          try {
+            const parsed = JSON.parse(local);
+            if (parsed.nodes && parsed.edges) {
+              editor.loadDiagram(parsed.nodes, parsed.edges);
+            }
+            if (parsed.viewport) setViewport(parsed.viewport);
+          } catch {
+            // Abaikan parsing lokal gagal
+          }
+        }
+      } finally {
+        if (isMounted) {
+          isInitialLoadingRef.current = false;
+          setSaveStatus("saved");
+        }
+      }
+    }
+
+    loadDiagram();
+    return () => {
+      isMounted = false;
+    };
+  }, [diagramId]);
+
+  // Debounced Auto-Save (1500ms) saat diagram berubah
+  useEffect(() => {
+    if (isInitialLoadingRef.current) return;
+
+    setSaveStatus("saving");
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave();
+    }, 1500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editor.nodes, editor.edges, viewport, diagramTitle, performSave]);
 
   // Zoom Handlers
   const handleZoomIn = () => {
@@ -271,7 +405,7 @@ export function FlowchartEditor() {
     }
   }, [editor]);
 
-  // Keyboard Shortcuts Lengkap (Tahap 4)
+  // Keyboard Shortcuts Lengkap (Tahap 4 & 5: Termasuk Ctrl+S Save)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -284,6 +418,14 @@ export function FlowchartEditor() {
 
       const isCtrl = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
+
+      // Manual Save (Ctrl+S)
+      if (isCtrl && key === "s") {
+        e.preventDefault();
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        performSave();
+        return;
+      }
 
       // Undo / Redo
       if (isCtrl && key === "z") {
@@ -352,15 +494,19 @@ export function FlowchartEditor() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor]);
+  }, [editor, performSave]);
 
   const selectedCount = editor.selectedNodeIds.length + editor.selectedEdgeIds.length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
-      {/* 1. Toolbar Atas (Tahap 4: Undo, Redo, Copy, Cut, Paste, Select All) */}
+      {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status) */}
       <FlowchartToolbar
         viewport={viewport}
+        diagramTitle={diagramTitle}
+        onBackToList={onBackToList}
+        saveStatus={saveStatus}
+        onManualSave={performSave}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}

@@ -271,3 +271,21 @@ model CatalogComponent {
   @@index([kategori])
   @@map("catalog_components")
 }
+
+model FlowchartDiagram {
+  id         String   @id @default(cuid())
+  nama       String   @db.VarChar(300)
+  deskripsi  String?  @db.Text
+  dataJson   String   @default("{\"nodes\":[],\"edges\":[],\"viewport\":{\"zoom\":1,\"panX\":40,\"panY\":20}}") @map("data_json") @db.Text
+  userId     String?  @map("user_id") @db.VarChar(100)
+  authorName String?  @map("author_name") @db.VarChar(200)
+  nodeCount  Int      @default(0) @map("node_count")
+  edgeCount  Int      @default(0) @map("edge_count")
+  projectId  String?  @map("project_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("flowchart_diagrams")
+}

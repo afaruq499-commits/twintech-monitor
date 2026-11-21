@@ -465,6 +465,16 @@ export function useFlowchartEditor({ initialNodes, initialEdges }: UseFlowchartE
     setSelectedEdgeIds([]);
   }, [commitChange]);
 
+  // Load Diagram Baru (Tahap 5)
+  const loadDiagram = useCallback((newNodes: FlowchartNode[], newEdges: FlowchartEdge[]) => {
+    historyRef.current.clear({ nodes: newNodes, edges: newEdges });
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
   // Helper getters
   const selectedNode =
     selectedNodeIds.length === 1 ? nodes.find((n) => n.id === selectedNodeIds[0]) || null : null;
@@ -518,5 +528,6 @@ export function useFlowchartEditor({ initialNodes, initialEdges }: UseFlowchartE
     updateEdgeColor,
     updateEdgeStrokeWidth,
     clearAll,
+    loadDiagram,
   };
 }
