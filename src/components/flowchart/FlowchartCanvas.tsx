@@ -3,30 +3,50 @@
 import { useRef, useState, useEffect } from "react";
 import type {
   FlowchartNode,
+  FlowchartEdge,
+  PortPosition,
+  ConnectionDraft,
   CanvasViewport,
   PaletteShapeDefinition,
 } from "@/lib/flowchart-types";
+import {
+  getNodePortCoordinates,
+  computeEdgePath,
+  computeStraightPath,
+} from "@/lib/flowchart-routing";
 
 interface FlowchartCanvasProps {
   nodes: FlowchartNode[];
+  edges: FlowchartEdge[];
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
   onSelectNode: (id: string | null) => void;
+  onSelectEdge: (id: string | null) => void;
   onUpdateNodePosition: (id: string, x: number, y: number) => void;
   onUpdateNodeLabel: (id: string, newLabel: string) => void;
   onDropNewShape: (def: PaletteShapeDefinition, x: number, y: number) => void;
+  onCreateEdge: (newEdge: Omit<FlowchartEdge, "id">) => void;
+  onDoubleClickEdgeLabel?: (edgeId: string) => void;
   viewport: CanvasViewport;
   onUpdateViewport: (updater: (prev: CanvasViewport) => CanvasViewport) => void;
   showGrid: boolean;
   snapToGrid: boolean;
 }
 
+const PORTS: PortPosition[] = ["top", "right", "bottom", "left"];
+
 export function FlowchartCanvas({
   nodes,
+  edges,
   selectedNodeId,
+  selectedEdgeId,
   onSelectNode,
+  onSelectEdge,
   onUpdateNodePosition,
   onUpdateNodeLabel,
   onDropNewShape,
+  onCreateEdge,
+  onDoubleClickEdgeLabel,
   viewport,
   onUpdateViewport,
   showGrid,
@@ -42,12 +62,18 @@ export function FlowchartCanvas({
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Double-click inline text editing
+  // Hovered node untuk menampilkan handle koneksi
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // Dragging Garis Alur (Connection Draft)
+  const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
+
+  // Double-click inline text editing untuk Node
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const editInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Focus input saat mulai edit teks
+  // Focus input saat mulai edit teks node
   useEffect(() => {
     if (editingNodeId && editInputRef.current) {
       editInputRef.current.focus();
@@ -79,6 +105,17 @@ export function FlowchartCanvas({
     }
   };
 
+  // Konversi mouse event ke koordinat dunia (World Coordinate)
+  const getWorldCoordinate = (clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const left = rect ? rect.left : 0;
+    const top = rect ? rect.top : 0;
+    return {
+      x: (clientX - left - viewport.panX) / viewport.zoom,
+      y: (clientY - top - viewport.panY) / viewport.zoom,
+    };
+  };
+
   // Drag over canvas untuk HTML5 Drop
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -88,20 +125,14 @@ export function FlowchartCanvas({
   // Drop shape dari palette
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!containerRef.current) return;
-
     try {
       const dataStr = e.dataTransfer.getData("application/json");
       if (!dataStr) return;
       const def = JSON.parse(dataStr) as PaletteShapeDefinition;
 
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      // Konversi ke koordinat dunia (world coordinates)
-      let worldX = (mouseX - viewport.panX) / viewport.zoom - def.defaultWidth / 2;
-      let worldY = (mouseY - viewport.panY) / viewport.zoom - def.defaultHeight / 2;
+      const world = getWorldCoordinate(e.clientX, e.clientY);
+      let worldX = world.x - def.defaultWidth / 2;
+      let worldY = world.y - def.defaultHeight / 2;
 
       if (snapToGrid) {
         worldX = Math.round(worldX / 10) * 10;
@@ -139,11 +170,12 @@ export function FlowchartCanvas({
       handleFinishEditing();
     }
 
-    // Jika klik kiri pada background (bukan pada node)
+    // Jika klik kiri pada background (bukan pada node/garis)
     if (e.button === 0 || e.button === 1) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewport.panX, y: e.clientY - viewport.panY });
       onSelectNode(null);
+      onSelectEdge(null);
     }
   };
 
@@ -157,19 +189,65 @@ export function FlowchartCanvas({
     }
 
     onSelectNode(node.id);
+    onSelectEdge(null);
     setDraggingNodeId(node.id);
 
-    // Hitung offset klik relatif terhadap titik (x, y) node
-    const clickWorldX = (e.clientX - (containerRef.current?.getBoundingClientRect().left || 0) - viewport.panX) / viewport.zoom;
-    const clickWorldY = (e.clientY - (containerRef.current?.getBoundingClientRect().top || 0) - viewport.panY) / viewport.zoom;
-
+    const clickWorld = getWorldCoordinate(e.clientX, e.clientY);
     setDragOffset({
-      x: clickWorldX - node.x,
-      y: clickWorldY - node.y,
+      x: clickWorld.x - node.x,
+      y: clickWorld.y - node.y,
     });
   };
 
-  // Global Mouse Move (Panning atau Node Dragging)
+  // Mouse Down pada Handle Port (Mulai Tarik Garis)
+  const handlePortMouseDown = (
+    nodeId: string,
+    port: PortPosition,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const sourceNode = nodes.find((n) => n.id === nodeId);
+    if (!sourceNode) return;
+
+    const sourcePoint = getNodePortCoordinates(sourceNode, port);
+    const clickWorld = getWorldCoordinate(e.clientX, e.clientY);
+
+    setConnectionDraft({
+      sourceNodeId: nodeId,
+      sourcePort: port,
+      sourcePoint,
+      currentPoint: clickWorld,
+    });
+  };
+
+  // Mouse Up pada Handle Port (Selesaikan Tarik Garis ke Node Lain)
+  const handlePortMouseUp = (
+    targetNodeId: string,
+    targetPort: PortPosition,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    if (connectionDraft) {
+      // Tidak boleh menghubungkan node ke dirinya sendiri
+      if (connectionDraft.sourceNodeId !== targetNodeId) {
+        onCreateEdge({
+          sourceNodeId: connectionDraft.sourceNodeId,
+          sourcePort: connectionDraft.sourcePort,
+          targetNodeId,
+          targetPort,
+          routing: "orthogonal",
+          style: "solid",
+          marker: "arrow",
+          label: "",
+        });
+      }
+      setConnectionDraft(null);
+    }
+  };
+
+  // Global Mouse Move (Panning, Drag Node, atau Drag Garis Alur)
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isPanning) {
       onUpdateViewport((prev) => ({
@@ -180,13 +258,16 @@ export function FlowchartCanvas({
       return;
     }
 
-    if (draggingNodeId && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseWorldX = (e.clientX - rect.left - viewport.panX) / viewport.zoom;
-      const mouseWorldY = (e.clientY - rect.top - viewport.panY) / viewport.zoom;
+    if (connectionDraft) {
+      const world = getWorldCoordinate(e.clientX, e.clientY);
+      setConnectionDraft((prev) => (prev ? { ...prev, currentPoint: world } : null));
+      return;
+    }
 
-      let newX = mouseWorldX - dragOffset.x;
-      let newY = mouseWorldY - dragOffset.y;
+    if (draggingNodeId) {
+      const mouseWorld = getWorldCoordinate(e.clientX, e.clientY);
+      let newX = mouseWorld.x - dragOffset.x;
+      let newY = mouseWorld.y - dragOffset.y;
 
       if (snapToGrid) {
         newX = Math.round(newX / 10) * 10;
@@ -197,17 +278,19 @@ export function FlowchartCanvas({
     }
   };
 
-  // Mouse Up
+  // Mouse Up Global
   const handleMouseUp = () => {
     setIsPanning(false);
     setDraggingNodeId(null);
+    if (connectionDraft) {
+      setConnectionDraft(null);
+    }
   };
 
   // Render SVG Path/Geometry untuk masing-masing tipe shape
   const renderShapeGeometry = (node: FlowchartNode, isSelected: boolean) => {
     const { width: w, height: h, type } = node;
 
-    // Warna default industrial Twintech
     const getThemeStyles = () => {
       switch (type) {
         case "start_end":
@@ -402,6 +485,12 @@ export function FlowchartCanvas({
     }
   };
 
+  // Node Map untuk pencarian O(1) saat render garis
+  const nodeMap = new Map<string, FlowchartNode>();
+  for (const n of nodes) {
+    nodeMap.set(n.id, n);
+  }
+
   const editingNode = nodes.find((n) => n.id === editingNodeId);
 
   return (
@@ -448,6 +537,58 @@ export function FlowchartCanvas({
           <filter id="node-glow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#6366f1" floodOpacity="0.75" />
           </filter>
+
+          {/* Marker Ujung Panah Default (Akhir) */}
+          <marker
+            id="flowchart-arrow-end"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#64748b" />
+          </marker>
+
+          {/* Marker Ujung Panah Terpilih (Akhir) */}
+          <marker
+            id="flowchart-arrow-end-selected"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#4f46e5" />
+          </marker>
+
+          {/* Marker Ujung Panah Default (Awal) */}
+          <marker
+            id="flowchart-arrow-start"
+            viewBox="0 0 10 10"
+            refX="2"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 9 1 L 0 5 L 9 9 z" fill="#64748b" />
+          </marker>
+
+          {/* Marker Ujung Panah Terpilih (Awal) */}
+          <marker
+            id="flowchart-arrow-start-selected"
+            viewBox="0 0 10 10"
+            refX="2"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 9 1 L 0 5 L 9 9 z" fill="#4f46e5" />
+          </marker>
         </defs>
 
         {/* Latar Belakang Grid */}
@@ -457,14 +598,167 @@ export function FlowchartCanvas({
 
         {/* Layer Dunia dengan Pan & Zoom Transform */}
         <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
+          {/* ========================================================= */}
+          {/* 1. LAYER GARIS ALUR (EDGES) - Render di bawah node */}
+          {/* ========================================================= */}
+          {edges.map((edge) => {
+            const sourceNode = nodeMap.get(edge.sourceNodeId);
+            const targetNode = nodeMap.get(edge.targetNodeId);
+            if (!sourceNode || !targetNode) return null;
+
+            const p1 = getNodePortCoordinates(sourceNode, edge.sourcePort);
+            const p2 = getNodePortCoordinates(targetNode, edge.targetPort);
+            const isSelected = selectedEdgeId === edge.id;
+
+            const { path, labelPosition } = computeEdgePath(
+              p1,
+              edge.sourcePort,
+              p2,
+              edge.targetPort,
+              edge.routing
+            );
+
+            // Tentukan marker berdasarkan setting dan status seleksi
+            let markerEnd: string | undefined = undefined;
+            if (edge.marker === "arrow" || edge.marker === "arrow-both") {
+              markerEnd = isSelected ? "url(#flowchart-arrow-end-selected)" : "url(#flowchart-arrow-end)";
+            }
+
+            let markerStart: string | undefined = undefined;
+            if (edge.marker === "arrow-start" || edge.marker === "arrow-both") {
+              markerStart = isSelected ? "url(#flowchart-arrow-start-selected)" : "url(#flowchart-arrow-start)";
+            }
+
+            return (
+              <g key={edge.id} className="group">
+                {/* Efek Glow bila garis terpilih */}
+                {isSelected && (
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke="#818cf8"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.45"
+                  />
+                )}
+
+                {/* Garis Tampak Nyata */}
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={isSelected ? "#4f46e5" : edge.color || "#64748b"}
+                  strokeWidth={isSelected ? 2.5 : 2}
+                  strokeDasharray={edge.style === "dashed" ? "6,4" : undefined}
+                  markerEnd={markerEnd}
+                  markerStart={markerStart}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-colors pointer-events-none"
+                />
+
+                {/* Area Hit Transparan Lebih Tebal Agar Mudah Diklik */}
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth="20"
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectEdge(edge.id);
+                    onSelectNode(null);
+                  }}
+                />
+
+                {/* Badge Label Garis (misal: "Ya", "Tidak") */}
+                {edge.label && edge.label.trim().length > 0 && (
+                  <g
+                    transform={`translate(${labelPosition.x}, ${labelPosition.y})`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectEdge(edge.id);
+                      onSelectNode(null);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (onDoubleClickEdgeLabel) {
+                        onDoubleClickEdgeLabel(edge.id);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {/* Background badge pill */}
+                    <rect
+                      x={-(edge.label.length * 4.2 + 10)}
+                      y="-11"
+                      width={edge.label.length * 8.4 + 20}
+                      height="22"
+                      rx="11"
+                      className={`${
+                        isSelected
+                          ? "fill-indigo-50 dark:fill-indigo-950 stroke-indigo-500"
+                          : "fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-700 hover:stroke-indigo-400"
+                      } transition-colors`}
+                      strokeWidth="1.5"
+                    />
+                    {/* Teks badge */}
+                    <text
+                      x="0"
+                      y="4"
+                      textAnchor="middle"
+                      className={`text-[11px] font-bold select-none ${
+                        isSelected
+                          ? "fill-indigo-600 dark:fill-indigo-400"
+                          : "fill-slate-700 dark:fill-slate-200"
+                      }`}
+                    >
+                      {edge.label}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+
+          {/* ========================================================= */}
+          {/* 2. DRAFT GARIS SEMENTARA SAAT SEDANG DITARIK DARI HANDLE  */}
+          {/* ========================================================= */}
+          {connectionDraft && (
+            <g className="pointer-events-none">
+              <path
+                d={computeStraightPath(connectionDraft.sourcePoint, connectionDraft.currentPoint).path}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="2.5"
+                strokeDasharray="5,4"
+                markerEnd="url(#flowchart-arrow-end-selected)"
+              />
+              <circle
+                cx={connectionDraft.currentPoint.x}
+                cy={connectionDraft.currentPoint.y}
+                r="4"
+                fill="#6366f1"
+              />
+            </g>
+          )}
+
+          {/* ========================================================= */}
+          {/* 3. LAYER NODE / SIMBOL FLOWCHART                          */}
+          {/* ========================================================= */}
           {nodes.map((node) => {
             const isSelected = selectedNodeId === node.id;
             const isEditing = editingNodeId === node.id;
+            const isHovered = hoveredNodeId === node.id;
+            const showHandles = isHovered || isSelected || connectionDraft !== null;
 
             return (
               <g
                 key={node.id}
                 transform={`translate(${node.x}, ${node.y})`}
+                onMouseEnter={() => setHoveredNodeId(node.id)}
+                onMouseLeave={() => setHoveredNodeId(null)}
                 onMouseDown={(e) => handleNodeMouseDown(node, e)}
                 onDoubleClick={(e) => handleNodeDoubleClick(node, e)}
                 filter={isSelected ? "url(#node-glow)" : undefined}
@@ -497,13 +791,68 @@ export function FlowchartCanvas({
                     <rect x={node.width - 4} y={node.height - 4} width="8" height="8" fill="#ffffff" stroke="#6366f1" strokeWidth="1.5" />
                   </g>
                 )}
+
+                {/* ===================================================== */}
+                {/* HANDLE KONEKSI PORT (TOP, RIGHT, BOTTOM, LEFT)        */}
+                {/* ===================================================== */}
+                {showHandles &&
+                  PORTS.map((port) => {
+                    let px = 0;
+                    let py = 0;
+                    if (port === "top") {
+                      px = node.width / 2;
+                      py = 0;
+                    } else if (port === "bottom") {
+                      px = node.width / 2;
+                      py = node.height;
+                    } else if (port === "left") {
+                      px = 0;
+                      py = node.height / 2;
+                    } else if (port === "right") {
+                      px = node.width;
+                      py = node.height / 2;
+                    }
+
+                    return (
+                      <g key={port} className="transition-opacity duration-150">
+                        {/* Lingkaran Handle Port Tampak Nyata */}
+                        <circle
+                          cx={px}
+                          cy={py}
+                          r="5"
+                          fill="#ffffff"
+                          stroke="#6366f1"
+                          strokeWidth="2.5"
+                          className="pointer-events-none drop-shadow-xs"
+                        />
+                        <circle
+                          cx={px}
+                          cy={py}
+                          r="2.5"
+                          fill="#4f46e5"
+                          className="pointer-events-none"
+                        />
+
+                        {/* Area Hit Besar untuk Memulai atau Menyambungkan Garis */}
+                        <circle
+                          cx={px}
+                          cy={py}
+                          r="14"
+                          fill="transparent"
+                          className="cursor-crosshair pointer-events-auto"
+                          onMouseDown={(e) => handlePortMouseDown(node.id, port, e)}
+                          onMouseUp={(e) => handlePortMouseUp(node.id, port, e)}
+                        />
+                      </g>
+                    );
+                  })}
               </g>
             );
           })}
         </g>
       </svg>
 
-      {/* Input Overlay untuk Dobel Klik Edit Teks */}
+      {/* Input Overlay untuk Dobel Klik Edit Teks Node */}
       {editingNode && (
         <div
           style={{
@@ -527,7 +876,7 @@ export function FlowchartCanvas({
         </div>
       )}
 
-      {/* Watermark Petunjuk Penggunaan */}
+      {/* Watermark Petunjuk Penggunaan jika Kosong */}
       {nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
           <div className="text-center p-6 rounded-3xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs border border-slate-200/80 dark:border-slate-800/80 shadow-xl max-w-sm">

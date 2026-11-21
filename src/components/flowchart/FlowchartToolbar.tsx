@@ -22,10 +22,11 @@ interface FlowchartToolbarProps {
   onToggleGrid: () => void;
   snapToGrid: boolean;
   onToggleSnap: () => void;
-  hasSelectedNode: boolean;
+  hasSelection: boolean;
   onDeleteSelected: () => void;
   onClearAll: () => void;
   nodeCount: number;
+  edgeCount: number;
 }
 
 export function FlowchartToolbar({
@@ -38,10 +39,11 @@ export function FlowchartToolbar({
   onToggleGrid,
   snapToGrid,
   onToggleSnap,
-  hasSelectedNode,
+  hasSelection,
   onDeleteSelected,
   onClearAll,
   nodeCount,
+  edgeCount,
 }: FlowchartToolbarProps) {
   return (
     <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between gap-4 shrink-0 select-none transition-colors">
@@ -56,11 +58,11 @@ export function FlowchartToolbar({
               Flowchart Studio
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              Native SVG
+              Tahap 2
             </span>
           </div>
           <div className="text-[11px] text-slate-400">
-            {nodeCount} simbol pada canvas • Dobel-klik teks untuk mengedit
+            {nodeCount} simbol • {edgeCount} garis alur • Tarik titik biru antar-simbol
           </div>
         </div>
       </div>
@@ -103,15 +105,15 @@ export function FlowchartToolbar({
             type="button"
             onClick={onZoomOut}
             className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
-            title="Perkecil Zoom (-)"
+            title="Zoom Out (-15%)"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={onZoomReset}
-            className="px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded transition cursor-pointer"
-            title="Klik untuk reset zoom ke 100%"
+            className="px-2 py-1 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+            title="Reset Zoom ke 100%"
           >
             {Math.round(viewport.zoom * 100)}%
           </button>
@@ -119,44 +121,47 @@ export function FlowchartToolbar({
             type="button"
             onClick={onZoomIn}
             className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
-            title="Perbesar Zoom (+)"
+            title="Zoom In (+15%)"
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
-          <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+          <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
           <button
             type="button"
             onClick={onFitToScreen}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 transition cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
-            title="Pusatkan dan sesuaikan seluruh diagram ke layar (Fit to screen)"
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+            title="Pas ke Layar (Fit to Screen)"
           >
             <Maximize2 className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Fit to Screen</span>
           </button>
         </div>
 
-        {/* Hapus Shape Terpilih */}
+        {/* Tombol Hapus Elemen Terpilih */}
         <button
           type="button"
           onClick={onDeleteSelected}
-          disabled={!hasSelectedNode}
-          className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-          title="Hapus shape yang sedang dipilih (Tombol Del)"
+          disabled={!hasSelection}
+          className={`p-2 rounded-xl border flex items-center gap-1.5 text-xs font-semibold transition cursor-pointer ${
+            hasSelection
+              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 hover:bg-rose-100"
+              : "opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-800/40 text-slate-400 border-slate-200 dark:border-slate-800"
+          }`}
+          title="Hapus Simbol atau Garis Terpilih (Delete / Backspace)"
         >
           <Trash2 className="w-4 h-4" />
+          <span className="hidden md:inline">Hapus</span>
         </button>
 
-        {/* Reset / Clear All */}
-        {nodeCount > 0 && (
-          <button
-            type="button"
-            onClick={onClearAll}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition cursor-pointer"
-            title="Bersihkan seluruh kanvas"
-          >
-            <Trash className="w-4 h-4" />
-          </button>
-        )}
+        {/* Tombol Clear All Canvas */}
+        <button
+          type="button"
+          onClick={onClearAll}
+          disabled={nodeCount === 0 && edgeCount === 0}
+          className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Kosongkan Seluruh Kanvas"
+        >
+          <Trash className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );

@@ -1,5 +1,5 @@
 /**
- * Definisi Tipe Data Flowchart Studio (Tahap 1)
+ * Definisi Tipe Data Flowchart Studio (Tahap 1 & 2)
  * TypeScript Strict - Tanpa menggunakan type `any`
  */
 
@@ -25,6 +25,34 @@ export interface FlowchartNode {
   fillColor?: string;
   strokeColor?: string;
   textColor?: string;
+}
+
+export type PortPosition = "top" | "right" | "bottom" | "left";
+
+export type EdgeRoutingType = "straight" | "orthogonal" | "curved";
+
+export type EdgeMarker = "arrow" | "arrow-both" | "arrow-start" | "none";
+
+export type EdgeStyle = "solid" | "dashed";
+
+export interface FlowchartEdge {
+  id: string;
+  sourceNodeId: string;
+  sourcePort: PortPosition;
+  targetNodeId: string;
+  targetPort: PortPosition;
+  routing: EdgeRoutingType;
+  style: EdgeStyle;
+  marker: EdgeMarker;
+  label?: string;
+  color?: string;
+}
+
+export interface ConnectionDraft {
+  sourceNodeId: string;
+  sourcePort: PortPosition;
+  sourcePoint: { x: number; y: number };
+  currentPoint: { x: number; y: number };
 }
 
 export interface CanvasViewport {

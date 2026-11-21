@@ -3,8 +3,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type {
   FlowchartNode,
+  FlowchartEdge,
   CanvasViewport,
   PaletteShapeDefinition,
+  EdgeRoutingType,
+  EdgeStyle,
+  EdgeMarker,
 } from "@/lib/flowchart-types";
 import { FlowchartToolbar } from "./FlowchartToolbar";
 import { FlowchartShapePalette } from "./FlowchartShapePalette";
@@ -12,7 +16,7 @@ import { FlowchartCanvas } from "./FlowchartCanvas";
 import { FlowchartMinimap } from "./FlowchartMinimap";
 import { FlowchartPropertyPanel } from "./FlowchartPropertyPanel";
 
-// Diagram starter awal agar kanvas tidak langsung kosong melompong
+// Diagram starter awal dengan 4 simbol
 const INITIAL_STARTER_NODES: FlowchartNode[] = [
   {
     id: "node-start",
@@ -36,7 +40,7 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     id: "node-decision-1",
     type: "decision",
     x: 285,
-    y: 290,
+    y: 300,
     width: 130,
     height: 80,
     label: "INTERLOCK OK?",
@@ -45,16 +49,67 @@ const INITIAL_STARTER_NODES: FlowchartNode[] = [
     id: "node-process-2",
     type: "process",
     x: 275,
-    y: 420,
+    y: 440,
     width: 150,
     height: 64,
     label: "CYCLE RUNNING",
   },
 ];
 
+// Garis alur starter yang menghubungkan simbol awal (Tahap 2)
+const INITIAL_STARTER_EDGES: FlowchartEdge[] = [
+  {
+    id: "edge-1",
+    sourceNodeId: "node-start",
+    sourcePort: "bottom",
+    targetNodeId: "node-process-1",
+    targetPort: "top",
+    routing: "orthogonal",
+    style: "solid",
+    marker: "arrow",
+    label: "",
+  },
+  {
+    id: "edge-2",
+    sourceNodeId: "node-process-1",
+    sourcePort: "bottom",
+    targetNodeId: "node-decision-1",
+    targetPort: "top",
+    routing: "orthogonal",
+    style: "solid",
+    marker: "arrow",
+    label: "",
+  },
+  {
+    id: "edge-3",
+    sourceNodeId: "node-decision-1",
+    sourcePort: "bottom",
+    targetNodeId: "node-process-2",
+    targetPort: "top",
+    routing: "orthogonal",
+    style: "solid",
+    marker: "arrow",
+    label: "Ya",
+  },
+  {
+    id: "edge-4",
+    sourceNodeId: "node-decision-1",
+    sourcePort: "right",
+    targetNodeId: "node-process-1",
+    targetPort: "right",
+    routing: "orthogonal",
+    style: "dashed",
+    marker: "arrow",
+    label: "Tidak",
+  },
+];
+
 export function FlowchartEditor() {
   const [nodes, setNodes] = useState<FlowchartNode[]>(INITIAL_STARTER_NODES);
+  const [edges, setEdges] = useState<FlowchartEdge[]>(INITIAL_STARTER_EDGES);
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   // Viewport Kanvas: Zoom & Panning
   const [viewport, setViewport] = useState<CanvasViewport>({
@@ -175,6 +230,7 @@ export function FlowchartEditor() {
 
       setNodes((prev) => [...prev, newNode]);
       setSelectedNodeId(newNode.id);
+      setSelectedEdgeId(null);
     },
     [centerDimensions, viewport, snapToGrid]
   );
@@ -194,6 +250,7 @@ export function FlowchartEditor() {
 
       setNodes((prev) => [...prev, newNode]);
       setSelectedNodeId(newNode.id);
+      setSelectedEdgeId(null);
     },
     []
   );
@@ -212,18 +269,84 @@ export function FlowchartEditor() {
     );
   }, []);
 
-  // Hapus node terpilih
-  const handleDeleteSelected = useCallback(() => {
-    if (!selectedNodeId) return;
-    setNodes((prev) => prev.filter((n) => n.id !== selectedNodeId));
+  // =====================================================================
+  // OPERASI GARIS ALUR (EDGES) - TAHAP 2
+  // =====================================================================
+
+  // Buat garis alur baru saat user selesai menarik dari handle
+  const handleCreateEdge = useCallback((newEdgeData: Omit<FlowchartEdge, "id">) => {
+    const newEdge: FlowchartEdge = {
+      ...newEdgeData,
+      id: `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    };
+
+    setEdges((prev) => [...prev, newEdge]);
+    setSelectedEdgeId(newEdge.id);
     setSelectedNodeId(null);
-  }, [selectedNodeId]);
+    setPropertyPanelCollapsed(false); // Otomatis buka panel untuk mengatur garis
+  }, []);
+
+  // Ubah tipe routing garis (lurus, siku, lengkung)
+  const handleUpdateEdgeRouting = useCallback((id: string, routing: EdgeRoutingType) => {
+    setEdges((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, routing } : e))
+    );
+  }, []);
+
+  // Ubah bentuk garis (solid vs putus-putus)
+  const handleUpdateEdgeStyle = useCallback((id: string, style: EdgeStyle) => {
+    setEdges((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, style } : e))
+    );
+  }, []);
+
+  // Ubah ujung panah (arrow, arrow-start, arrow-both, none)
+  const handleUpdateEdgeMarker = useCallback((id: string, marker: EdgeMarker) => {
+    setEdges((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, marker } : e))
+    );
+  }, []);
+
+  // Ubah label teks garis
+  const handleUpdateEdgeLabel = useCallback((id: string, label: string) => {
+    setEdges((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, label } : e))
+    );
+  }, []);
+
+  // Hapus garis alur
+  const handleDeleteEdge = useCallback((id: string) => {
+    setEdges((prev) => prev.filter((e) => e.id !== id));
+    if (selectedEdgeId === id) {
+      setSelectedEdgeId(null);
+    }
+  }, [selectedEdgeId]);
+
+  // Hapus elemen terpilih (baik Node maupun Garis)
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedEdgeId) {
+      handleDeleteEdge(selectedEdgeId);
+      return;
+    }
+
+    if (selectedNodeId) {
+      // Hapus node terpilih
+      setNodes((prev) => prev.filter((n) => n.id !== selectedNodeId));
+      // Otomatis hapus semua garis yang terhubung ke node ini
+      setEdges((prev) =>
+        prev.filter((e) => e.sourceNodeId !== selectedNodeId && e.targetNodeId !== selectedNodeId)
+      );
+      setSelectedNodeId(null);
+    }
+  }, [selectedEdgeId, selectedNodeId, handleDeleteEdge]);
 
   // Hapus semua
   const handleClearAll = useCallback(() => {
-    if (window.confirm("Apakah Anda yakin ingin mengosongkan seluruh kanvas flowchart?")) {
+    if (window.confirm("Apakah Anda yakin ingin mengosongkan seluruh kanvas flowchart dan semua garis?")) {
       setNodes([]);
+      setEdges([]);
       setSelectedNodeId(null);
+      setSelectedEdgeId(null);
     }
   }, []);
 
@@ -236,7 +359,7 @@ export function FlowchartEditor() {
         activeEl instanceof HTMLTextAreaElement ||
         (activeEl as HTMLElement)?.isContentEditable;
 
-      if (!isInput && (e.key === "Delete" || e.key === "Backspace") && selectedNodeId) {
+      if (!isInput && (e.key === "Delete" || e.key === "Backspace") && (selectedNodeId || selectedEdgeId)) {
         e.preventDefault();
         handleDeleteSelected();
       }
@@ -244,9 +367,10 @@ export function FlowchartEditor() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNodeId, handleDeleteSelected]);
+  }, [selectedNodeId, selectedEdgeId, handleDeleteSelected]);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
+  const selectedEdge = edges.find((e) => e.id === selectedEdgeId) || null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
@@ -261,10 +385,11 @@ export function FlowchartEditor() {
         onToggleGrid={() => setShowGrid((prev) => !prev)}
         snapToGrid={snapToGrid}
         onToggleSnap={() => setSnapToGrid((prev) => !prev)}
-        hasSelectedNode={Boolean(selectedNodeId)}
+        hasSelection={Boolean(selectedNodeId || selectedEdgeId)}
         onDeleteSelected={handleDeleteSelected}
         onClearAll={handleClearAll}
         nodeCount={nodes.length}
+        edgeCount={edges.length}
       />
 
       {/* 2. Workspace: Sidebar Palet Kiri, Kanvas Tengah, Panel Kanan */}
@@ -276,11 +401,26 @@ export function FlowchartEditor() {
         <div ref={mainCenterRef} className="flex-1 relative flex overflow-hidden">
           <FlowchartCanvas
             nodes={nodes}
+            edges={edges}
             selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
+            selectedEdgeId={selectedEdgeId}
+            onSelectNode={(id) => {
+              setSelectedNodeId(id);
+              if (id) setSelectedEdgeId(null);
+            }}
+            onSelectEdge={(id) => {
+              setSelectedEdgeId(id);
+              if (id) setSelectedNodeId(null);
+            }}
             onUpdateNodePosition={handleUpdateNodePosition}
             onUpdateNodeLabel={handleUpdateNodeLabel}
             onDropNewShape={handleDropNewShape}
+            onCreateEdge={handleCreateEdge}
+            onDoubleClickEdgeLabel={(id) => {
+              setSelectedEdgeId(id);
+              setSelectedNodeId(null);
+              setPropertyPanelCollapsed(false);
+            }}
             viewport={viewport}
             onUpdateViewport={setViewport}
             showGrid={showGrid}
@@ -299,11 +439,17 @@ export function FlowchartEditor() {
           />
         </div>
 
-        {/* Panel Properti Kanan (Dibuat kosong dulu untuk Tahap 1) */}
+        {/* Panel Properti Kanan */}
         <FlowchartPropertyPanel
           selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
           isCollapsed={propertyPanelCollapsed}
           onToggleCollapse={() => setPropertyPanelCollapsed((prev) => !prev)}
+          onUpdateEdgeRouting={handleUpdateEdgeRouting}
+          onUpdateEdgeStyle={handleUpdateEdgeStyle}
+          onUpdateEdgeMarker={handleUpdateEdgeMarker}
+          onUpdateEdgeLabel={handleUpdateEdgeLabel}
+          onDeleteEdge={handleDeleteEdge}
         />
       </div>
     </div>
