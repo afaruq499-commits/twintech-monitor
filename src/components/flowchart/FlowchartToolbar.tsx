@@ -9,6 +9,9 @@ import {
   Workflow,
   Magnet,
   Trash,
+  Copy,
+  BringToFront,
+  SendToBack,
 } from "lucide-react";
 import type { CanvasViewport } from "@/lib/flowchart-types";
 
@@ -23,6 +26,10 @@ interface FlowchartToolbarProps {
   snapToGrid: boolean;
   onToggleSnap: () => void;
   hasSelection: boolean;
+  hasSelectedNode: boolean;
+  onDuplicateSelected: () => void;
+  onBringToFront: () => void;
+  onSendToBack: () => void;
   onDeleteSelected: () => void;
   onClearAll: () => void;
   nodeCount: number;
@@ -40,6 +47,10 @@ export function FlowchartToolbar({
   snapToGrid,
   onToggleSnap,
   hasSelection,
+  hasSelectedNode,
+  onDuplicateSelected,
+  onBringToFront,
+  onSendToBack,
   onDeleteSelected,
   onClearAll,
   nodeCount,
@@ -58,11 +69,11 @@ export function FlowchartToolbar({
               Flowchart Studio
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              Tahap 2
+              Tahap 3
             </span>
           </div>
           <div className="text-[11px] text-slate-400">
-            {nodeCount} simbol • {edgeCount} garis alur • Tarik titik biru antar-simbol
+            {nodeCount} simbol • {edgeCount} garis • Snap & Smart Guides aktif
           </div>
         </div>
       </div>
@@ -92,10 +103,41 @@ export function FlowchartToolbar({
                 ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             }`}
-            title="Snap ke Grid (Kelipatan 10px)"
+            title="Snap ke Grid & Alignment Guides"
           >
             <Magnet className="w-3.5 h-3.5" />
             <span className="hidden sm:inline text-[11px]">Snap</span>
+          </button>
+        </div>
+
+        {/* Kontrol Susunan & Duplikat (Tahap 3) */}
+        <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
+          <button
+            type="button"
+            onClick={onDuplicateSelected}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Duplikat Simbol Terpilih (Ctrl+D)"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onBringToFront}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Bawa ke Paling Depan"
+          >
+            <BringToFront className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onSendToBack}
+            disabled={!hasSelectedNode}
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Kirim ke Paling Belakang"
+          >
+            <SendToBack className="w-3.5 h-3.5" />
           </button>
         </div>
 

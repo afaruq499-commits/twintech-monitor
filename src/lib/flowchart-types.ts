@@ -1,5 +1,5 @@
 /**
- * Definisi Tipe Data Flowchart Studio (Tahap 1 & 2)
+ * Definisi Tipe Data Flowchart Studio (Tahap 1, 2, & 3)
  * TypeScript Strict - Tanpa menggunakan type `any`
  */
 
@@ -14,6 +14,8 @@ export type FlowchartShapeType =
   | "connector"     // Circular On-page Connector
   | "note";         // Annotation / Note (Folded corner)
 
+export type TextAlign = "left" | "center" | "right";
+
 export interface FlowchartNode {
   id: string;
   type: FlowchartShapeType;
@@ -24,7 +26,10 @@ export interface FlowchartNode {
   label: string;
   fillColor?: string;
   strokeColor?: string;
+  strokeWidth?: number; // 1, 2, 3, 4
   textColor?: string;
+  fontSize?: number; // 10, 11, 12, 14, 16, 18
+  textAlign?: TextAlign; // "left" | "center" | "right"
 }
 
 export type PortPosition = "top" | "right" | "bottom" | "left";
@@ -46,6 +51,7 @@ export interface FlowchartEdge {
   marker: EdgeMarker;
   label?: string;
   color?: string;
+  strokeWidth?: number; // 1, 2, 3, 4
 }
 
 export interface ConnectionDraft {
@@ -53,6 +59,15 @@ export interface ConnectionDraft {
   sourcePort: PortPosition;
   sourcePoint: { x: number; y: number };
   currentPoint: { x: number; y: number };
+}
+
+export type ResizeHandleType = "nw" | "ne" | "se" | "sw" | "n" | "s" | "e" | "w";
+
+export interface AlignmentGuide {
+  type: "horizontal" | "vertical";
+  position: number; // koordinat x (vertikal) atau y (horizontal)
+  start: number;
+  end: number;
 }
 
 export interface CanvasViewport {

@@ -2,6 +2,7 @@ import type {
   FlowchartNode,
   PortPosition,
   EdgeRoutingType,
+  AlignmentGuide,
 } from "./flowchart-types";
 
 export interface Point {
@@ -260,4 +261,128 @@ export function computeEdgePath(
     default:
       return computeOrthogonalPath(p1, dir1, p2, dir2);
   }
+}
+
+export interface AlignmentResult {
+  snappedX: number;
+  snappedY: number;
+  guides: AlignmentGuide[];
+}
+
+/**
+ * Menghitung smart alignment guides dan posisi snap saat memindahkan sebuah node
+ */
+export function calculateNodeAlignment(
+  draggedNode: { x: number; y: number; width: number; height: number },
+  otherNodes: FlowchartNode[],
+  tolerance = 6
+): AlignmentResult {
+  let snappedX = draggedNode.x;
+  let snappedY = draggedNode.y;
+  const guides: AlignmentGuide[] = [];
+
+  const currentLeft = draggedNode.x;
+  const currentCenterX = draggedNode.x + draggedNode.width / 2;
+  const currentRight = draggedNode.x + draggedNode.width;
+
+  const currentTop = draggedNode.y;
+  const currentCenterY = draggedNode.y + draggedNode.height / 2;
+  const currentBottom = draggedNode.y + draggedNode.height;
+
+  let bestDiffX = tolerance + 1;
+  let guideLineX: AlignmentGuide | null = null;
+
+  let bestDiffY = tolerance + 1;
+  let guideLineY: AlignmentGuide | null = null;
+
+  for (const other of otherNodes) {
+    const oLeft = other.x;
+    const oCenterX = other.x + other.width / 2;
+    const oRight = other.x + other.width;
+
+    const oTop = other.y;
+    const oCenterY = other.y + other.height / 2;
+    const oBottom = other.y + other.height;
+
+    // Check X alignments:
+    // 1. Center to Center
+    const diffCenterX = Math.abs(currentCenterX - oCenterX);
+    if (diffCenterX < bestDiffX) {
+      bestDiffX = diffCenterX;
+      snappedX = oCenterX - draggedNode.width / 2;
+      guideLineX = {
+        type: "vertical",
+        position: oCenterX,
+        start: Math.min(draggedNode.y, oTop) - 40,
+        end: Math.max(draggedNode.y + draggedNode.height, oBottom) + 40,
+      };
+    }
+    // 2. Left to Left
+    const diffLL = Math.abs(currentLeft - oLeft);
+    if (diffLL < bestDiffX) {
+      bestDiffX = diffLL;
+      snappedX = oLeft;
+      guideLineX = {
+        type: "vertical",
+        position: oLeft,
+        start: Math.min(draggedNode.y, oTop) - 40,
+        end: Math.max(draggedNode.y + draggedNode.height, oBottom) + 40,
+      };
+    }
+    // 3. Right to Right
+    const diffRR = Math.abs(currentRight - oRight);
+    if (diffRR < bestDiffX) {
+      bestDiffX = diffRR;
+      snappedX = oRight - draggedNode.width;
+      guideLineX = {
+        type: "vertical",
+        position: oRight,
+        start: Math.min(draggedNode.y, oTop) - 40,
+        end: Math.max(draggedNode.y + draggedNode.height, oBottom) + 40,
+      };
+    }
+
+    // Check Y alignments:
+    // 1. Center to Center
+    const diffCenterY = Math.abs(currentCenterY - oCenterY);
+    if (diffCenterY < bestDiffY) {
+      bestDiffY = diffCenterY;
+      snappedY = oCenterY - draggedNode.height / 2;
+      guideLineY = {
+        type: "horizontal",
+        position: oCenterY,
+        start: Math.min(draggedNode.x, oLeft) - 40,
+        end: Math.max(draggedNode.x + draggedNode.width, oRight) + 40,
+      };
+    }
+    // 2. Top to Top
+    const diffTT = Math.abs(currentTop - oTop);
+    if (diffTT < bestDiffY) {
+      bestDiffY = diffTT;
+      snappedY = oTop;
+      guideLineY = {
+        type: "horizontal",
+        position: oTop,
+        start: Math.min(draggedNode.x, oLeft) - 40,
+        end: Math.max(draggedNode.x + draggedNode.width, oRight) + 40,
+      };
+    }
+    // 3. Bottom to Bottom
+    const diffBB = Math.abs(currentBottom - oBottom);
+    if (diffBB < bestDiffY) {
+      bestDiffY = diffBB;
+      snappedY = oBottom - draggedNode.height;
+      guideLineY = {
+        type: "horizontal",
+        position: oBottom,
+        start: Math.min(draggedNode.x, oLeft) - 40,
+        end: Math.max(draggedNode.x + draggedNode.width, oRight) + 40,
+      };
+    }
+  }
+
+  if (guideLineX) guides.push(guideLineX);
+  if (guideLineY) guides.push(guideLineY);
+
+  return { snappedX, snappedY, guides };
 }

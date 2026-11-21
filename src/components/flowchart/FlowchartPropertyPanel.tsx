@@ -3,7 +3,6 @@
 import {
   SlidersHorizontal,
   Info,
-  Sparkles,
   ChevronRight,
   ChevronLeft,
   ArrowRight,
@@ -13,6 +12,15 @@ import {
   Tag,
   GitFork,
   Check,
+  Copy,
+  BringToFront,
+  SendToBack,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Paintbrush,
+  Type,
+  Maximize,
 } from "lucide-react";
 import type {
   FlowchartNode,
@@ -20,6 +28,7 @@ import type {
   EdgeRoutingType,
   EdgeStyle,
   EdgeMarker,
+  TextAlign,
 } from "@/lib/flowchart-types";
 
 interface FlowchartPropertyPanelProps {
@@ -27,22 +36,71 @@ interface FlowchartPropertyPanelProps {
   selectedEdge: FlowchartEdge | null;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  // Handler untuk Node (Tahap 3)
+  onUpdateNodeFillColor?: (id: string, color: string) => void;
+  onUpdateNodeStrokeColor?: (id: string, color: string) => void;
+  onUpdateNodeStrokeWidth?: (id: string, width: number) => void;
+  onUpdateNodeFontSize?: (id: string, size: number) => void;
+  onUpdateNodeTextColor?: (id: string, color: string) => void;
+  onUpdateNodeTextAlign?: (id: string, align: TextAlign) => void;
+  onDuplicateNode?: (id: string) => void;
+  onBringToFront?: (id: string) => void;
+  onSendToBack?: (id: string) => void;
+  onDeleteNode?: (id: string) => void;
+  // Handler untuk Garis / Edge (Tahap 2 & 3)
   onUpdateEdgeRouting?: (id: string, routing: EdgeRoutingType) => void;
   onUpdateEdgeStyle?: (id: string, style: EdgeStyle) => void;
   onUpdateEdgeMarker?: (id: string, marker: EdgeMarker) => void;
   onUpdateEdgeLabel?: (id: string, label: string) => void;
+  onUpdateEdgeColor?: (id: string, color: string) => void;
+  onUpdateEdgeStrokeWidth?: (id: string, width: number) => void;
   onDeleteEdge?: (id: string) => void;
 }
+
+// Palet warna standar Twintech
+const COLOR_PRESETS = [
+  { name: "Blue", hex: "#2563eb" },
+  { name: "Indigo", hex: "#4f46e5" },
+  { name: "Emerald", hex: "#059669" },
+  { name: "Amber", hex: "#d97706" },
+  { name: "Teal", hex: "#0d9488" },
+  { name: "Sky", hex: "#0284c7" },
+  { name: "Purple", hex: "#7c3aed" },
+  { name: "Dark Slate", hex: "#1e293b" },
+  { name: "White", hex: "#ffffff" },
+  { name: "Rose", hex: "#e11d48" },
+];
+
+const TEXT_COLOR_PRESETS = [
+  { name: "White", hex: "#ffffff" },
+  { name: "Slate Dark", hex: "#0f172a" },
+  { name: "Slate Muted", hex: "#64748b" },
+  { name: "Yellow", hex: "#f59e0b" },
+  { name: "Emerald", hex: "#10b981" },
+  { name: "Red", hex: "#ef4444" },
+];
 
 export function FlowchartPropertyPanel({
   selectedNode,
   selectedEdge,
   isCollapsed,
   onToggleCollapse,
+  onUpdateNodeFillColor,
+  onUpdateNodeStrokeColor,
+  onUpdateNodeStrokeWidth,
+  onUpdateNodeFontSize,
+  onUpdateNodeTextColor,
+  onUpdateNodeTextAlign,
+  onDuplicateNode,
+  onBringToFront,
+  onSendToBack,
+  onDeleteNode,
   onUpdateEdgeRouting,
   onUpdateEdgeStyle,
   onUpdateEdgeMarker,
   onUpdateEdgeLabel,
+  onUpdateEdgeColor,
+  onUpdateEdgeStrokeWidth,
   onDeleteEdge,
 }: FlowchartPropertyPanelProps) {
   if (isCollapsed) {
@@ -61,7 +119,7 @@ export function FlowchartPropertyPanel({
   }
 
   return (
-    <aside className="w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-all">
+    <aside className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-all">
       {/* Header Panel */}
       <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -83,9 +141,263 @@ export function FlowchartPropertyPanel({
       {/* Konten Properti */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {/* ======================================================== */}
-        {/* KONDISI 1: GARIS ALUR TERPILIH (EDGES)                    */}
+        {/* KONDISI 1: NODE / SIMBOL TERPILIH (TAHAP 3)              */}
         {/* ======================================================== */}
-        {selectedEdge ? (
+        {selectedNode ? (
+          <div className="space-y-4">
+            {/* Header Status Node */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {selectedNode.label || "Simbol Flowchart"}
+                </div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">
+                  Tipe: {selectedNode.type}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onDuplicateNode?.(selectedNode.id)}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                  title="Duplikat Simbol (Ctrl+D)"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onBringToFront?.(selectedNode.id)}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                  title="Bawa ke Paling Depan"
+                >
+                  <BringToFront className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSendToBack?.(selectedNode.id)}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                  title="Kirim ke Paling Belakang"
+                >
+                  <SendToBack className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 1. Warna Isi (Fill Color) */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Paintbrush className="w-3.5 h-3.5 text-indigo-500" />
+                Warna Isi (Fill)
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => onUpdateNodeFillColor?.(selectedNode.id, preset.hex)}
+                    style={{ backgroundColor: preset.hex }}
+                    className={`w-5 h-5 rounded-md border transition cursor-pointer hover:scale-110 shadow-2xs ${
+                      selectedNode.fillColor === preset.hex
+                        ? "ring-2 ring-indigo-500 border-white"
+                        : "border-slate-300 dark:border-slate-700"
+                    }`}
+                    title={preset.name}
+                  />
+                ))}
+                {/* Custom Color Input */}
+                <label
+                  className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 flex items-center justify-center cursor-pointer hover:scale-110 overflow-hidden bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500"
+                  title="Warna Khusus"
+                >
+                  <input
+                    type="color"
+                    value={selectedNode.fillColor || "#4f46e5"}
+                    onChange={(e) => onUpdateNodeFillColor?.(selectedNode.id, e.target.value)}
+                    className="opacity-0 w-0 h-0"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 2. Warna Garis & Ketebalan Garis (Stroke) */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                Garis Border
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => onUpdateNodeStrokeColor?.(selectedNode.id, preset.hex)}
+                    style={{ backgroundColor: preset.hex }}
+                    className={`w-5 h-5 rounded-md border transition cursor-pointer hover:scale-110 shadow-2xs ${
+                      selectedNode.strokeColor === preset.hex
+                        ? "ring-2 ring-indigo-500 border-white"
+                        : "border-slate-300 dark:border-slate-700"
+                    }`}
+                    title={preset.name}
+                  />
+                ))}
+                <label
+                  className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 flex items-center justify-center cursor-pointer hover:scale-110 overflow-hidden bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500"
+                  title="Warna Khusus Border"
+                >
+                  <input
+                    type="color"
+                    value={selectedNode.strokeColor || "#3730a3"}
+                    onChange={(e) => onUpdateNodeStrokeColor?.(selectedNode.id, e.target.value)}
+                    className="opacity-0 w-0 h-0"
+                  />
+                </label>
+              </div>
+
+              {/* Ketebalan Border (1px, 2px, 3px, 4px) */}
+              <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                {[1, 2, 3, 4].map((width) => (
+                  <button
+                    key={width}
+                    type="button"
+                    onClick={() => onUpdateNodeStrokeWidth?.(selectedNode.id, width)}
+                    className={`py-1 text-center rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      (selectedNode.strokeWidth || (width === 2 ? 2 : 1.5)) === width
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                  >
+                    {width}px
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Pengaturan Teks / Font */}
+            <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Type className="w-3.5 h-3.5 text-indigo-500" />
+                Format Teks
+              </label>
+
+              {/* Ukuran Font & Perataan */}
+              <div className="flex items-center gap-2">
+                {/* Perataan Teks (Align Left, Center, Right) */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateNodeTextAlign?.(selectedNode.id, "left")}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      selectedNode.textAlign === "left"
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                    title="Rata Kiri"
+                  >
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateNodeTextAlign?.(selectedNode.id, "center")}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      (!selectedNode.textAlign || selectedNode.textAlign === "center")
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                    title="Rata Tengah"
+                  >
+                    <AlignCenter className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateNodeTextAlign?.(selectedNode.id, "right")}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      selectedNode.textAlign === "right"
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                    title="Rata Kanan"
+                  >
+                    <AlignRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Pilihan Ukuran Font */}
+                <select
+                  value={selectedNode.fontSize || 11}
+                  onChange={(e) => onUpdateNodeFontSize?.(selectedNode.id, Number(e.target.value))}
+                  className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-hidden"
+                >
+                  <option value={10}>10px (Kecil)</option>
+                  <option value={11}>11px (Standar)</option>
+                  <option value={12}>12px (Sedang)</option>
+                  <option value={14}>14px (Besar)</option>
+                  <option value={16}>16px (Ekstra)</option>
+                  <option value={18}>18px (Judul)</option>
+                </select>
+              </div>
+
+              {/* Warna Font */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase">Warna Teks</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {TEXT_COLOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => onUpdateNodeTextColor?.(selectedNode.id, preset.hex)}
+                      style={{ backgroundColor: preset.hex }}
+                      className={`w-5 h-5 rounded-md border transition cursor-pointer hover:scale-110 shadow-2xs ${
+                        selectedNode.textColor === preset.hex
+                          ? "ring-2 ring-indigo-500 border-white"
+                          : "border-slate-300 dark:border-slate-700"
+                      }`}
+                      title={preset.name}
+                    />
+                  ))}
+                  <label
+                    className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 flex items-center justify-center cursor-pointer hover:scale-110 overflow-hidden bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500"
+                    title="Warna Khusus Teks"
+                  >
+                    <input
+                      type="color"
+                      value={selectedNode.textColor || "#ffffff"}
+                      onChange={(e) => onUpdateNodeTextColor?.(selectedNode.id, e.target.value)}
+                      className="opacity-0 w-0 h-0"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Dimensi & Posisi Info (Resize via Handle) */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <Maximize className="w-3.5 h-3.5 text-indigo-500" />
+                Dimensi & Posisi (Resize via Handle)
+              </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[10px]">
+                <div>W: <span className="font-bold">{Math.round(selectedNode.width)}px</span></div>
+                <div>H: <span className="font-bold">{Math.round(selectedNode.height)}px</span></div>
+                <div>X: <span className="font-bold">{Math.round(selectedNode.x)}px</span></div>
+                <div>Y: <span className="font-bold">{Math.round(selectedNode.y)}px</span></div>
+              </div>
+            </div>
+
+            {/* 5. Aksi Hapus Node */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => onDeleteNode?.(selectedNode.id)}
+                className="w-full py-2 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus Simbol Ini (Delete)
+              </button>
+            </div>
+          </div>
+        ) : selectedEdge ? (
+          /* ======================================================== */
+          /* KONDISI 2: GARIS ALUR TERPILIH (TAHAP 2 & 3)             */
+          /* ======================================================== */
           <div className="space-y-4">
             {/* Header Status Garis */}
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -150,12 +462,12 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 2. Bentuk Garis (Solid vs Dashed) */}
+            {/* 2. Bentuk Garis & Ketebalan Garis (Tahap 3) */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                Bentuk Garis
+                Bentuk & Ketebalan Garis
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5 mb-2">
                 <button
                   type="button"
                   onClick={() => onUpdateEdgeStyle?.(selectedEdge.id, "solid")}
@@ -181,9 +493,61 @@ export function FlowchartPropertyPanel({
                   Putus-Putus
                 </button>
               </div>
+
+              {/* Selector Ketebalan Garis (Tahap 3) */}
+              <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                {[1, 2, 3, 4].map((width) => (
+                  <button
+                    key={width}
+                    type="button"
+                    onClick={() => onUpdateEdgeStrokeWidth?.(selectedEdge.id, width)}
+                    className={`py-1 text-center rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      (selectedEdge.strokeWidth || 2) === width
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                  >
+                    {width}px
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* 3. Pilihan Ujung Panah (Marker) */}
+            {/* 3. Warna Garis (Tahap 3) */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                Warna Garis
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => onUpdateEdgeColor?.(selectedEdge.id, preset.hex)}
+                    style={{ backgroundColor: preset.hex }}
+                    className={`w-5 h-5 rounded-md border transition cursor-pointer hover:scale-110 shadow-2xs ${
+                      selectedEdge.color === preset.hex
+                        ? "ring-2 ring-indigo-500 border-white"
+                        : "border-slate-300 dark:border-slate-700"
+                    }`}
+                    title={preset.name}
+                  />
+                ))}
+                <label
+                  className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-700 flex items-center justify-center cursor-pointer hover:scale-110 overflow-hidden bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500"
+                  title="Warna Khusus Garis"
+                >
+                  <input
+                    type="color"
+                    value={selectedEdge.color || "#64748b"}
+                    onChange={(e) => onUpdateEdgeColor?.(selectedEdge.id, e.target.value)}
+                    className="opacity-0 w-0 h-0"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 4. Pilihan Ujung Panah (Marker) */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                 Ujung Panah
@@ -236,7 +600,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 4. Label Garis (e.g. "Ya" / "Tidak") */}
+            {/* 5. Label Garis (e.g. "Ya" / "Tidak") */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -281,7 +645,7 @@ export function FlowchartPropertyPanel({
               </div>
             </div>
 
-            {/* 5. Tombol Hapus Garis */}
+            {/* 6. Tombol Hapus Garis */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
@@ -291,32 +655,6 @@ export function FlowchartPropertyPanel({
                 <Trash2 className="w-3.5 h-3.5" />
                 Hapus Garis Ini (Delete)
               </button>
-            </div>
-          </div>
-        ) : selectedNode ? (
-          /* ======================================================== */
-          /* KONDISI 2: NODE / SIMBOL TERPILIH                        */
-          /* ======================================================== */
-          <div className="space-y-3 w-full">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto border border-indigo-200 dark:border-indigo-800/60">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {selectedNode.label || "Shape Terpilih"}
-              </div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
-                Tipe: {selectedNode.type}
-              </div>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 text-left space-y-1">
-              <div>Lebar: <span className="font-mono font-bold">{Math.round(selectedNode.width)}px</span></div>
-              <div>Tinggi: <span className="font-mono font-bold">{Math.round(selectedNode.height)}px</span></div>
-              <div>Posisi X: <span className="font-mono font-bold">{Math.round(selectedNode.x)}px</span></div>
-              <div>Posisi Y: <span className="font-mono font-bold">{Math.round(selectedNode.y)}px</span></div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-              💡 <strong>Tips Menghubungkan:</strong> Arahkan kursor ke titik biru di tepi simbol ini, lalu tarik garis ke simbol lain.
             </div>
           </div>
         ) : (
@@ -331,7 +669,7 @@ export function FlowchartPropertyPanel({
               Belum Ada Elemen Terpilih
             </div>
             <p className="text-[11px] text-slate-400 max-w-[210px] mx-auto leading-relaxed">
-              Klik salah satu simbol atau garis alur pada kanvas untuk melihat dan mengatur propertinya.
+              Klik salah satu simbol atau garis alur pada kanvas untuk mengubah warna, ukuran, gaya, atau susunannya.
             </p>
           </div>
         )}
