@@ -357,26 +357,26 @@ export function FlowchartEditor({
   }, [editor.nodes, editor.edges, viewport, diagramTitle, performSave]);
 
   // Zoom Handlers
-  const handleZoomIn = () => {
+  const handleZoomIn = useCallback(() => {
     setViewport((prev) => ({
       ...prev,
-      zoom: Math.min(prev.zoom + 0.15, 3.0),
+      zoom: Math.min(Number((prev.zoom + 0.15).toFixed(2)), 3.0),
     }));
-  };
+  }, []);
 
-  const handleZoomOut = () => {
+  const handleZoomOut = useCallback(() => {
     setViewport((prev) => ({
       ...prev,
-      zoom: Math.max(prev.zoom - 0.15, 0.2),
+      zoom: Math.max(Number((prev.zoom - 0.15).toFixed(2)), 0.2),
     }));
-  };
+  }, []);
 
-  const handleZoomReset = () => {
+  const handleZoomReset = useCallback(() => {
     setViewport((prev) => ({
       ...prev,
       zoom: 1.0,
     }));
-  };
+  }, []);
 
   // Fit To Screen
   const handleFitToScreen = useCallback(() => {
@@ -566,6 +566,25 @@ export function FlowchartEditor({
         return;
       }
 
+      // Zoom Keyboard Shortcuts (Ctrl + / Ctrl - / Ctrl 0)
+      if (isCtrl && (e.key === "=" || e.key === "+" || key === "add")) {
+        e.preventDefault();
+        handleZoomIn();
+        return;
+      }
+
+      if (isCtrl && (e.key === "-" || e.key === "_" || key === "subtract")) {
+        e.preventDefault();
+        handleZoomOut();
+        return;
+      }
+
+      if (isCtrl && (e.key === "0" || key === "numpad0")) {
+        e.preventDefault();
+        handleZoomReset();
+        return;
+      }
+
       // Delete / Backspace
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
@@ -583,7 +602,7 @@ export function FlowchartEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, performSave]);
+  }, [editor, performSave, handleZoomIn, handleZoomOut, handleZoomReset]);
 
   const selectedCount = editor.selectedNodeIds.length + editor.selectedEdgeIds.length;
 

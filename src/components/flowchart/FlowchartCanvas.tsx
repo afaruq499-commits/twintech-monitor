@@ -176,24 +176,66 @@ export function FlowchartCanvas({
     }
   };
 
-  // Mouse wheel zoom
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      onUpdateViewport((prev) => ({
-        ...prev,
-        zoom: Math.max(0.2, Math.min(3.0, prev.zoom * zoomFactor)),
-      }));
-    } else {
-      // Dua jari trackpad / scroll pan
-      onUpdateViewport((prev) => ({
-        ...prev,
-        panX: prev.panX - e.deltaX,
-        panY: prev.panY - e.deltaY,
-      }));
-    }
-  };
+  // Native Wheel Event Handler: Zoom dengan Ctrl + Scroll (Mouse wheel atau Pinch Trackpad)
+  // Menggunakan listener DOM langsung dengan { passive: false } agar e.preventDefault() dapat
+  // mencegah zoom bawaan seluruh halaman browser dan menjalankan zoom kanvas berpusat pada kursor mouse.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      // 1. Zoom dengan Ctrl / Meta + Scroll
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        // Sensitivitas zoom:
+        // Jika delta > 50 (mouse wheel standar berkisar 100-120): langkah zoom 12%
+        // Jika delta <= 50 (gesture pinch trackpad halus): skala proporsional halus
+        let zoomRatio: number;
+        if (Math.abs(e.deltaY) > 50) {
+          zoomRatio = e.deltaY < 0 ? 1.12 : 0.89;
+        } else {
+          zoomRatio = Math.max(0.92, Math.min(1.08, 1 - e.deltaY * 0.005));
+        }
+
+        onUpdateViewport((prev) => {
+          const newZoom = Math.max(0.15, Math.min(3.5, Number((prev.zoom * zoomRatio).toFixed(3))));
+          if (newZoom === prev.zoom) return prev;
+
+          // Koordinat dunia di bawah titik mouse saat ini
+          const worldX = (cursorX - prev.panX) / prev.zoom;
+          const worldY = (cursorY - prev.panY) / prev.zoom;
+
+          // Hitung panX & panY baru agar titik dunia di bawah kursor tetap tepat berada di posisi kursor
+          const newPanX = cursorX - worldX * newZoom;
+          const newPanY = cursorY - worldY * newZoom;
+
+          return {
+            zoom: newZoom,
+            panX: Math.round(newPanX),
+            panY: Math.round(newPanY),
+          };
+        });
+      } else {
+        // 2. Pan Kanvas dengan Scroll Dua Jari Trackpad atau Wheel Biasa
+        e.preventDefault();
+        onUpdateViewport((prev) => ({
+          ...prev,
+          panX: Math.round(prev.panX - (e.shiftKey ? e.deltaY : e.deltaX)),
+          panY: Math.round(prev.panY - (e.shiftKey ? 0 : e.deltaY)),
+        }));
+      }
+    };
+
+    container.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, [onUpdateViewport]);
 
   // Mouse down pada Canvas Background (Start Panning atau Selection Box)
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -655,7 +697,6 @@ export function FlowchartCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={`flex-1 relative overflow-hidden select-none bg-slate-50 dark:bg-[#0b0f19] ${
