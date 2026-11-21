@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile, stat } from "fs/promises";
 import path from "path";
 import os from "os";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,10 @@ const MIME_TYPES: Record<string, string> = {
   ".rar": "application/vnd.rar",
   ".7z": "application/x-7z-compressed",
   ".json": "application/json",
+  ".kpr": "application/octet-stream",
+  ".vfx": "application/octet-stream",
+  ".gtx": "application/octet-stream",
+  ".gtn": "application/octet-stream",
 };
 
 export async function GET(
@@ -60,6 +65,68 @@ export async function GET(
       }
     }
 
+    // Fallback serverless: Jika berkas tidak ada di filesystem fisik, cari di database (Supabase)
+    if (!fileExists) {
+      try {
+        const fileName = safeSegments[safeSegments.length - 1];
+        const cleanName = fileName.replace(/^\d+_/, "");
+
+        const project = await prisma.project.findFirst({
+          where: {
+            OR: [
+              { wiringDiagramPdfUrl: { contains: fileName } },
+              { wiringDiagramPdfUrl: { contains: cleanName } },
+              { wiringDiagramPdfName: cleanName },
+              { plcProgramFileUrl: { contains: fileName } },
+              { plcProgramFileName: cleanName },
+              { hmiProgramFileUrl: { contains: fileName } },
+              { hmiProgramFileName: cleanName },
+            ],
+          },
+          select: {
+            wiringDiagramPdfUrl: true,
+            wiringDiagramPdfName: true,
+            plcProgramFileUrl: true,
+            plcProgramFileName: true,
+            hmiProgramFileUrl: true,
+            hmiProgramFileName: true,
+          },
+        });
+
+        if (project) {
+          const candidateUrls = [
+            project.wiringDiagramPdfUrl,
+            project.plcProgramFileUrl,
+            project.hmiProgramFileUrl,
+          ].filter(Boolean) as string[];
+
+          for (const rawUrl of candidateUrls) {
+            if (rawUrl.startsWith("data:")) {
+              const matches = rawUrl.match(/^data:([^;]+);base64,(.+)$/);
+              if (matches) {
+                const mimeType = matches[1];
+                const base64Data = matches[2];
+                const dataBuffer = Buffer.from(base64Data, "base64");
+                const cleanDownloadName = cleanName || "berkas_download";
+
+                return new Response(dataBuffer, {
+                  status: 200,
+                  headers: {
+                    "Content-Type": mimeType,
+                    "Content-Length": dataBuffer.length.toString(),
+                    "Content-Disposition": `attachment; filename="${encodeURIComponent(cleanDownloadName)}"`,
+                    "Cache-Control": "public, max-age=31536000, immutable",
+                  },
+                });
+              }
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.error("Gagal mencari berkas di database:", dbErr);
+      }
+    }
+
     if (!fileExists) {
       return NextResponse.json({ error: "Berkas tidak ditemukan" }, { status: 404 });
     }
@@ -69,8 +136,6 @@ export async function GET(
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
     const originalFilename = path.basename(filePath);
-    // Jika nama berkas diawali timestamp angka_ misal 173000000_nama.ext, kita bisa bersihkan jika diinginkan,
-    // namun kita gunakan encodeURIComponent untuk keselamatan header HTTP
     const cleanDownloadName = originalFilename.replace(/^\d+_/, "") || originalFilename;
 
     const url = new URL(req.url);

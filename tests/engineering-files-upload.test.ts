@@ -163,4 +163,35 @@ describe("Upload & Download Round-Trip for CAD & Engineering Files", () => {
       await unlink(filePath);
     } catch {}
   });
+
+  it("pada lingkungan serverless (Vercel), mengembalikan Data URL persisten agar tidak hilang saat container restart", async () => {
+    const prevVercelEnv = process.env.VERCEL;
+    try {
+      process.env.VERCEL = "1";
+
+      const sampleDwgBytes = new Uint8Array([0x41, 0x43, 0x31, 0x30, 0x32, 0x34]);
+      const blob = new Blob([sampleDwgBytes], { type: "application/acad" });
+      const file = new File([blob], "DIAGRAM WIRING FUNGTION TESTER.dwg", { type: "application/acad" });
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", "wiring-diagrams");
+
+      const req = new Request("http://localhost/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const res = await handleUpload(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.isDataUrl).toBe(true);
+      expect(json.url).toMatch(/^data:application\/acad;base64,/);
+      expect(json.fileName).toBe("DIAGRAM WIRING FUNGTION TESTER.dwg");
+    } finally {
+      process.env.VERCEL = prevVercelEnv;
+    }
+  });
 });

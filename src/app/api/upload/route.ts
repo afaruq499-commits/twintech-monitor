@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-import os from "os";
 
 export const dynamic = "force-dynamic";
+
+const MIME_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".dwg": "application/acad",
+  ".dxf": "image/vnd.dxf",
+  ".zip": "application/zip",
+  ".rar": "application/vnd.rar",
+  ".7z": "application/x-7z-compressed",
+  ".json": "application/json",
+  ".kpr": "application/octet-stream",
+  ".vfx": "application/octet-stream",
+  ".gtx": "application/octet-stream",
+  ".gtn": "application/octet-stream",
+};
 
 export async function POST(req: Request) {
   try {
@@ -40,6 +59,28 @@ export async function POST(req: Request) {
 
     const uniqueName = `${Date.now()}_${baseName}${ext}`;
 
+    // Lingkungan serverless (seperti Vercel) memiliki filesystem read-only & container ephemeral (/tmp tidak persisten antar request).
+    // Untuk memastikan berkas teknik (AutoCAD DWG, PLC, HMI, PDF, gambar) tidak pernah 404 saat diunduh,
+    // di serverless file berukuran <= 25MB selalu disimpan sebagai Data URL persisten di database.
+    const isServerlessEnv = Boolean(
+      process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT
+    );
+
+    if (isServerlessEnv && buffer.length <= 25 * 1024 * 1024) {
+      const mime = file.type || MIME_TYPES[ext] || "application/octet-stream";
+      const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+      return NextResponse.json({
+        success: true,
+        url: dataUrl,
+        fileName: originalName,
+        fileSize: file.size,
+        mimeType: mime,
+        isDataUrl: true,
+      });
+    }
+
     try {
       const uploadDir = path.join(process.cwd(), "public", "uploads", category);
       await mkdir(uploadDir, { recursive: true });
@@ -54,43 +95,26 @@ export async function POST(req: Request) {
         url: publicUrl,
         fileName: originalName,
         fileSize: file.size,
-        mimeType: file.type,
+        mimeType: file.type || MIME_TYPES[ext] || "application/octet-stream",
       });
     } catch (fsError: any) {
-      // Fallback untuk platform serverless dengan read-only filesystem (seperti Vercel)
+      // Fallback untuk platform dengan read-only filesystem jika deteksi serverless belum aktif
       const isReadOnlyFs =
         fsError?.code === "EROFS" ||
         fsError?.code === "EACCES" ||
         fsError?.message?.includes("read-only");
 
-      if (isReadOnlyFs) {
-        // Coba tulis ke os.tmpdir()/uploads/${category}
-        try {
-          const tmpDir = path.join(os.tmpdir(), "uploads", category);
-          await mkdir(tmpDir, { recursive: true });
-          await writeFile(path.join(tmpDir, uniqueName), buffer);
-          return NextResponse.json({
-            success: true,
-            url: `/uploads/${category}/${uniqueName}`,
-            fileName: originalName,
-            fileSize: file.size,
-            mimeType: file.type,
-          });
-        } catch {
-          // Jika tmpdir juga gagal, simpan sebagai Data URL jika ukuran berkas wajar
-          if (buffer.length <= 25 * 1024 * 1024) {
-            const mime = file.type || "application/octet-stream";
-            const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
-            return NextResponse.json({
-              success: true,
-              url: dataUrl,
-              fileName: originalName,
-              fileSize: file.size,
-              mimeType: mime,
-              isDataUrl: true,
-            });
-          }
-        }
+      if (buffer.length <= 25 * 1024 * 1024) {
+        const mime = file.type || MIME_TYPES[ext] || "application/octet-stream";
+        const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+        return NextResponse.json({
+          success: true,
+          url: dataUrl,
+          fileName: originalName,
+          fileSize: file.size,
+          mimeType: mime,
+          isDataUrl: true,
+        });
       }
 
       console.error("Gagal menulis berkas ke filesystem:", fsError);
