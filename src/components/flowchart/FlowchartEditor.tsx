@@ -277,7 +277,10 @@ export function FlowchartEditor({
     }
   }, [diagramId, diagramTitle, editor.nodes, editor.edges, viewport]);
 
-  // Load Diagram dari Cloud Database saat diagramId tersedia
+  const loadDiagramFnRef = useRef(editor.loadDiagram);
+  loadDiagramFnRef.current = editor.loadDiagram;
+
+  // Load Diagram dari Cloud Database saat diagramId tersedia (hanya dijalankan saat diagramId berubah)
   useEffect(() => {
     if (!diagramId) {
       isInitialLoadingRef.current = false;
@@ -295,7 +298,7 @@ export function FlowchartEditor({
           const d = result.diagram;
           if (d.nama) setDiagramTitle(d.nama);
           if (d.data?.nodes) {
-            editor.loadDiagram(d.data.nodes, d.data.edges || []);
+            loadDiagramFnRef.current(d.data.nodes, d.data.edges || []);
           }
           if (d.data?.viewport) {
             setViewport(d.data.viewport);
@@ -314,7 +317,7 @@ export function FlowchartEditor({
           try {
             const parsed = JSON.parse(local);
             if (parsed.nodes && parsed.edges) {
-              editor.loadDiagram(parsed.nodes, parsed.edges);
+              loadDiagramFnRef.current(parsed.nodes, parsed.edges);
             }
             if (parsed.viewport) setViewport(parsed.viewport);
           } catch {
@@ -334,7 +337,7 @@ export function FlowchartEditor({
     return () => {
       isMounted = false;
     };
-  }, [diagramId, editor]);
+  }, [diagramId]);
 
   // Debounced Auto-Save (1500ms) saat diagram berubah
   useEffect(() => {
