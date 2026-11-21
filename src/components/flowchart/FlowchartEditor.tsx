@@ -588,7 +588,7 @@ export function FlowchartEditor({
   const selectedCount = editor.selectedNodeIds.length + editor.selectedEdgeIds.length;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] min-h-[580px] rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] shadow-xs overflow-hidden transition-colors">
       {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status, Export/Import, Auto-Layout, Template) */}
       <FlowchartToolbar
         viewport={viewport}
@@ -678,7 +678,7 @@ export function FlowchartEditor({
 
           {/* Loading State Overlay saat Mengambil Data Diagram dari Server */}
           {isLoadingDiagram && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs select-none animate-in fade-in duration-200">
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/80 dark:bg-[#12141a]/85 backdrop-blur-xs select-none animate-in fade-in duration-200">
               <RefreshCw className="w-9 h-9 text-indigo-600 animate-spin mb-3" />
               <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
                 Memuat Diagram Flowchart...

@@ -147,18 +147,18 @@ export function FlowchartShapePalette({
 
   if (isCollapsed) {
     return (
-      <aside className="w-14 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center shrink-0 select-none py-3 gap-2 transition-all">
+      <aside className="w-14 border-r border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] flex flex-col items-center shrink-0 select-none py-3 gap-2 transition-all">
         {onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition cursor-pointer"
             title="Buka Palet Simbol"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         )}
-        <div className="w-6 h-px bg-slate-200 dark:bg-slate-800 my-1" />
+        <div className="w-6 h-px bg-slate-200/80 dark:border-white/10 my-1" />
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1.5 w-full px-2">
           {SHAPE_DEFINITIONS.map((def) => (
             <div
@@ -166,7 +166,7 @@ export function FlowchartShapePalette({
               draggable
               onDragStart={(e) => handleDragStart(e, def)}
               onClick={() => onAddShape(def)}
-              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:shadow-xs transition cursor-grab active:cursor-grabbing shrink-0"
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-white/10 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50/50 dark:bg-white/[0.04] hover:bg-white dark:hover:bg-white/[0.08] hover:shadow-xs transition cursor-grab active:cursor-grabbing shrink-0"
               title={`${def.name}: ${def.description}`}
             >
               {getShapeIcon(def.type)}
@@ -178,9 +178,9 @@ export function FlowchartShapePalette({
   }
 
   return (
-    <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-all">
+    <aside className="w-64 border-r border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] flex flex-col shrink-0 select-none transition-all">
       {/* Header Panel */}
-      <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <div className="p-3.5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shapes className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <span className="text-xs font-bold text-slate-800 dark:text-slate-100 tracking-wide uppercase">
@@ -188,14 +188,14 @@ export function FlowchartShapePalette({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-white/[0.08] px-2 py-0.5 rounded-full">
             {SHAPE_DEFINITIONS.length}
           </span>
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition cursor-pointer"
               title="Kecilkan Palet"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -205,7 +205,7 @@ export function FlowchartShapePalette({
       </div>
 
       {/* Input Pencarian */}
-      <div className="p-2.5 border-b border-slate-100 dark:border-slate-800/80">
+      <div className="p-2.5 border-b border-slate-100 dark:border-white/[0.06]">
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -213,7 +213,7 @@ export function FlowchartShapePalette({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari simbol..."
-            className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
           />
         </div>
       </div>

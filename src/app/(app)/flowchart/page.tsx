@@ -8,9 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function FlowchartPage() {
-  return (
-    <div className="p-2 sm:p-4 lg:p-6 w-full h-full max-w-[1920px] mx-auto">
-      <FlowchartWorkspace />
-    </div>
-  );
+  return <FlowchartWorkspace />;
 }

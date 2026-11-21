@@ -183,23 +183,18 @@ export function FlowchartDiagramList({
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
-      {/* Header Halaman Daftar Diagram */}
-      <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Header Halaman Daftar Diagram (Standar Layout Twintech) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+          <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/25 shrink-0">
             <FolderKanban className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight">
-                Flowchart Studio
-              </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                Tahap 5 • Database Cloud
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              Flowchart Studio
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Manajemen alur logika mesin SPM, interlock PLC, dan dokumentasi sistem otomatisasi
             </p>
           </div>
@@ -214,7 +209,7 @@ export function FlowchartDiagramList({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari diagram..."
-              className="pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 w-44 sm:w-60 transition"
+              className="pl-9 pr-3.5 py-2 text-xs rounded-xl bg-white dark:bg-[#161822] border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 w-44 sm:w-60 transition shadow-xs"
             />
           </div>
 
@@ -223,7 +218,7 @@ export function FlowchartDiagramList({
             type="button"
             onClick={fetchDiagrams}
             disabled={loading}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 transition cursor-pointer"
+            className="p-2 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 transition cursor-pointer shadow-xs"
             title="Muat ulang daftar"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -233,7 +228,7 @@ export function FlowchartDiagramList({
           <button
             type="button"
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/25 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Diagram Baru</span>
@@ -243,7 +238,7 @@ export function FlowchartDiagramList({
 
       {/* Database Warning Banner (Jika tabel Supabase belum dimigrasikan) */}
       {isTableMissing ? (
-        <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 flex items-start gap-3">
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 text-xs">
             <div className="font-bold text-amber-900 dark:text-amber-200">
@@ -257,7 +252,7 @@ export function FlowchartDiagramList({
           </div>
         </div>
       ) : error ? (
-        <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 flex items-start gap-3">
+        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1 text-xs">
             <div className="font-bold text-red-900 dark:text-red-200">
@@ -271,7 +266,7 @@ export function FlowchartDiagramList({
       ) : null}
 
       {/* Konten Utama Grid Diagram */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div>
         {loading && diagrams.length === 0 ? (
           <div>
             <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-slate-400">
@@ -282,7 +277,7 @@ export function FlowchartDiagramList({
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-3"
+                  className="p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] space-y-3 shadow-xs"
                 >
                   <div className="flex justify-between items-center">
                     <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-1/2" />
@@ -292,7 +287,7 @@ export function FlowchartDiagramList({
                     <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-3/4" />
                     <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-1/2" />
                   </div>
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between">
+                  <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex justify-between">
                     <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-1/3" />
                     <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-16" />
                   </div>
@@ -301,14 +296,14 @@ export function FlowchartDiagramList({
             </div>
           </div>
         ) : filteredDiagrams.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-80 text-center max-w-md mx-auto">
-            <div className="p-4 rounded-3xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 border border-indigo-100 dark:border-indigo-900/60 mb-4">
-              <FileCode2 className="w-10 h-10" />
+          <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] p-12 text-center max-w-lg mx-auto shadow-xs">
+            <div className="w-14 h-14 rounded-3xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center mx-auto mb-4">
+              <FileCode2 className="w-7 h-7" />
             </div>
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
               {searchQuery ? "Diagram Tidak Ditemukan" : "Belum Ada Diagram Alur"}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
               {searchQuery
                 ? `Tidak ada diagram yang cocok dengan kata kunci "${searchQuery}". Coba kata kunci lain.`
                 : "Mulai rancang diagram alur logika mesin otomatisasi, interlock sensor, atau tahapan proyek Anda sekarang."}
@@ -316,7 +311,7 @@ export function FlowchartDiagramList({
             <button
               type="button"
               onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Buat Diagram Pertama</span>
@@ -328,7 +323,7 @@ export function FlowchartDiagramList({
               <div
                 key={d.id}
                 onClick={() => onOpenDiagram(d.id, d.nama)}
-                className="group relative flex flex-col justify-between p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/5 dark:hover:border-indigo-500/50 transition cursor-pointer"
+                className="group relative flex flex-col justify-between p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] hover:border-indigo-500/60 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:border-indigo-500/50 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 transition-all duration-180 cursor-pointer"
               >
                 <div>
                   {/* Header Card */}
@@ -336,7 +331,7 @@ export function FlowchartDiagramList({
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition line-clamp-1">
                       {d.nama}
                     </h4>
-                    <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300">
                       {d.nodeCount} simbol
                     </span>
                   </div>
@@ -347,7 +342,7 @@ export function FlowchartDiagramList({
                 </div>
 
                 {/* Footer Card */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+                <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
                     <span>{new Date(d.updatedAt).toLocaleDateString("id-ID")}</span>
@@ -362,7 +357,7 @@ export function FlowchartDiagramList({
                         setRenamingItem(d);
                         setRenameTitle(d.nama);
                       }}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
                       title="Ubah Nama"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -371,7 +366,7 @@ export function FlowchartDiagramList({
                       type="button"
                       onClick={(e) => handleDuplicate(e, d.id)}
                       disabled={actionLoading}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
                       title="Duplikat Diagram"
                     >
                       <Copy className="w-3.5 h-3.5" />

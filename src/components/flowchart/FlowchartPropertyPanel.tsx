@@ -111,11 +111,11 @@ export function FlowchartPropertyPanel({
 }: FlowchartPropertyPanelProps) {
   if (isCollapsed) {
     return (
-      <div className="border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 flex flex-col items-center shrink-0 select-none">
+      <div className="border-l border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] p-2 flex flex-col items-center shrink-0 select-none">
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 cursor-pointer"
+          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 cursor-pointer"
           title="Buka Panel Properti"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -125,9 +125,9 @@ export function FlowchartPropertyPanel({
   }
 
   return (
-    <aside className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-all">
+    <aside className="w-80 border-l border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#161822] flex flex-col shrink-0 select-none transition-all">
       {/* Header Panel */}
-      <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <div className="p-3.5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <span className="text-xs font-bold text-slate-800 dark:text-slate-100 tracking-wide uppercase">
@@ -137,7 +137,7 @@ export function FlowchartPropertyPanel({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
           title="Sembunyikan Panel"
         >
           <ChevronRight className="w-4 h-4" />
