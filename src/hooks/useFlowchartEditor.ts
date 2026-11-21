@@ -19,6 +19,7 @@ import {
   pasteClipboardData,
   isNodeInSelectionBox,
 } from "@/lib/flowchart-history";
+import { applyAutoLayout, type AutoLayoutOptions } from "@/lib/flowchart-layout";
 
 export interface UseFlowchartEditorProps {
   initialNodes: FlowchartNode[];
@@ -465,6 +466,30 @@ export function useFlowchartEditor({ initialNodes, initialEdges }: UseFlowchartE
     setSelectedEdgeIds([]);
   }, [commitChange]);
 
+  // Auto-Layout hierarkis dengan Dagre (Tahap 7 - Undoable)
+  const autoLayout = useCallback(
+    (direction: "TB" | "LR" = "TB", options?: Omit<AutoLayoutOptions, "direction">) => {
+      if (nodes.length === 0) return;
+      const result = applyAutoLayout(nodes, edges, { direction, ...options });
+      commitChange(result.nodes, result.edges);
+    },
+    [nodes, edges, commitChange]
+  );
+
+  // Terapkan Template Diagram Baru (Tahap 7 - Undoable)
+  const applyTemplate = useCallback(
+    (newNodes: FlowchartNode[], newEdges: FlowchartEdge[], replace = true) => {
+      if (replace) {
+        commitChange(newNodes, newEdges);
+        setSelectedNodeIds([]);
+        setSelectedEdgeIds([]);
+      } else {
+        commitChange([...nodes, ...newNodes], [...edges, ...newEdges]);
+      }
+    },
+    [nodes, edges, commitChange]
+  );
+
   // Load Diagram Baru (Tahap 5)
   const loadDiagram = useCallback((newNodes: FlowchartNode[], newEdges: FlowchartEdge[]) => {
     historyRef.current.clear({ nodes: newNodes, edges: newEdges });
@@ -528,6 +553,8 @@ export function useFlowchartEditor({ initialNodes, initialEdges }: UseFlowchartE
     updateEdgeColor,
     updateEdgeStrokeWidth,
     clearAll,
+    autoLayout,
+    applyTemplate,
     loadDiagram,
   };
 }

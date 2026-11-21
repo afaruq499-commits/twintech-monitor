@@ -13,6 +13,8 @@ import {
   StickyNote,
   Search,
   Shapes,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { FlowchartShapeType, PaletteShapeDefinition } from "@/lib/flowchart-types";
 
@@ -93,9 +95,15 @@ export const SHAPE_DEFINITIONS: PaletteShapeDefinition[] = [
 
 interface FlowchartShapePaletteProps {
   onAddShape: (def: PaletteShapeDefinition) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function FlowchartShapePalette({ onAddShape }: FlowchartShapePaletteProps) {
+export function FlowchartShapePalette({
+  onAddShape,
+  isCollapsed = false,
+  onToggleCollapse,
+}: FlowchartShapePaletteProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredShapes = SHAPE_DEFINITIONS.filter((shape) =>
@@ -137,8 +145,40 @@ export function FlowchartShapePalette({ onAddShape }: FlowchartShapePaletteProps
     e.dataTransfer.effectAllowed = "copy";
   };
 
+  if (isCollapsed) {
+    return (
+      <aside className="w-14 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center shrink-0 select-none py-3 gap-2 transition-all">
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            title="Buka Palet Simbol"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+        <div className="w-6 h-px bg-slate-200 dark:bg-slate-800 my-1" />
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1.5 w-full px-2">
+          {SHAPE_DEFINITIONS.map((def) => (
+            <div
+              key={def.type}
+              draggable
+              onDragStart={(e) => handleDragStart(e, def)}
+              onClick={() => onAddShape(def)}
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:shadow-xs transition cursor-grab active:cursor-grabbing shrink-0"
+              title={`${def.name}: ${def.description}`}
+            >
+              {getShapeIcon(def.type)}
+            </div>
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-colors">
+    <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 select-none transition-all">
       {/* Header Panel */}
       <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -147,9 +187,21 @@ export function FlowchartShapePalette({ onAddShape }: FlowchartShapePaletteProps
             Palet Bentuk
           </span>
         </div>
-        <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-          {SHAPE_DEFINITIONS.length}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+            {SHAPE_DEFINITIONS.length}
+          </span>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              title="Kecilkan Palet"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Input Pencarian */}

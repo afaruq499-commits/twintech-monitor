@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
+import { LayoutTemplate, ArrowRight } from "lucide-react";
 import type {
   FlowchartNode,
   FlowchartEdge,
@@ -18,6 +19,7 @@ import {
   computeStraightPath,
   calculateNodeAlignment,
 } from "@/lib/flowchart-routing";
+import { ALL_FLOWCHART_TEMPLATES, type FlowchartTemplate } from "@/lib/flowchart-templates";
 
 interface FlowchartCanvasProps {
   nodes: FlowchartNode[];
@@ -35,6 +37,7 @@ interface FlowchartCanvasProps {
   onDropNewShape: (def: PaletteShapeDefinition, x: number, y: number) => void;
   onCreateEdge: (newEdge: Omit<FlowchartEdge, "id">) => void;
   onDoubleClickEdgeLabel?: (edgeId: string) => void;
+  onApplyTemplate?: (template: FlowchartTemplate) => void;
   viewport: CanvasViewport;
   onUpdateViewport: (updater: (prev: CanvasViewport) => CanvasViewport) => void;
   showGrid: boolean;
@@ -59,6 +62,7 @@ export function FlowchartCanvas({
   onDropNewShape,
   onCreateEdge,
   onDoubleClickEdgeLabel,
+  onApplyTemplate,
   viewport,
   onUpdateViewport,
   showGrid,
@@ -412,7 +416,16 @@ export function FlowchartCanvas({
 
       const currentNode = nodes.find((n) => n.id === draggingNodeId);
       if (currentNode) {
-        const otherNodes = nodes.filter((n) => n.id !== draggingNodeId);
+        // Optimasi Performa 200+ node: Pre-filter spasial kandidat guide yang berada di dekat kursor
+        const otherNodes =
+          nodes.length > 80
+            ? nodes.filter(
+                (n) =>
+                  n.id !== draggingNodeId &&
+                  Math.abs(n.x - rawX) < 1400 &&
+                  Math.abs(n.y - rawY) < 1400
+              )
+            : nodes.filter((n) => n.id !== draggingNodeId);
         const alignment = calculateNodeAlignment(
           { x: rawX, y: rawY, width: currentNode.width, height: currentNode.height },
           otherNodes,
@@ -624,12 +637,16 @@ export function FlowchartCanvas({
     }
   };
 
-  const nodeMap = new Map<string, FlowchartNode>();
-  for (const n of nodes) {
-    nodeMap.set(n.id, n);
-  }
+  // Optimasi Performa 200+ node: Lookup node cepat O(1) termemoize
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, FlowchartNode>();
+    for (const n of nodes) {
+      map.set(n.id, n);
+    }
+    return map;
+  }, [nodes]);
 
-  const editingNode = nodes.find((n) => n.id === editingNodeId);
+  const editingNode = editingNodeId ? nodeMap.get(editingNodeId) : undefined;
 
   return (
     <div
@@ -1164,19 +1181,47 @@ export function FlowchartCanvas({
         </div>
       )}
 
-      {/* Watermark Petunjuk Penggunaan jika Kosong */}
+      {/* 5. INTERACTIVE EMPTY STATE OVERLAY (Tahap 7: Saat belum ada node di kanvas) */}
       {nodes.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <div className="text-center p-6 rounded-3xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs border border-slate-200/80 dark:border-slate-800/80 shadow-xl max-w-sm">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold">✨</span>
+        <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none z-10 select-none">
+          <div className="max-w-md w-full p-6 sm:p-7 rounded-3xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl text-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs">
+              <LayoutTemplate className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              Canvas Flowchart Masih Kosong
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              Kanvas Flowchart Masih Kosong
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              Tarik simbol dari palet di sebelah kiri atau klik simbol untuk menambahkannya ke kanvas.
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Tarik simbol dari palet di sebelah kiri, atau mulai cepat dengan memilih template alur siap pakai:
             </p>
+
+            {onApplyTemplate && (
+              <div className="mt-4 flex flex-col gap-2">
+                {ALL_FLOWCHART_TEMPLATES.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => onApplyTemplate(tmpl)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 transition group cursor-pointer text-left"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {tmpl.name}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                          {tmpl.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {tmpl.description}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

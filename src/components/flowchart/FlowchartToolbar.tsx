@@ -21,6 +21,9 @@ import {
   Save,
   Download,
   Upload,
+  ArrowDownWideNarrow,
+  ArrowRightLeft,
+  LayoutTemplate,
 } from "lucide-react";
 import type { CanvasViewport } from "@/lib/flowchart-types";
 
@@ -32,6 +35,8 @@ interface FlowchartToolbarProps {
   onManualSave?: () => void;
   onOpenExportModal?: () => void;
   onImportJsonFile?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onAutoLayout?: (direction: "TB" | "LR") => void;
+  onOpenTemplateModal?: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
@@ -68,6 +73,8 @@ export function FlowchartToolbar({
   onManualSave,
   onOpenExportModal,
   onImportJsonFile,
+  onAutoLayout,
+  onOpenTemplateModal,
   onZoomIn,
   onZoomOut,
   onZoomReset,
@@ -96,9 +103,9 @@ export function FlowchartToolbar({
   edgeCount,
 }: FlowchartToolbarProps) {
   return (
-    <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between gap-4 shrink-0 select-none transition-colors">
+    <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 sm:px-4 flex items-center justify-between gap-3 shrink-0 select-none transition-colors overflow-x-auto scrollbar-none">
       {/* Kiri: Tombol Back, Judul & Status Save */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
         {onBackToList && (
           <button
             type="button"
@@ -110,24 +117,24 @@ export function FlowchartToolbar({
           </button>
         )}
 
-        <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-xs">
+        <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-xs shrink-0">
           <Workflow className="w-4 h-4" />
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight truncate max-w-[180px] sm:max-w-[280px]">
+            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight truncate max-w-[130px] sm:max-w-[220px] md:max-w-[300px]">
               {diagramTitle || "Flowchart Studio"}
             </span>
 
             {/* Indikator Status Auto-Save (Tahap 5) */}
             {saveStatus === "saving" && (
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Menyimpan...
               </span>
             )}
             {saveStatus === "saved" && (
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Tersimpan
               </span>
@@ -136,7 +143,7 @@ export function FlowchartToolbar({
               <button
                 type="button"
                 onClick={onManualSave}
-                className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition cursor-pointer"
+                className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition cursor-pointer shrink-0"
                 title="Gagal menyimpan ke cloud. Klik untuk coba lagi."
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -144,14 +151,14 @@ export function FlowchartToolbar({
               </button>
             )}
           </div>
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-slate-400 truncate">
             {nodeCount} simbol • {edgeCount} garis • Auto-save aktif
           </div>
         </div>
       </div>
 
       {/* Tengah / Kanan: Kontrol Undo/Redo, Clipboard, Zoom, Grid, Snap, Aksi */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Tombol Simpan Manual (Ctrl+S) */}
         {onManualSave && (
           <button
@@ -255,6 +262,45 @@ export function FlowchartToolbar({
             <SendToBack className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Auto-Layout Hierarkis Dagre (Tahap 7 - Undoable) */}
+        {onAutoLayout && (
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => onAutoLayout("TB")}
+              disabled={nodeCount === 0}
+              className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1"
+              title="Tata Otomatis Vertikal / Auto-Layout TB (Bisa di-undo)"
+            >
+              <ArrowDownWideNarrow className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="hidden xl:inline text-[11px] font-semibold">Vertikal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onAutoLayout("LR")}
+              disabled={nodeCount === 0}
+              className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1"
+              title="Tata Otomatis Horizontal / Auto-Layout LR (Bisa di-undo)"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="hidden xl:inline text-[11px] font-semibold">Horizontal</span>
+            </button>
+          </div>
+        )}
+
+        {/* Template Diagram Cepat (Tahap 7) */}
+        {onOpenTemplateModal && (
+          <button
+            type="button"
+            onClick={onOpenTemplateModal}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+            title="Pilih Template Diagram Siap Pakai"
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="hidden md:inline">Template</span>
+          </button>
+        )}
 
         {/* 4. Toggle Grid & Magnet Snap */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 text-xs">

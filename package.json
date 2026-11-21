@@ -25,6 +25,8 @@
     "@fullcalendar/react": "^6.1.22",
     "@fullcalendar/timegrid": "^6.1.22",
     "@prisma/client": "^6.19.3",
+    "@types/dagre": "^0.7.54",
+    "dagre": "^0.8.5",
     "exceljs": "^4.4.0",
     "jose": "^6.2.13",
     "lucide-react": "^0.487.0",

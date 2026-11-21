@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   FolderKanban,
 } from "lucide-react";
+import { FlowchartConfirmModal } from "./FlowchartConfirmModal";
 
 export interface DiagramListItem {
   id: string;
@@ -27,7 +28,10 @@ export interface DiagramListItem {
 
 interface FlowchartDiagramListProps {
   onOpenDiagram: (id: string, initialName: string) => void;
-  onCreateNewDiagram: (nama: string, template?: "blank" | "spm" | "decision") => void;
+  onCreateNewDiagram: (
+    nama: string,
+    template?: "blank" | "spm" | "standard" | "approval" | "decision"
+  ) => void;
 }
 
 export function FlowchartDiagramList({
@@ -43,10 +47,13 @@ export function FlowchartDiagramList({
   // Modal State
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<"blank" | "spm" | "decision">("spm");
+  const [selectedTemplate, setSelectedTemplate] = useState<
+    "blank" | "spm" | "standard" | "approval" | "decision"
+  >("standard");
 
   const [renamingItem, setRenamingItem] = useState<DiagramListItem | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
+  const [deletingItem, setDeletingItem] = useState<DiagramListItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Load Daftar Diagram dari API
@@ -97,21 +104,25 @@ export function FlowchartDiagramList({
     onCreateNewDiagram(title, selectedTemplate);
   };
 
-  // Handle Hapus Diagram
-  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+  // Handle Buka Modal Konfirmasi Hapus Diagram (Tahap 7)
+  const handleDeleteClick = (e: React.MouseEvent, item: DiagramListItem) => {
     e.stopPropagation();
-    if (!window.confirm(`Hapus diagram "${name}" secara permanen?`)) {
-      return;
-    }
+    setDeletingItem(item);
+  };
+
+  // Eksekusi Konfirmasi Hapus Diagram
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
 
     try {
-      const res = await fetch(`/api/flowchart/diagrams/${id}`, {
+      const res = await fetch(`/api/flowchart/diagrams/${deletingItem.id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
         throw new Error("Gagal menghapus diagram.");
       }
-      setDiagrams((prev) => prev.filter((d) => d.id !== id));
+      setDiagrams((prev) => prev.filter((d) => d.id !== deletingItem.id));
+      setDeletingItem(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal menghapus diagram.");
     }
@@ -262,10 +273,31 @@ export function FlowchartDiagramList({
       {/* Konten Utama Grid Diagram */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading && diagrams.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <RefreshCw className="w-8 h-8 animate-spin text-indigo-500 mb-3" />
-            <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-              Menghubungkan ke Supabase...
+          <div>
+            <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-slate-400">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+              <span>Memuat daftar diagram...</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-3"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-1/2" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-12" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-3/4" />
+                    <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-1/2" />
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between">
+                    <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-1/3" />
+                    <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded-md w-16" />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : filteredDiagrams.length === 0 ? (
@@ -346,7 +378,7 @@ export function FlowchartDiagramList({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => handleDelete(e, d.id, d.nama)}
+                      onClick={(e) => handleDeleteClick(e, d)}
                       className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition"
                       title="Hapus Diagram"
                     >
@@ -393,6 +425,21 @@ export function FlowchartDiagramList({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
+                    onClick={() => setSelectedTemplate("standard")}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      selectedTemplate === "standard"
+                        ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <div className="text-xs">Alur Standar</div>
+                    <div className="text-[10px] opacity-75 font-normal">
+                      Input, validasi & database
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setSelectedTemplate("spm")}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       selectedTemplate === "spm"
@@ -400,9 +447,24 @@ export function FlowchartDiagramList({
                         : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                     }`}
                   >
-                    <div className="text-xs">Starter SPM Alur</div>
+                    <div className="text-xs">Otomasi PLC SPM</div>
                     <div className="text-[10px] opacity-75 font-normal">
-                      4 simbol dasar & interlock
+                      Clamp, siklus SPM & QC
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate("approval")}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      selectedTemplate === "approval"
+                        ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <div className="text-xs">Persetujuan Dokumen</div>
+                    <div className="text-[10px] opacity-75 font-normal">
+                      Pengajuan & approval PR
                     </div>
                   </button>
 
@@ -483,6 +545,17 @@ export function FlowchartDiagramList({
           </div>
         </div>
       )}
+      {/* Modal Konfirmasi Hapus Diagram (Tahap 7: Replaces window.confirm) */}
+      <FlowchartConfirmModal
+        isOpen={Boolean(deletingItem)}
+        title="Hapus Diagram Flowchart?"
+        message={`Diagram "${deletingItem?.nama}" akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Hapus Permanen"
+        cancelText="Batal"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingItem(null)}
+      />
     </div>
   );
 }

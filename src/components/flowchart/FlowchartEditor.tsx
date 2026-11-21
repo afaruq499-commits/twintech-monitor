@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { RefreshCw } from "lucide-react";
 import type {
   CanvasViewport,
   PaletteShapeDefinition,
@@ -12,7 +13,10 @@ import { FlowchartCanvas } from "./FlowchartCanvas";
 import { FlowchartMinimap } from "./FlowchartMinimap";
 import { FlowchartPropertyPanel } from "./FlowchartPropertyPanel";
 import { FlowchartExportModal } from "./FlowchartExportModal";
+import { FlowchartTemplateModal } from "./FlowchartTemplateModal";
+import { FlowchartConfirmModal } from "./FlowchartConfirmModal";
 import { importDiagramFromJson } from "@/lib/flowchart-export";
+import type { FlowchartTemplate } from "@/lib/flowchart-templates";
 
 // Diagram starter awal dengan 4 simbol
 const INITIAL_STARTER_NODES = [
@@ -160,6 +164,14 @@ export function FlowchartEditor({
   // Modal Ekspor & Impor JSON (Tahap 6)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  // UX State: Loading, Template & Konfirmasi (Tahap 7)
+  const [isLoadingDiagram, setIsLoadingDiagram] = useState<boolean>(Boolean(diagramId));
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
+  const [pendingTemplate, setPendingTemplate] = useState<FlowchartTemplate | null>(null);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState<boolean>(false);
+  const [showTemplateConfirmModal, setShowTemplateConfirmModal] = useState<boolean>(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState<boolean>(false);
+
   const handleImportJsonFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -218,6 +230,10 @@ export function FlowchartEditor({
       }
     };
     updateSize();
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setPaletteCollapsed(true);
+      setPropertyPanelCollapsed(true);
+    }
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
   }, []);
@@ -308,6 +324,7 @@ export function FlowchartEditor({
       } finally {
         if (isMounted) {
           isInitialLoadingRef.current = false;
+          setIsLoadingDiagram(false);
           setSaveStatus("saved");
         }
       }
@@ -429,15 +446,52 @@ export function FlowchartEditor({
     [editor]
   );
 
-  // Hapus semua (Clear All)
-  const handleClearAll = useCallback(() => {
-    if (
-      window.confirm(
-        "Apakah Anda yakin ingin mengosongkan seluruh kanvas flowchart dan semua garis?"
-      )
-    ) {
-      editor.clearAll();
+  // Auto-Layout hierarkis dengan Dagre (Tahap 7 - Bisa di-undo)
+  const handleAutoLayout = useCallback(
+    (direction: "TB" | "LR") => {
+      editor.autoLayout(direction);
+      setTimeout(() => {
+        handleFitToScreen();
+      }, 80);
+    },
+    [editor, handleFitToScreen]
+  );
+
+  // Terapkan Template Diagram Siap Pakai (Tahap 7)
+  const handleApplyTemplate = useCallback(
+    (template: FlowchartTemplate) => {
+      if (editor.nodes.length > 0) {
+        setPendingTemplate(template);
+        setShowTemplateConfirmModal(true);
+      } else {
+        editor.applyTemplate(template.nodes, template.edges, true);
+        setTimeout(() => {
+          handleFitToScreen();
+        }, 80);
+      }
+    },
+    [editor, handleFitToScreen]
+  );
+
+  const handleConfirmApplyTemplate = useCallback(() => {
+    if (pendingTemplate) {
+      editor.applyTemplate(pendingTemplate.nodes, pendingTemplate.edges, true);
+      setPendingTemplate(null);
+      setShowTemplateConfirmModal(false);
+      setTimeout(() => {
+        handleFitToScreen();
+      }, 80);
     }
+  }, [pendingTemplate, editor, handleFitToScreen]);
+
+  // Hapus semua (Clear All dengan Modal Konfirmasi - Tahap 7)
+  const handleClearAll = useCallback(() => {
+    setShowClearConfirmModal(true);
+  }, []);
+
+  const handleConfirmClearAll = useCallback(() => {
+    editor.clearAll();
+    setShowClearConfirmModal(false);
   }, [editor]);
 
   // Keyboard Shortcuts Lengkap (Tahap 4 & 5: Termasuk Ctrl+S Save)
@@ -535,7 +589,7 @@ export function FlowchartEditor({
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] min-h-[640px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-colors">
-      {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status, Export/Import) */}
+      {/* 1. Toolbar Atas (Undo, Redo, Copy, Cut, Paste, Select All, Auto-Save Status, Export/Import, Auto-Layout, Template) */}
       <FlowchartToolbar
         viewport={viewport}
         diagramTitle={diagramTitle}
@@ -544,6 +598,8 @@ export function FlowchartEditor({
         onManualSave={performSave}
         onOpenExportModal={() => setIsExportModalOpen(true)}
         onImportJsonFile={handleImportJsonFile}
+        onAutoLayout={handleAutoLayout}
+        onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
@@ -574,8 +630,12 @@ export function FlowchartEditor({
 
       {/* 2. Workspace: Sidebar Palet Kiri, Kanvas Tengah, Panel Kanan */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Palet Shape Kiri */}
-        <FlowchartShapePalette onAddShape={handleAddShapeFromPalette} />
+        {/* Palet Shape Kiri (Responsif: bisa di-collapse) */}
+        <FlowchartShapePalette
+          onAddShape={handleAddShapeFromPalette}
+          isCollapsed={paletteCollapsed}
+          onToggleCollapse={() => setPaletteCollapsed((prev) => !prev)}
+        />
 
         {/* Kanvas Tengah */}
         <div ref={mainCenterRef} className="flex-1 relative flex overflow-hidden">
@@ -598,6 +658,7 @@ export function FlowchartEditor({
               editor.selectEdge(id);
               setPropertyPanelCollapsed(false);
             }}
+            onApplyTemplate={handleApplyTemplate}
             viewport={viewport}
             onUpdateViewport={setViewport}
             showGrid={showGrid}
@@ -614,6 +675,19 @@ export function FlowchartEditor({
               setViewport((prev) => ({ ...prev, panX: newPanX, panY: newPanY }))
             }
           />
+
+          {/* Loading State Overlay saat Mengambil Data Diagram dari Server */}
+          {isLoadingDiagram && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs select-none animate-in fade-in duration-200">
+              <RefreshCw className="w-9 h-9 text-indigo-600 animate-spin mb-3" />
+              <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Memuat Diagram Flowchart...
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Sinkronisasi node dan alur dari database cloud
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Panel Properti Kanan */}
@@ -653,6 +727,40 @@ export function FlowchartEditor({
         edges={editor.edges}
         viewport={viewport}
         defaultTitle={diagramTitle}
+      />
+
+      {/* Modal Template Siap Pakai (Tahap 7) */}
+      <FlowchartTemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        onSelectTemplate={handleApplyTemplate}
+      />
+
+      {/* Modal Konfirmasi: Kosongkan Kanvas (Tahap 7) */}
+      <FlowchartConfirmModal
+        isOpen={showClearConfirmModal}
+        title="Kosongkan Seluruh Kanvas?"
+        message="Semua simbol dan garis alur akan dihapus dari kanvas. Anda dapat mengurungkan tindakan ini dengan Undo (Ctrl+Z)."
+        confirmText="Kosongkan Kanvas"
+        cancelText="Batal"
+        variant="danger"
+        onConfirm={handleConfirmClearAll}
+        onCancel={() => setShowClearConfirmModal(false)}
+      />
+
+      {/* Modal Konfirmasi: Ganti Template saat Kanvas Berisi (Tahap 7) */}
+      <FlowchartConfirmModal
+        isOpen={showTemplateConfirmModal}
+        title="Terapkan Template Baru?"
+        message={`Kanvas Anda saat ini berisi ${editor.nodes.length} simbol. Menerapkan template "${pendingTemplate?.name}" akan menimpa diagram saat ini (dapat di-undo dengan Ctrl+Z).`}
+        confirmText="Terapkan Template"
+        cancelText="Batal"
+        variant="warning"
+        onConfirm={handleConfirmApplyTemplate}
+        onCancel={() => {
+          setPendingTemplate(null);
+          setShowTemplateConfirmModal(false);
+        }}
       />
     </div>
   );

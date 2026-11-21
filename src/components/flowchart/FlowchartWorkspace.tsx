@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { FlowchartDiagramList } from "./FlowchartDiagramList";
 import { FlowchartEditor } from "./FlowchartEditor";
+import {
+  TEMPLATE_STANDARD_PROCESS,
+  TEMPLATE_APPROVAL_WORKFLOW,
+  TEMPLATE_PLC_AUTOMATION,
+} from "@/lib/flowchart-templates";
 
 export function FlowchartWorkspace() {
   const [activeDiagramId, setActiveDiagramId] = useState<string | null>(null);
@@ -11,13 +16,31 @@ export function FlowchartWorkspace() {
   // Buat diagram baru melalui API dan langsung buka di kanvas
   const handleCreateNew = async (
     nama: string,
-    template?: "blank" | "spm" | "decision"
+    template?: "blank" | "spm" | "standard" | "approval" | "decision"
   ) => {
     try {
-      const initialData =
-        template === "blank"
-          ? { nodes: [], edges: [], viewport: { zoom: 1, panX: 40, panY: 20 } }
-          : undefined;
+      let initialData;
+      if (template === "blank") {
+        initialData = { nodes: [], edges: [], viewport: { zoom: 1, panX: 40, panY: 20 } };
+      } else if (template === "standard") {
+        initialData = {
+          nodes: TEMPLATE_STANDARD_PROCESS.nodes,
+          edges: TEMPLATE_STANDARD_PROCESS.edges,
+          viewport: { zoom: 1, panX: 40, panY: 20 },
+        };
+      } else if (template === "spm") {
+        initialData = {
+          nodes: TEMPLATE_PLC_AUTOMATION.nodes,
+          edges: TEMPLATE_PLC_AUTOMATION.edges,
+          viewport: { zoom: 0.9, panX: 40, panY: 20 },
+        };
+      } else if (template === "approval") {
+        initialData = {
+          nodes: TEMPLATE_APPROVAL_WORKFLOW.nodes,
+          edges: TEMPLATE_APPROVAL_WORKFLOW.edges,
+          viewport: { zoom: 1, panX: 40, panY: 20 },
+        };
+      }
 
       const res = await fetch("/api/flowchart/diagrams", {
         method: "POST",
