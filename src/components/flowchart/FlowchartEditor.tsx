@@ -598,11 +598,42 @@ export function FlowchartEditor({
         editor.clearSelection();
         return;
       }
+
+      // Arrow keys (Geser seluruh simbol terpilih secara serentak)
+      if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        if (editor.selectedNodeIds.length > 0) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 2;
+          const dx = key === "arrowleft" ? -step : key === "arrowright" ? step : 0;
+          const dy = key === "arrowup" ? -step : key === "arrowdown" ? step : 0;
+
+          const primaryId = editor.selectedNodeIds[0];
+          const primaryNode = editor.nodes.find((n) => n.id === primaryId);
+          if (primaryNode) {
+            editor.updateNodePosition(primaryId, primaryNode.x + dx, primaryNode.y + dy);
+          }
+          return;
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editor, performSave, handleZoomIn, handleZoomOut, handleZoomReset]);
+
+  // Cegah browser native zoom (Chrome/Edge Ctrl+Wheel) agar hanya diagram/kanvas yang zoom
+  useEffect(() => {
+    const preventBrowserZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("wheel", preventBrowserZoom, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", preventBrowserZoom);
+    };
+  }, []);
 
   const selectedCount = editor.selectedNodeIds.length + editor.selectedEdgeIds.length;
 
@@ -693,6 +724,7 @@ export function FlowchartEditor({
             onJumpPan={(newPanX, newPanY) =>
               setViewport((prev) => ({ ...prev, panX: newPanX, panY: newPanY }))
             }
+            onZoomChange={setViewport}
           />
 
           {/* Loading State Overlay saat Mengambil Data Diagram dari Server */}

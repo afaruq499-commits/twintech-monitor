@@ -82,6 +82,13 @@ export function FlowchartCanvas({
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Pelacak apakah interaksi klik pada node berlanjut ke pergeseran (drag)
+  const nodeDragRef = useRef<{
+    nodeId: string;
+    hasMoved: boolean;
+    wasMultiSelected: boolean;
+  } | null>(null);
+
   // Resizing Node (Tahap 3)
   const [resizing, setResizing] = useState<{
     nodeId: string;
@@ -274,8 +281,25 @@ export function FlowchartCanvas({
       handleFinishEditing();
     }
 
-    // Dukung Shift+Klik untuk multi-select (Tahap 4)
-    onSelectNode(node.id, e.shiftKey);
+    const isAlreadySelected = selectedNodeIds.includes(node.id);
+
+    if (e.shiftKey) {
+      // Dukung Shift+Klik untuk toggle multi-select (Tahap 4)
+      onSelectNode(node.id, true);
+    } else if (!isAlreadySelected) {
+      // Jika node belum terpilih dan tanpa Shift -> pilih node ini saja
+      onSelectNode(node.id, false);
+    }
+    // Jika node SUDAH terpilih sebelumnya (misalnya setelah 'Select All' atau box select):
+    // JANGAN hapus seleksi node lainnya pada mousedown!
+    // Pertahankan multi-seleksi saat ini agar saat digeser, SELURUH node yang terpilih ikut bergeser bersama!
+
+    nodeDragRef.current = {
+      nodeId: node.id,
+      hasMoved: false,
+      wasMultiSelected: isAlreadySelected && selectedNodeIds.length > 1,
+    };
+
     onSelectEdge(null, false);
     setDraggingNodeId(node.id);
 
@@ -452,6 +476,10 @@ export function FlowchartCanvas({
 
     // Dragging Node with Alignment Guides & Snap
     if (draggingNodeId) {
+      if (nodeDragRef.current) {
+        nodeDragRef.current.hasMoved = true;
+      }
+
       const mouseWorld = getWorldCoordinate(e.clientX, e.clientY);
       let rawX = mouseWorld.x - dragOffset.x;
       let rawY = mouseWorld.y - dragOffset.y;
@@ -459,15 +487,16 @@ export function FlowchartCanvas({
       const currentNode = nodes.find((n) => n.id === draggingNodeId);
       if (currentNode) {
         // Optimasi Performa 200+ node: Pre-filter spasial kandidat guide yang berada di dekat kursor
+        // dan pastikan node lain yang ikut terpilih diabaikan agar tidak snap ke diri sendiri
         const otherNodes =
           nodes.length > 80
             ? nodes.filter(
                 (n) =>
-                  n.id !== draggingNodeId &&
+                  !selectedNodeIds.includes(n.id) &&
                   Math.abs(n.x - rawX) < 1400 &&
                   Math.abs(n.y - rawY) < 1400
               )
-            : nodes.filter((n) => n.id !== draggingNodeId);
+            : nodes.filter((n) => !selectedNodeIds.includes(n.id));
         const alignment = calculateNodeAlignment(
           { x: rawX, y: rawY, width: currentNode.width, height: currentNode.height },
           otherNodes,
@@ -495,8 +524,22 @@ export function FlowchartCanvas({
   };
 
   // Mouse Up Global (Satu drag = Satu langkah history)
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent) => {
     setIsPanning(false);
+
+    if (nodeDragRef.current) {
+      // Jika user mengklik node yang merupakan bagian dari multi-seleksi,
+      // tetapi mouse dilepas TANPA digeser (hanya klik tunggal biasa):
+      // Baru ciutkan seleksi menjadi hanya node yang diklik tersebut.
+      if (
+        nodeDragRef.current.wasMultiSelected &&
+        !nodeDragRef.current.hasMoved &&
+        !e?.shiftKey
+      ) {
+        onSelectNode(nodeDragRef.current.nodeId, false);
+      }
+      nodeDragRef.current = null;
+    }
 
     if (isMarquee) {
       setIsMarquee(false);

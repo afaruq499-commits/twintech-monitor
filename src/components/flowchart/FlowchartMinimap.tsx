@@ -10,6 +10,7 @@ interface FlowchartMinimapProps {
   containerWidth: number;
   containerHeight: number;
   onJumpPan: (newPanX: number, newPanY: number) => void;
+  onZoomChange?: (updater: (prev: CanvasViewport) => CanvasViewport) => void;
 }
 
 export function FlowchartMinimap({
@@ -18,6 +19,7 @@ export function FlowchartMinimap({
   containerWidth,
   containerHeight,
   onJumpPan,
+  onZoomChange,
 }: FlowchartMinimapProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -88,10 +90,25 @@ export function FlowchartMinimap({
     onJumpPan(newPanX, newPanY);
   };
 
+  const handleMinimapWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+      onZoomChange?.((prev) => ({
+        ...prev,
+        zoom: Math.max(0.15, Math.min(3.5, Number((prev.zoom * zoomFactor).toFixed(3)))),
+      }));
+    }
+  };
+
   return (
-    <div className="absolute bottom-4 right-4 z-20 select-none shadow-xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md transition-all">
+    <div
+      onWheel={handleMinimapWheel}
+      className="absolute bottom-4 right-4 z-20 select-none shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#161822]/90 backdrop-blur-md transition-all"
+    >
       {/* Header Minimap */}
-      <div className="px-3 py-1.5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+      <div className="px-3 py-1.5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
         <div className="flex items-center gap-1.5 font-bold text-[11px]">
           <Map className="w-3.5 h-3.5 text-indigo-500" />
           <span>Minimap</span>
