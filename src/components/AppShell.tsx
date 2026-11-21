@@ -10,7 +10,6 @@ import {
   CalendarDays,
   CalendarPlus,
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -18,13 +17,13 @@ import {
   Download,
   FileSpreadsheet,
   FolderKanban,
-  GitFork,
   Home,
   KeyRound,
   Layers,
   LayoutDashboard,
   ListOrdered,
   LogOut,
+  type LucideIcon,
   Menu,
   Moon,
   PanelLeft,
@@ -32,13 +31,9 @@ import {
   Plus,
   Search,
   Settings,
-  ShieldCheck,
-  Sparkles,
   Sun,
   Type,
   Upload,
-  User,
-  Users,
   Workflow,
   X,
 } from "lucide-react";
@@ -55,7 +50,7 @@ interface NavItem {
   href: string;
   label: string;
   shortLabel: string;
-  icon: any;
+  icon: LucideIcon;
   badge?: string;
   shortcut?: string;
 }
@@ -147,8 +142,8 @@ const NAV_SECTIONS: NavSection[] = [
         icon: FileSpreadsheet,
       },
       {
-        href: "/convert-flowchart",
-        label: "Buat Flowchart",
+        href: "/flowchart",
+        label: "Flowchart",
         shortLabel: "Flowchart",
         icon: Workflow,
       },
@@ -442,10 +437,10 @@ export function AppShell({
         { label: "Template Pekerjaan" },
       ];
     }
-    if (pathname === "/convert-flowchart") {
+    if (pathname === "/flowchart" || pathname === "/convert-flowchart") {
       return [
         { label: "Workspace", href: "/" },
-        { label: "Studio Flowchart" },
+        { label: "Flowchart" },
       ];
     }
     if (pathname === "/pengaturan") {
