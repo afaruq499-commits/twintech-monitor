@@ -536,6 +536,53 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
     expect(highlighted).toEqual(["FX5U", "ES"]);
   });
 
+  it("mencakup semua komponen Mitsubishi MELSEC iQ-R Series termasuk modul EtherNet/IP RJ71EIP91", () => {
+    // 1. Verifikasi keberadaan RJ71EIP91
+    const rj71eip = DEFAULT_PR_CATALOG.find((c) => c.tipeModel === "RJ71EIP91");
+    expect(rj71eip).toBeDefined();
+    expect(rj71eip?.merek).toBe("Mitsubishi");
+    expect(rj71eip?.kategori).toBe("PLC & Modul Kontrol");
+    expect(rj71eip?.defaultUnit).toBe("unit");
+    expect(rj71eip?.estimasiHarga).toBe(9800000);
+
+    // 2. Format untuk PR Excel
+    const formatted = formatCatalogItemForPr(rj71eip!);
+    expect(formatted.partType).toBe("Mitsubishi RJ71EIP91");
+    expect(formatted.partName).toContain("EtherNet/IP Communication Module");
+    expect(formatted.unit).toBe("unit");
+
+    // 3. Pencarian via query "RJ71EIP91" dan alias "ethernet ip"
+    const searchExact = searchCatalogComponents(DEFAULT_PR_CATALOG, "RJ71EIP91");
+    expect(searchExact.matches.length).toBeGreaterThan(0);
+    expect(searchExact.matches[0].tipeModel).toBe("RJ71EIP91");
+
+    const searchEip = searchCatalogComponents(DEFAULT_PR_CATALOG, "ethernet ip rj71");
+    expect(searchEip.matches.length).toBeGreaterThan(0);
+    expect(searchEip.matches.some((m) => m.tipeModel === "RJ71EIP91")).toBe(true);
+
+    // 4. Verifikasi modul-modul penting R Series lainnya
+    const requiredModels = [
+      "R00CPU", "R01CPU", "R02CPU", "R04CPU", "R08CPU", "R16CPU", "R32CPU", "R120CPU",
+      "R04ENCPU", "R08ENCPU", "R16ENCPU", "R32ENCPU", "R08SFCPU-SET",
+      "R33B", "R35B", "R38B", "R310B", "R312B", "R65B", "R68B", "R612B",
+      "RC06B", "RC12B", "RC30B",
+      "R61P", "R62P", "R63P", "R64P", "R61P-S1",
+      "RX10", "RX40C7", "RX40PC6H", "RX40NC6H", "RX41C4", "RX42C4",
+      "RY10R2", "RY18R2A", "RY40PT5P", "RY40NT5P", "RY41NT2P", "RY41PT1P", "RY42NT2P", "RY42PT1P",
+      "RH42C4NT2P", "RH42C4PT1P",
+      "R60AD4", "R60AD8-G", "R60AD16-G", "R60ADH4", "R60DA4", "R60DA8-G", "R60TD8-G", "R60RD8-G", "R60TCRT4",
+      "RD62P2", "RD62D2", "RD75P2", "RD75P4", "RD75D4", "RD77MS2", "RD77MS4", "RD77MS8", "RD77MS16",
+      "RD78G4", "RD78G8", "RD78G16",
+      "RJ71EIP91", "RJ71GP21-SX", "RJ71GF11-T2", "RJ71GN11-T2", "RJ71C24", "RJ71C24-R2", "RJ71C24-R4", "RJ71PB91V", "RJ71DN91", "RJ71OP10", "RJ71MES96",
+      "RG60", "NZ1MEM-4GBSD", "NZ1MEM-16GBSD"
+    ];
+
+    for (const model of requiredModels) {
+      const exists = DEFAULT_PR_CATALOG.some((c) => c.tipeModel === model);
+      expect(exists).toBe(true);
+    }
+  });
+
   it("memisahkan kelompok OP Panel dan Sensor secara cerdas saat nomor urut reset kembali ke 1 tanpa baris kosong", async () => {
     // Simulasi tabel PR Excel seperti kasus mtm.xlsx:
     // Baris 1-8: HMI & tombol operator (No. 1 s.d. 8)

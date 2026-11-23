@@ -31,6 +31,10 @@ const AUTOMATION_ALIASES: Array<[needle: string, aliases: string]> = [
   ["proximity", "prox"],
   ["photoelectric", "photosensor photo sensor"],
   ["solenoid valve", "selenoid valve katup"],
+  ["ethernet/ip", "eip rj71eip91 rj71eip ethernet ip"],
+  ["rj71", "rj71eip91 rj71en71 rj71c24 rj71gp21 rj71gf11 rj71gn11 rj71pb91v rj71dn91 rj71op10 rj71mes96"],
+  ["r series", "melsec iq-r r-series r00 r01 r02 r04 r08 r16 r32 r120 r33 r35 r38 r310 r312 r61 r62 r63 r64 r65 r68 r612 rx40 rx41 rx42 ry10 ry40 ry41 ry42 rh42 r60 rd62 rd75 rd77 rd78"],
+  ["melsec", "iq-r melsec-r mitsubishi plc"],
 ];
 
 export function tokenizeSearchQuery(rawQuery: string): string[] {
