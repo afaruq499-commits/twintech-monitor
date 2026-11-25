@@ -20,7 +20,7 @@ export interface CatalogComponentDTO {
  */
 export async function getCatalogComponents(): Promise<CatalogComponentDTO[]> {
   const existingRows = await prisma.catalogComponent.findMany({
-    select: { id: true, nama: true, tipeModel: true },
+    select: { id: true, nama: true, tipeModel: true, spesifikasi: true },
   });
 
   if (existingRows.length === 0) {
@@ -39,17 +39,16 @@ export async function getCatalogComponents(): Promise<CatalogComponentDTO[]> {
     });
   } else {
     // Sinkronkan item baru dari DEFAULT_PR_CATALOG yang belum ada di database
+    // Sertakan spesifikasi dalam kunci unik agar varian rating (mis. NXB-63 2P vs 3P) tetap tersinkron
+    const makeKey = (nama: string, tipeModel: string, spesifikasi: string | null | undefined) =>
+      `${nama.trim().toLowerCase()}||${tipeModel.trim().toLowerCase()}||${(spesifikasi ?? "").trim().toLowerCase()}`;
+
     const existingKeys = new Set(
-      existingRows.map(
-        (r) => `${r.nama.trim().toLowerCase()}||${r.tipeModel.trim().toLowerCase()}`
-      )
+      existingRows.map((r) => makeKey(r.nama, r.tipeModel, r.spesifikasi))
     );
 
     const missingItems = DEFAULT_PR_CATALOG.filter(
-      (item) =>
-        !existingKeys.has(
-          `${item.nama.trim().toLowerCase()}||${item.tipeModel.trim().toLowerCase()}`
-        )
+      (item) => !existingKeys.has(makeKey(item.nama, item.tipeModel, item.spesifikasi))
     );
 
     if (missingItems.length > 0) {

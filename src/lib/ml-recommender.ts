@@ -66,6 +66,7 @@ export interface RecommendedPrComponent {
   kelompok: "Panel Utama" | "OP Panel" | "Sensor & Push Button";
   partType: string;
   partName: string;
+  supplier?: string;
   qty: number;
   unit: string;
   hargaSatuan: number | null;
@@ -1105,10 +1106,11 @@ function makeRecommendedRow(
     kelompok: opts.kelompok,
     partType: pr.partType,
     partName: pr.partName,
+    supplier: pr.merek || undefined,
     qty: opts.qty,
     unit: pr.unit,
     hargaSatuan: pr.hargaSatuan,
-    catatanPr: opts.catatanPr,
+    catatanPr: opts.catatanPr || pr.spesifikasi || "",
     alasanSingkat: opts.alasanSingkat,
     catalogId: item.id ?? null,
     defaultChecked: opts.defaultChecked ?? true,

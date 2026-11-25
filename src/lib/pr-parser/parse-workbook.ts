@@ -106,7 +106,13 @@ export async function parsePrWorkbook(buffer: ArrayBuffer | Buffer, filename = "
 
 export function parsePrWorksheet(ws: ExcelJS.Worksheet, filename = ""): ParsedPr {
   const last = ws.rowCount;
-  let headerRow = findRow(ws, 1, Math.min(last, 30), (t) => t.includes("PART TYPE"), 2);
+  let headerRow = findRow(
+    ws,
+    1,
+    Math.min(last, 30),
+    (t) => t.includes("PART TYPE") || t.includes("PART CODE"),
+    2
+  );
   if (headerRow < 0) headerRow = 8; // fallback sesuai template
   let footerRow = findRow(ws, headerRow + 1, last, (t) => t.trim() === "PARTS NAME");
   if (footerRow < 0) footerRow = last + 1;

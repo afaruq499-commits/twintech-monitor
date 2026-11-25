@@ -390,6 +390,14 @@ export function CatalogAutocompleteInput({
                             />
                           )}
                         </span>
+                        {prFields.merek && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">
+                            <HighlightedText
+                              text={prFields.merek}
+                              tokens={tokens}
+                            />
+                          </span>
+                        )}
                         <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
                           <HighlightedText
                             text={sug.kategori}

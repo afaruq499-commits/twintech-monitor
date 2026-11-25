@@ -284,9 +284,9 @@ export async function exportPrToBuffer(
 
   const tableHeaders: { addr: string; text: string; fontName: string; size: number }[] = [
     { addr: "A8", text: "NO.", fontName: "Roboto", size: 11 },
-    { addr: "B8", text: "PART TYPE", fontName: "Roboto", size: 11 },
-    { addr: "D8", text: "PARTS NAME", fontName: "Roboto", size: 11 },
-    { addr: "G8", text: "DESCRIPTION", fontName: "Roboto", size: 11 },
+    { addr: "B8", text: "PART CODE", fontName: "Roboto", size: 11 },
+    { addr: "D8", text: "PART NAME", fontName: "Roboto", size: 11 },
+    { addr: "G8", text: "DESKRIPSI", fontName: "Roboto", size: 11 },
     { addr: "H8", text: "QTY", fontName: "Arial", size: 10 },
     { addr: "I8", text: "Unit", fontName: "Arial", size: 10 },
     { addr: "J8", text: "NOTE", fontName: "Arial", size: 10 },

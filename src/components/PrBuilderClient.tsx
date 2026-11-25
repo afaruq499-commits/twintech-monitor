@@ -273,13 +273,24 @@ export function PrBuilderClient({
 
   const filteredCatalogMaster = masterSearchResult.matches;
 
-  // Hitung jumlah yang sudah masuk ke PR per catalog item
+  // Hitung jumlah yang sudah masuk ke PR per item & per varian katalog (termasuk spesifikasi/note)
   const qtyInPrByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of items) {
       const k = `${row.partType.trim().toLowerCase()}||${row.partName
         .trim()
         .toLowerCase()}`;
+      map.set(k, (map.get(k) ?? 0) + (Number(row.qty) || 0));
+    }
+    return map;
+  }, [items]);
+
+  const qtyInPrByCatalogVariant = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of items) {
+      const k = `${row.partType.trim().toLowerCase()}||${row.partName
+        .trim()
+        .toLowerCase()}||${row.catatanPr.trim().toLowerCase()}`;
       map.set(k, (map.get(k) ?? 0) + (Number(row.qty) || 0));
     }
     return map;
@@ -431,13 +442,17 @@ export function PrBuilderClient({
     const addQty = Math.max(1, Number(quickQtyMap[cat.id] ?? 1) || 1);
 
     setItems((prev) => {
-      // Cek apakah komponen yang persis sama sudah ada di kelompok aktif -> tambahkan Qty
+      // Cek apakah komponen yang persis sama (termasuk spesifikasi/note & merek) sudah ada di kelompok aktif -> tambahkan Qty
+      const targetNote = (prFields.spesifikasi ?? "").trim().toLowerCase();
+      const targetSupplier = (defaultSupplier.trim() || prFields.merek).trim().toLowerCase();
       const existingIdx = prev.findIndex(
         (r) =>
           r.kelompok === activeGroup &&
           r.partType.trim().toLowerCase() ===
             prFields.partType.toLowerCase() &&
-          r.partName.trim().toLowerCase() === prFields.partName.toLowerCase()
+          r.partName.trim().toLowerCase() === prFields.partName.toLowerCase() &&
+          r.catatanPr.trim().toLowerCase() === targetNote &&
+          r.supplier.trim().toLowerCase() === targetSupplier
       );
       if (existingIdx >= 0) {
         return prev.map((r, i) =>
@@ -454,10 +469,10 @@ export function PrBuilderClient({
           noPr: nextNo,
           partType: prFields.partType,
           partName: prFields.partName,
-          supplier: defaultSupplier.trim(),
+          supplier: defaultSupplier.trim() || prFields.merek,
           qty: addQty,
           unit: prFields.unit,
-          catatanPr: "",
+          catatanPr: prFields.spesifikasi ?? "",
           tanggalPakai: "",
           hargaSatuan:
             prFields.hargaSatuan !== null ? String(prFields.hargaSatuan) : "",
@@ -507,16 +522,17 @@ export function PrBuilderClient({
           };
           updatedCount += 1;
         } else {
+          const matchedPr = matchedCat ? formatCatalogItemForPr(matchedCat) : null;
           updated.push({
             tempId: nextTempId(),
             kelompok: p.kelompok,
             noPr: String(updated.length + 1),
-            partType: p.partType,
-            partName: p.partName,
-            supplier: defaultSupplier.trim(),
+            partType: matchedPr ? matchedPr.partType : p.partType,
+            partName: matchedPr ? matchedPr.partName : p.partName,
+            supplier: defaultSupplier.trim() || (matchedPr?.merek ?? ""),
             qty: addQty,
-            unit: p.unit || matchedCat?.defaultUnit || "pcs",
-            catatanPr: "",
+            unit: p.unit || matchedPr?.unit || matchedCat?.defaultUnit || "pcs",
+            catatanPr: matchedPr?.spesifikasi ?? "",
             tanggalPakai: "",
             hargaSatuan:
               matchedCat?.estimasiHarga != null ? String(matchedCat.estimasiHarga) : "",
@@ -579,6 +595,8 @@ export function PrBuilderClient({
     updateRow(tempId, {
       partType: prFields.partType,
       partName: prFields.partName,
+      supplier: prFields.merek || "",
+      catatanPr: prFields.spesifikasi ?? "",
       unit: prFields.unit,
       hargaSatuan:
         prFields.hargaSatuan !== null ? String(prFields.hargaSatuan) : "",
@@ -793,7 +811,7 @@ export function PrBuilderClient({
 
   async function quickSaveRowToCatalog(row: PrDraftRow) {
     if (!row.partType.trim() || !row.partName.trim()) {
-      setErrorMsg("Isi PART TYPE dan PARTS NAME sebelum menyimpan ke katalog.");
+      setErrorMsg("Isi PART CODE dan PART NAME sebelum menyimpan ke katalog.");
       return;
     }
     setErrorMsg(null);
@@ -804,7 +822,7 @@ export function PrBuilderClient({
         body: JSON.stringify({
           kategori: row.kelompok || "Komponen Custom",
           nama: row.partName.trim(),
-          merek: "Bebas",
+          merek: row.supplier.trim() || "Bebas",
           tipeModel: row.partType.trim(),
           spesifikasi: row.catatanPr.trim() || null,
           estimasiHarga:
@@ -1651,8 +1669,8 @@ export function PrBuilderClient({
               ) : (
                 filteredCatalogPicker.map((cat) => {
                   const prFields = formatCatalogItemForPr(cat);
-                  const matchKey = `${prFields.partType.toLowerCase()}||${prFields.partName.toLowerCase()}`;
-                  const alreadyQty = qtyInPrByKey.get(matchKey) ?? 0;
+                  const matchKey = `${prFields.partType.toLowerCase()}||${prFields.partName.toLowerCase()}||${(prFields.spesifikasi ?? "").toLowerCase()}`;
+                  const alreadyQty = qtyInPrByCatalogVariant.get(matchKey) ?? 0;
                   const inputQty = quickQtyMap[cat.id] ?? 1;
 
                   return (
@@ -1676,6 +1694,14 @@ export function PrBuilderClient({
                               tokens={pickerSearchTokens}
                             />
                           </span>
+                          {prFields.merek && (
+                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-bold">
+                              <HighlightedText
+                                text={prFields.merek}
+                                tokens={pickerSearchTokens}
+                              />
+                            </span>
+                          )}
                           {alreadyQty > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold">
                               ✓ Sudah di PR: {alreadyQty} {prFields.unit}
@@ -1998,13 +2024,13 @@ export function PrBuilderClient({
                             <tr>
                               <th className="p-2.5 text-center w-14">NO.</th>
                               <th className="p-2.5 text-left min-w-[240px]">
-                                PART TYPE (Merk / Tipe / Spesifikasi)
+                                PART CODE (Tipe / Model)
                               </th>
                               <th className="p-2.5 text-left min-w-[200px]">
-                                PARTS NAME (Nama / Jenis)
+                                PART NAME (Jenis Komponen)
                               </th>
                               <th className="p-2.5 text-left w-32">
-                                DESCRIPTION (Supplier)
+                                DESKRIPSI (Merek)
                               </th>
                               <th className="p-2.5 text-center w-20">QTY</th>
                               <th className="p-2.5 text-center w-20">Unit</th>
@@ -2015,7 +2041,7 @@ export function PrBuilderClient({
                                 TOTAL (Rp)
                               </th>
                               <th className="p-2.5 text-left min-w-[180px]">
-                                NOTE & Tgl Pakai
+                                NOTE (Spesifikasi)
                               </th>
                               <th className="p-2.5 text-left w-32">Kelompok</th>
                               <th className="p-2.5 text-center w-16">Aksi</th>
@@ -2129,7 +2155,7 @@ export function PrBuilderClient({
                                     />
                                   </td>
 
-                                  {/* SUPPLIER */}
+                                  {/* SUPPLIER / DESKRIPSI (MEREK) */}
                                   <td className="p-2">
                                     <input
                                       type="text"
@@ -2139,7 +2165,7 @@ export function PrBuilderClient({
                                           supplier: e.target.value,
                                         })
                                       }
-                                      placeholder="Supplier (kosong)"
+                                      placeholder="Merek / Deskripsi"
                                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
                                     />
                                   </td>
@@ -2209,7 +2235,7 @@ export function PrBuilderClient({
                                           catatanPr: e.target.value,
                                         })
                                       }
-                                      placeholder="Catatan PR (NOTE)..."
+                                      placeholder="Spesifikasi / Note (mis. 3 Pole 63A)..."
                                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
                                     />
                                     <input

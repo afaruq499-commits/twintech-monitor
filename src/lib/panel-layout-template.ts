@@ -1579,6 +1579,7 @@ export function inferComponentVisual(
     combined.includes("MCCB") ||
     combined.includes("EZC100") ||
     combined.includes("NF32") ||
+    combined.includes("NXM-") ||
     combined.includes("NO FUSE BREAKER")
   ) {
     return {
@@ -1613,7 +1614,7 @@ export function inferComponentVisual(
     combined.includes("KONTAKTOR") ||
     combined.includes("RELAY") ||
     combined.includes("TERMINAL");
-  if (!isNonBreakerNoiseOrCoil && (combined.includes("3P") || combined.includes("3-POLE") || combined.includes("3 PHASE"))) {
+  if (!isNonBreakerNoiseOrCoil && (combined.includes("3P") || combined.includes("3-POLE") || combined.includes("3 POLE") || combined.includes("3 PHASE"))) {
     return {
       category: "MCB",
       widthMm: 54,
@@ -1626,9 +1627,11 @@ export function inferComponentVisual(
     !isNonBreakerNoiseOrCoil &&
     (combined.includes("2P") ||
       combined.includes("2-POLE") ||
+      combined.includes("2 POLE") ||
       combined.includes("A9F742") ||
       combined.includes("A9N615") ||
       combined.includes("CP30") ||
+      combined.includes("CP32") ||
       combined.includes("NXB-63 2P"))
   ) {
     const mcbTag = combined.includes("A9F74216")

@@ -1805,7 +1805,7 @@ export function ProjectDetailClient({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold mb-1">
-                    Part Type / Merk *
+                    Part Code (Tipe / Model) *
                   </label>
                   <CatalogAutocompleteInput
                     required
@@ -1821,6 +1821,8 @@ export function ProjectDetailClient({
                         ...newComp,
                         partType: pr.partType,
                         partName: pr.partName,
+                        supplier: pr.merek || newComp.supplier,
+                        catatan: pr.spesifikasi ?? newComp.catatan,
                         unit: pr.unit,
                         hargaSatuan:
                           pr.hargaSatuan !== null ? String(pr.hargaSatuan) : "",
@@ -1832,7 +1834,7 @@ export function ProjectDetailClient({
                 </div>
                 <div>
                   <label className="block font-bold mb-1">
-                    Parts Name / Kategori *
+                    Part Name (Jenis Komponen) *
                   </label>
                   <CatalogAutocompleteInput
                     required
@@ -1848,6 +1850,8 @@ export function ProjectDetailClient({
                         ...newComp,
                         partType: pr.partType,
                         partName: pr.partName,
+                        supplier: pr.merek || newComp.supplier,
+                        catatan: pr.spesifikasi ?? newComp.catatan,
                         unit: pr.unit,
                         hargaSatuan:
                           pr.hargaSatuan !== null ? String(pr.hargaSatuan) : "",

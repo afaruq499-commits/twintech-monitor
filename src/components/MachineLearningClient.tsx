@@ -152,11 +152,11 @@ export function MachineLearningClient({
             kelompok: rec.kelompok,
             partType: rec.partType,
             partName: rec.partName,
-            supplier: "",
+            supplier: rec.supplier ?? "",
             qty: rec.qty,
             unit: rec.unit,
             hargaSatuan: rec.hargaSatuan,
-            catatanPr: "",
+            catatanPr: rec.catatanPr ?? "",
             statusPembelian: "BELUM_PR",
           }),
         });

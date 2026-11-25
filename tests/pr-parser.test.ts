@@ -386,7 +386,7 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
 
     const plcItem = DEFAULT_PR_CATALOG.find((c) => c.noUrut === 50)!;
     const formatted = formatCatalogItemForPr(plcItem);
-    expect(formatted.partType).toBe("Mitsubishi FX5U-32MR/ES");
+    expect(formatted.partType).toBe("FX5U-32MR/ES");
     expect(formatted.partName).toBe("Compact PLC CPU Unit (FX5U Series)");
     expect(formatted.hargaSatuan).toBe(5665000);
     expect(formatted.unit).toBe("pcs");
@@ -488,7 +488,7 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
     expect(reparsed.counts.check).toBe(0);
     expect(reparsed.counts.ok).toBe(3);
 
-    expect(reparsed.rows[0].partType).toBe("Mitsubishi FX5U-32MR/ES");
+    expect(reparsed.rows[0].partType).toBe("FX5U-32MR/ES");
     expect(reparsed.rows[0].tanggalPakai).toBe("2026-11-10");
     expect(reparsed.rows[0].total).toBe(5665000);
 
@@ -547,7 +547,7 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
 
     // 2. Format untuk PR Excel
     const formatted = formatCatalogItemForPr(rj71eip!);
-    expect(formatted.partType).toBe("Mitsubishi RJ71EIP91");
+    expect(formatted.partType).toBe("RJ71EIP91");
     expect(formatted.partName).toContain("EtherNet/IP Communication Module");
     expect(formatted.unit).toBe("unit");
 
@@ -636,5 +636,48 @@ describe("Master Katalog Komponen & Round-Trip Export -> Import PR Excel", () =>
     expect(parsed.rows.filter((r) => r.kelompok === "Sensor & Push Button").length).toBe(2);
     expect(parsed.rows[0].partName).toBe("HMI");
     expect(parsed.rows[0].kelompok).toBe("OP Panel");
+  });
+
+  it("merapikan format PR katalog: Part Code = tipeModel, Part Name = nama, Deskripsi = merek, Note = spesifikasi", () => {
+    const nxm63 = DEFAULT_PR_CATALOG.find((c) => c.tipeModel === "NXM-63S")!;
+    expect(nxm63).toBeDefined();
+    expect(formatCatalogItemForPr(nxm63)).toMatchObject({
+      partType: "NXM-63S",
+      partName: "MCCB",
+      merek: "CHINT",
+      spesifikasi: "3 Pole 63 Ampere",
+    });
+
+    const nxm125 = DEFAULT_PR_CATALOG.find((c) => c.tipeModel === "NXM-125S")!;
+    expect(nxm125).toBeDefined();
+    expect(formatCatalogItemForPr(nxm125)).toMatchObject({
+      partType: "NXM-125S",
+      partName: "MCCB",
+      merek: "CHINT",
+      spesifikasi: "3 Pole 80 Ampere",
+    });
+
+    const cp32 = DEFAULT_PR_CATALOG.find((c) => c.tipeModel === "CP32D/5")!;
+    expect(cp32).toBeDefined();
+    expect(formatCatalogItemForPr(cp32)).toMatchObject({
+      partType: "CP32D/5",
+      partName: "Circuit Protector",
+      merek: "FUJI",
+      spesifikasi: "2 Pole 5 Ampere",
+    });
+
+    const nxbVariants = DEFAULT_PR_CATALOG.filter((c) => c.tipeModel === "NXB-63");
+    expect(nxbVariants.length).toBeGreaterThanOrEqual(7);
+    expect(nxbVariants.every((v) => v.nama === "MCB" && v.merek === "CHINT")).toBe(true);
+    const specs = nxbVariants.map((v) => v.spesifikasi);
+    expect(specs).toContain("3 Pole 10 Ampere");
+    expect(specs).toContain("2 Pole 32 Ampere");
+    expect(specs).toContain("2 Pole 25 Ampere");
+
+    // Pastikan merek "Bebas" / "-" tidak masuk ke Deskripsi
+    const bebasItem = DEFAULT_PR_CATALOG.find((c) => c.merek === "Bebas");
+    if (bebasItem) {
+      expect(formatCatalogItemForPr(bebasItem).merek).toBe("");
+    }
   });
 });
