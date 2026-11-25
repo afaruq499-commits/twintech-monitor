@@ -1,7 +1,17 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { Download, Printer, X, FileCode2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Download,
+  Printer,
+  X,
+  FileCode2,
+  Move,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+} from "lucide-react";
 import {
   extractPanelFeatures,
   generatePanelLayoutDxf,
@@ -43,6 +53,40 @@ export function PanelDrawingSheetModal({
   project,
 }: PanelDrawingSheetModalProps) {
   const printAreaRef = useRef<HTMLDivElement>(null);
+  const sheetSvgRef = useRef<SVGSVGElement>(null);
+  const dragStateRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
+
+  const [manualOffsets, setManualOffsets] = useState<Record<string, { x: number; y: number }>>({});
+  const [manualScales, setManualScales] = useState<Record<string, number>>({});
+  const [isDraggingDrawing, setIsDraggingDrawing] = useState(false);
+
+  const manualOffset = manualOffsets[mode] ?? { x: 0, y: 0 };
+  const manualScale = manualScales[mode] ?? 1;
+
+  const setCurrentOffset = useCallback(
+    (next: { x: number; y: number }) => {
+      setManualOffsets((prev) => ({ ...prev, [mode]: next }));
+    },
+    [mode]
+  );
+
+  const setCurrentScale = useCallback(
+    (next: number) => {
+      const clamped = Math.max(0.65, Math.min(1.4, Number(next.toFixed(2))));
+      setManualScales((prev) => ({ ...prev, [mode]: clamped }));
+    },
+    [mode]
+  );
+
+  const handleResetPlacement = useCallback(() => {
+    setManualOffsets((prev) => ({ ...prev, [mode]: { x: 0, y: 0 } }));
+    setManualScales((prev) => ({ ...prev, [mode]: 1 }));
+  }, [mode]);
 
   const metadata: DxfProjectMetadata = useMemo(() => {
     const today = new Date();
@@ -115,6 +159,44 @@ export function PanelDrawingSheetModal({
     [features, metadata, mode, outerPanel]
   );
 
+  // Dimensi sheet SVG (A4 / A3 Landscape Aspect 1.414)
+  const sheetW = 1188;
+  const sheetH = 840;
+
+  useEffect(() => {
+    if (!isDraggingDrawing) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const drag = dragStateRef.current;
+      const svg = sheetSvgRef.current;
+      if (!drag || !svg) return;
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const scaleX = sheetW / rect.width;
+      const scaleY = sheetH / rect.height;
+      const dx = (e.clientX - drag.startClientX) * scaleX;
+      const dy = (e.clientY - drag.startClientY) * scaleY;
+
+      setCurrentOffset({
+        x: Math.round(Math.max(-350, Math.min(450, drag.origX + dx))),
+        y: Math.round(Math.max(-250, Math.min(300, drag.origY + dy))),
+      });
+    };
+
+    const handleWindowMouseUp = () => {
+      dragStateRef.current = null;
+      setIsDraggingDrawing(false);
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isDraggingDrawing, setCurrentOffset]);
+
   if (!isOpen) return null;
 
   const handleDownloadDxf = () => {
@@ -132,36 +214,44 @@ export function PanelDrawingSheetModal({
     window.print();
   };
 
-  // Dimensi sheet SVG (A4 / A3 Landscape Aspect 1.414)
-  const sheetW = 1188;
-  const sheetH = 840;
+  const handleStartDragDrawing = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragStateRef.current = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      origX: manualOffset.x,
+      origY: manualOffset.y,
+    };
+    setIsDraggingDrawing(true);
+  };
 
-  // Area gambar mekanik (antara margin kiri dan tabel kop kanan)
-  const drawAreaX = 75;
-  const maxAvailW = 630;
-  const maxAvailH = 480;
+  // Area gambar mekanik aman (antara margin kiri X=85 s.d sebelum tabel toleransi kanan X=965)
+  const maxAvailW = 680;
+  const maxAvailH = 470;
 
   // Margin plat di dalam area gambar (memberikan ruang untuk garis dimensi atas & kiri)
-  const dimMarginLeft = 60;
+  const dimMarginLeft = 65;
   const dimMarginTop = 45;
   const usableW = maxAvailW - dimMarginLeft;
   const usableH = maxAvailH - dimMarginTop;
 
-  // Skala visual agar plat fit di dalam area gambar
-  const scale = Math.min(usableW / plateWidth, usableH / plateHeight, 1.6);
+  // Skala visual agar plat fit di dalam area gambar (dikali skala manual user jika diatur)
+  const baseScale = Math.min(usableW / plateWidth, usableH / plateHeight, 1.5);
+  const scale = baseScale * manualScale;
   const scaledPlateW = plateWidth * scale;
   const scaledPlateH = plateHeight * scale;
 
-  // Centering posisi plat di sheet SVG
-  const centerAreaX = 385;
+  // Centering posisi plat di sheet SVG (pusat area kerja = 505)
+  const centerAreaX = 505;
   const plateOriginX = Math.max(
-    75 + dimMarginLeft,
-    Math.round(centerAreaX - scaledPlateW / 2 + dimMarginLeft / 2)
+    90,
+    Math.round(centerAreaX - scaledPlateW / 2)
   );
 
   // Center vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
   const centerAreaY = 365;
-  const plateTopY = Math.max(120, Math.round(centerAreaY - scaledPlateH / 2));
+  const plateTopY = Math.max(115, Math.round(centerAreaY - scaledPlateH / 2));
   const plateBottomY = plateTopY + scaledPlateH;
 
   // Helper konversi koordinat CAD (origin bottom-left) ke koordinat SVG Sheet
@@ -232,6 +322,66 @@ export function PanelDrawingSheetModal({
           </div>
         </div>
 
+        {/* Bar Kontrol Posisi & Skala Gambar di Kertas (Tersembunyi saat Cetak/PDF) */}
+        <div className="px-5 py-2 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 print:hidden">
+          <div className="flex items-center gap-2">
+            <Move className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span>
+              <strong>Tahan &amp; geser gambar</strong> langsung di atas kertas untuk mengatur posisi center secara manual
+            </span>
+            {(manualOffset.x !== 0 || manualOffset.y !== 0) && (
+              <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[11px] text-amber-300">
+                X: {manualOffset.x >= 0 ? `+${manualOffset.x}` : manualOffset.x} • Y: {manualOffset.y >= 0 ? `+${manualOffset.y}` : manualOffset.y}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-0.5">
+              <button
+                type="button"
+                onClick={() => setCurrentScale(manualScale - 0.05)}
+                className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+                title="Perkecil skala gambar di kertas"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono text-[11px] font-bold w-11 text-center text-white">
+                {Math.round(manualScale * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentScale(manualScale + 0.05)}
+                className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+                title="Perbesar skala gambar di kertas"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResetPlacement}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/90 hover:bg-blue-500 text-white text-[11px] font-bold cursor-pointer transition"
+              title="Kembalikan posisi gambar tepat ke tengah (Auto Center) & skala 100%"
+            >
+              <Maximize2 className="w-3 h-3" />
+              <span>Auto Center</span>
+            </button>
+
+            {(manualOffset.x !== 0 || manualOffset.y !== 0 || manualScale !== 1) && (
+              <button
+                type="button"
+                onClick={handleResetPlacement}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition"
+                title="Reset posisi & skala"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Lembar Gambar Teknik (Bisa di-print langsung) */}
         <div
           ref={printAreaRef}
@@ -239,6 +389,7 @@ export function PanelDrawingSheetModal({
         >
           <div className="bg-white text-black shadow-2xl rounded-sm p-2 w-full max-w-[1050px] aspect-[1188/840] border border-slate-300 print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
             <svg
+              ref={sheetSvgRef}
               viewBox={`0 0 ${sheetW} ${sheetH}`}
               className="w-full h-full select-none"
               style={{ fontFamily: "'Courier New', Courier, monospace" }}
@@ -458,8 +609,45 @@ export function PanelDrawingSheetModal({
                 </g>
               </g>
 
-              {/* ================= AREA GAMBAR MEKANIK TEKNIK ================= */}
-              <g id="mechanical-cad-drawing">
+              {/* Garis Bantu Center Saat Menggeser Gambar Manual (Tidak ikut tercetak) */}
+              {isDraggingDrawing && (
+                <g className="print:hidden" pointerEvents="none">
+                  <line
+                    x1={505}
+                    y1={75}
+                    x2={505}
+                    y2={650}
+                    stroke="#0ea5e9"
+                    strokeWidth="0.9"
+                    strokeDasharray="6,4"
+                  />
+                  <line
+                    x1={35}
+                    y1={360}
+                    x2={980}
+                    y2={360}
+                    stroke="#0ea5e9"
+                    strokeWidth="0.9"
+                    strokeDasharray="6,4"
+                  />
+                </g>
+              )}
+
+              {/* ================= AREA GAMBAR MEKANIK TEKNIK (Bisa Digeser Manual) ================= */}
+              <g
+                id="mechanical-cad-drawing"
+                transform={`translate(${manualOffset.x}, ${manualOffset.y})`}
+                onMouseDown={handleStartDragDrawing}
+                className={isDraggingDrawing ? "cursor-grabbing" : "cursor-grab"}
+              >
+                {/* Hit area transparan agar klik di ruang kosong gambar juga bisa drag */}
+                <rect
+                  x={40}
+                  y={80}
+                  width={930}
+                  height={575}
+                  fill="transparent"
+                />
                 {mode === "OUTER" ? (
                   // ================= GAMBAR 2D PANEL LUAR (FRONT & SIDE VIEW) =================
                   (() => {
@@ -479,24 +667,24 @@ export function PanelDrawingSheetModal({
                     const outerGap = 70;
                     const totalCadW = outerW + outerGap + outerD;
 
-                    // Batas ruang gambar aman agar center dan tidak menabrak kop gambar di kanan bawah (Y=660)
-                    const maxDrawW = 620;
+                    // Batas ruang gambar aman agar center antara margin kiri (X=90) dan tabel toleransi kanan (X=965)
+                    const maxDrawW = 660;
                     const maxDrawH = 430;
-                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / outerH, 0.85);
+                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / outerH, 0.85) * manualScale;
                     const sw = outerW * s;
                     const sh = outerH * s;
                     const sd = outerD * s;
                     const sgap = outerGap * s;
                     const totalDrawingW = sw + sgap + sd;
 
-                    // Posisi Center Horizontal (di area kerja sebelah kiri kop gambar X=30 s.d X=715)
-                    const centerAreaX = 385;
-                    const fx = Math.max(70, Math.round(centerAreaX - totalDrawingW / 2));
+                    // Posisi Center Horizontal seimbang (pusat area aman = 505)
+                    const outerCenterX = 505;
+                    const fx = Math.max(90, Math.round(outerCenterX - totalDrawingW / 2));
                     const sx = fx + sw + sgap;
 
                     // Posisi Center Vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
-                    const centerAreaY = 350;
-                    const boxTopY = Math.round(centerAreaY - sh / 2);
+                    const outerCenterY = 355;
+                    const boxTopY = Math.round(outerCenterY - sh / 2);
                     const fy = boxTopY + sh;
                     const sy = fy;
 
@@ -913,23 +1101,23 @@ export function PanelDrawingSheetModal({
                     const totalCadW = hmiW + gap + hmiD;
 
                     // Batas ruang gambar aman agar center dan tidak menabrak kop gambar di kanan bawah (Y=660)
-                    const maxDrawW = 600;
-                    const maxDrawH = 410;
-                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / hmiH, 1.1);
+                    const maxDrawW = 650;
+                    const maxDrawH = 415;
+                    const s = Math.min(maxDrawW / totalCadW, maxDrawH / hmiH, 1.1) * manualScale;
                     const sw = hmiW * s;
                     const sh = hmiH * s;
                     const sd = hmiD * s;
                     const sgap = gap * s;
                     const totalDrawingW = sw + sgap + sd;
 
-                    // Posisi Center Horizontal (di area kerja sebelah kiri kop gambar X=30 s.d X=715)
-                    const centerAreaX = 390;
-                    const fx = Math.max(80, Math.round(centerAreaX - totalDrawingW / 2));
+                    // Posisi Center Horizontal seimbang (pusat area aman = 505)
+                    const hmiCenterX = 505;
+                    const fx = Math.max(90, Math.round(hmiCenterX - totalDrawingW / 2));
                     const sx = fx + sw + sgap;
 
                     // Posisi Center Vertikal (antara baris revisi atas Y=80 s.d kop kanan bawah Y=660)
-                    const centerAreaY = 350;
-                    const boxTopY = Math.round(centerAreaY - sh / 2);
+                    const hmiCenterY = 355;
+                    const boxTopY = Math.round(hmiCenterY - sh / 2);
                     const fy = boxTopY + sh;
                     const sy = fy;
 
