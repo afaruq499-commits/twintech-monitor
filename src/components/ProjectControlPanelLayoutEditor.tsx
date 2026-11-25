@@ -40,6 +40,7 @@ import {
   calculateSmartMagneticSnap,
   centerItemOnPlate,
   centerItemUnderHmi,
+  distributeDoorButtonsSymmetrically,
   distributeSelectedItemsHorizontally,
   type MagneticGuide,
 } from "@/lib/panel-magnetic-guide";
@@ -1552,16 +1553,17 @@ export function ProjectControlPanelLayoutEditor({
           targetIds = doorButtons.map((b) => b.id);
         }
 
+        const result = distributeDoorButtonsSymmetrically(
+          prev.items,
+          targetIds,
+          prev.enclosure,
+          effGap
+        );
+
         return {
           ...prev,
-          items: distributeSelectedItemsHorizontally(
-            prev.items,
-            targetIds,
-            prev.enclosure,
-            true, // sejajarkan sumbu Y
-            effGap, // jarak antar PB (misal 23 mm)
-            true // simetris di tengah enclosure
-          ),
+          enclosure: result.enclosure,
+          items: result.items,
         };
       });
     },

@@ -3,6 +3,7 @@ import {
   calculateSmartMagneticSnap,
   centerItemOnPlate,
   centerItemUnderHmi,
+  distributeDoorButtonsSymmetrically,
   distributeSelectedItemsHorizontally,
 } from "../src/lib/panel-magnetic-guide";
 import type { PanelEnclosure, PanelLayoutItem } from "../src/lib/panel-layout-template";
@@ -330,5 +331,123 @@ describe("panel-magnetic-guide - Smart Alignment & Center Snapping", () => {
     expect(holeStart).toBe(holeReset);
     expect(holeReset).toBe(holeKeysw);
     expect(holeKeysw).toBe(holeBuzzer);
+  });
+
+  it("arranges multi-row door buttons (14 buttons across 3 overlapping rows) cleanly below HMI without overlap", () => {
+    const opEnclosure: PanelEnclosure = {
+      name: "OP Panel",
+      widthMm: 430,
+      heightMm: 380,
+      depthMm: 180,
+    };
+    const hmi: PanelLayoutItem = {
+      id: "hmi",
+      type: "COMPONENT",
+      category: "HMI",
+      tagLabel: "HMI",
+      name: "GS2110",
+      xMm: 79,
+      yMm: 30,
+      widthMm: 272,
+      heightMm: 190, // bottom = 220
+    };
+    const makeBtn = (id: string, xMm: number, yMm: number, cat: PanelLayoutItem["category"] = "PUSH_BUTTON", w = 40, h = 55): PanelLayoutItem => ({
+      id,
+      type: "COMPONENT",
+      category: cat,
+      tagLabel: id.toUpperCase(),
+      name: id,
+      xMm,
+      yMm,
+      widthMm: w,
+      heightMm: h,
+    });
+
+    // Simulasi kondisi berantakan pada screenshot: 3 baris saling tumpang tindih (y=256, y=287, y=328)
+    const messyItems: PanelLayoutItem[] = [
+      hmi,
+      makeBtn("power", 55, 256, "PILOT_LAMP"),
+      makeBtn("master", 195, 256),
+      makeBtn("mode0", 265, 256, "SELECTOR_SWITCH"),
+      makeBtn("pickwp", 335, 256),
+      makeBtn("buzzer", 24, 287, "BUZZER"),
+      makeBtn("mode1", 78, 287, "SELECTOR_SWITCH"),
+      makeBtn("mode2", 132, 287, "SELECTOR_SWITCH"),
+      makeBtn("mode3", 186, 287, "SELECTOR_SWITCH"),
+      makeBtn("mode4", 240, 287, "SELECTOR_SWITCH"),
+      makeBtn("start", 55, 328),
+      makeBtn("stop", 125, 328),
+      makeBtn("origin", 195, 328),
+      makeBtn("reset", 265, 328),
+      makeBtn("estop", 330, 325, "EMERGENCY_STOP", 50, 62),
+    ];
+
+    const buttonIds = messyItems.filter((i) => i.id !== "hmi").map((i) => i.id);
+    const { items: result, enclosure: nextEnc } = distributeDoorButtonsSymmetrically(
+      messyItems,
+      buttonIds,
+      opEnclosure,
+      20
+    );
+
+    const arranged = result.filter((i) => i.id !== "hmi");
+    // Pastikan tidak ada satu pun tombol yang menumpuk satu sama lain (2D AABB overlap check)
+    for (let i = 0; i < arranged.length; i += 1) {
+      for (let j = i + 1; j < arranged.length; j += 1) {
+        const a = arranged[i];
+        const b = arranged[j];
+        const overlapX = a.xMm < b.xMm + b.widthMm && a.xMm + a.widthMm > b.xMm;
+        const overlapY = a.yMm < b.yMm + b.heightMm && a.yMm + a.heightMm > b.yMm;
+        expect(overlapX && overlapY, `Overlap between ${a.id} and ${b.id}`).toBe(false);
+      }
+      // Semua tombol harus berada di bawah HMI & di dalam tinggi enclosure baru
+      expect(arranged[i].yMm).toBeGreaterThanOrEqual(220 + 14);
+      expect(arranged[i].yMm + arranged[i].heightMm).toBeLessThanOrEqual(nextEnc.heightMm);
+    }
+
+    // Cek jarak horizontal pada baris tengah (5 item, gap = 20mm) & simetri kiri-kanan
+    const buzzer = arranged.find((i) => i.id === "buzzer")!;
+    const mode1 = arranged.find((i) => i.id === "mode1")!;
+    const mode4 = arranged.find((i) => i.id === "mode4")!;
+    expect(mode1.xMm - (buzzer.xMm + buzzer.widthMm)).toBe(20);
+    expect(buzzer.xMm).toBe(nextEnc.widthMm - (mode4.xMm + mode4.widthMm));
+  });
+
+  it("wraps 14 buttons placed on a single row into balanced symmetrical rows instead of stacking on the right edge", () => {
+    const opEnclosure: PanelEnclosure = {
+      name: "OP Panel",
+      widthMm: 430,
+      heightMm: 440,
+      depthMm: 180,
+    };
+    const sameRowItems: PanelLayoutItem[] = Array.from({ length: 14 }, (_, idx) => ({
+      id: `btn-${idx + 1}`,
+      type: "COMPONENT",
+      category: "PUSH_BUTTON",
+      tagLabel: `PB${idx + 1}`,
+      name: `PB ${idx + 1}`,
+      xMm: 10 + idx * 25,
+      yMm: 260,
+      widthMm: 40,
+      heightMm: 55,
+    }));
+
+    const { items: arranged } = distributeDoorButtonsSymmetrically(
+      sameRowItems,
+      sameRowItems.map((i) => i.id),
+      opEnclosure,
+      20
+    );
+
+    // 14 item harus terbagi rapi (mis. 5 + 5 + 4), tidak ada 2 item bertumpuk
+    for (let i = 0; i < arranged.length; i += 1) {
+      for (let j = i + 1; j < arranged.length; j += 1) {
+        const a = arranged[i];
+        const b = arranged[j];
+        const overlapX = a.xMm < b.xMm + b.widthMm && a.xMm + a.widthMm > b.xMm;
+        const overlapY = a.yMm < b.yMm + b.heightMm && a.yMm + a.heightMm > b.yMm;
+        expect(overlapX && overlapY).toBe(false);
+      }
+    }
   });
 });

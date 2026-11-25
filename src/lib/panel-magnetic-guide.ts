@@ -547,3 +547,221 @@ export function distributeSelectedItemsHorizontally(
     };
   });
 }
+
+const isDoorButtonCategory = (cat: string) =>
+  ["PUSH_BUTTON", "SELECTOR_SWITCH", "PILOT_LAMP", "BUZZER"].includes(cat);
+
+function getDoorHoleCenterY(it: PanelLayoutItem): number {
+  if (isDoorButtonCategory(it.category) && it.heightMm > 40) {
+    return it.yMm + (it.heightMm - 18);
+  }
+  return it.yMm + it.heightMm / 2;
+}
+
+function splitRowToFitWidth(
+  row: PanelLayoutItem[],
+  availWidth: number,
+  gapMm: number
+): PanelLayoutItem[][] {
+  const rowSpan = (arr: PanelLayoutItem[]) =>
+    arr.reduce((s, it) => s + it.widthMm, 0) + Math.max(0, arr.length - 1) * gapMm;
+
+  if (row.length <= 1 || rowSpan(row) <= availWidth) {
+    return [row];
+  }
+
+  // Hitung perkiraan jumlah kolom maksimum yang muat lalu bagi rata (balanced)
+  const avgW = row.reduce((s, it) => s + it.widthMm, 0) / row.length;
+  const maxCols = Math.max(1, Math.floor((availWidth + gapMm) / (avgW + gapMm)));
+  const numRows = Math.max(2, Math.ceil(row.length / maxCols));
+  const targetPerRow = Math.ceil(row.length / numRows);
+
+  const chunks: PanelLayoutItem[][] = [];
+  let cursor = 0;
+  while (cursor < row.length) {
+    let slice = row.slice(cursor, cursor + targetPerRow);
+    while (slice.length > 1 && rowSpan(slice) > availWidth) {
+      slice = slice.slice(0, slice.length - 1);
+    }
+    chunks.push(slice);
+    cursor += slice.length;
+  }
+  return chunks;
+}
+
+/**
+ * Merapikan tombol pintu HMI/OP secara simetris (mendukung 1 baris maupun multi-baris).
+ * - Jika tombol berada dalam 1 baris dan muat di lebar pintu, diratakan 1 baris simetris di tengah.
+ * - Jika tombol terdiri dari beberapa baris atau melebihi lebar pintu, otomatis dikelompokkan/dibagi
+ *   menjadi baris-baris seimbang yang masing-masing rata tengah dengan jarak horizontal persis `gapMm`
+ *   dan jarak vertikal aman di bawah layar HMI tanpa bertumpukan.
+ */
+export function distributeDoorButtonsSymmetrically(
+  items: PanelLayoutItem[],
+  selectedIds: string[],
+  enclosure: PanelEnclosure,
+  gapMm = 23
+): { items: PanelLayoutItem[]; enclosure: PanelEnclosure } {
+  const selectedSet = new Set(selectedIds);
+  const targets = items.filter((it) => selectedSet.has(it.id));
+  if (targets.length < 2) {
+    return { items, enclosure };
+  }
+
+  const sideMargin = 16;
+  const availWidth = Math.max(80, enclosure.widthMm - sideMargin * 2);
+  const effectiveGap = Math.max(4, gapMm);
+
+  // Cari batas bawah HMI agar tombol tidak menumpuk layar HMI
+  const hmiItems = items.filter(
+    (it) => it.category === "HMI" && !selectedSet.has(it.id)
+  );
+  const hmiBottomY =
+    hmiItems.length > 0
+      ? Math.max(...hmiItems.map((h) => h.yMm + h.heightMm))
+      : 0;
+
+  // Kelompokkan berdasarkan baris Y aktual (toleransi 24mm agar baris berdekatan tidak tergabung paksa)
+  const byHoleY = [...targets].sort(
+    (a, b) => getDoorHoleCenterY(a) - getDoorHoleCenterY(b)
+  );
+  const rawRows: PanelLayoutItem[][] = [];
+  for (const item of byHoleY) {
+    const holeY = getDoorHoleCenterY(item);
+    const lastRow = rawRows[rawRows.length - 1];
+    if (!lastRow) {
+      rawRows.push([item]);
+      continue;
+    }
+    const lastHoleAvg =
+      lastRow.reduce((s, r) => s + getDoorHoleCenterY(r), 0) / lastRow.length;
+    if (Math.abs(holeY - lastHoleAvg) <= 24) {
+      lastRow.push(item);
+    } else {
+      rawRows.push([item]);
+    }
+  }
+
+  // Urutkan kiri-ke-kanan per baris & pecah bila lebar baris melebihi lebar pintu panel
+  const finalRows: PanelLayoutItem[][] = [];
+  for (const row of rawRows) {
+    const sortedLeftToRight = [...row].sort((a, b) => a.xMm - b.xMm);
+    const fitted = splitRowToFitWidth(sortedLeftToRight, availWidth, effectiveGap);
+    finalRows.push(...fitted);
+  }
+
+  // Kasus 1 baris muat penuh: pertahankan sumbu Y rata-rata asalkan tidak menabrak HMI
+  const singleRowTotalW =
+    targets.reduce((s, it) => s + it.widthMm, 0) +
+    (targets.length - 1) * effectiveGap;
+  if (finalRows.length === 1 && singleRowTotalW <= availWidth) {
+    const minAllowedY = hmiBottomY > 0 ? hmiBottomY + 12 : 12;
+    const minTargetY = Math.min(...targets.map((t) => t.yMm));
+    let adjustedItems = distributeSelectedItemsHorizontally(
+      items,
+      selectedIds,
+      enclosure,
+      true,
+      effectiveGap,
+      true
+    );
+    if (minTargetY < minAllowedY) {
+      const shiftDown = minAllowedY - minTargetY;
+      adjustedItems = adjustedItems.map((it) =>
+        selectedSet.has(it.id) ? { ...it, yMm: it.yMm + shiftDown } : it
+      );
+    }
+    const maxBottom = Math.max(
+      ...adjustedItems
+        .filter((it) => selectedSet.has(it.id))
+        .map((it) => it.yMm + it.heightMm)
+    );
+    const nextHeight =
+      maxBottom + 12 > enclosure.heightMm
+        ? Math.ceil((maxBottom + 14) / 10) * 10
+        : enclosure.heightMm;
+    return {
+      items: adjustedItems,
+      enclosure:
+        nextHeight !== enclosure.heightMm
+          ? { ...enclosure, heightMm: nextHeight }
+          : enclosure,
+    };
+  }
+
+  // Multi-baris simetris: susun baris demi baris di bawah HMI dengan spasi vertikal rapi
+  const rowGapY = 12;
+  const minStartY = hmiBottomY > 0 ? hmiBottomY + 14 : 24;
+  const existingMinY = Math.min(...targets.map((t) => t.yMm));
+  let cursorRowTopY = Math.max(minStartY, existingMinY);
+  // Jika posisi awal sudah terlalu mepet ke bawah, mulai tepat di bawah HMI agar muat
+  const estimatedTotalH =
+    finalRows.reduce(
+      (sum, r) => sum + Math.max(...r.map((it) => it.heightMm)),
+      0
+    ) +
+    Math.max(0, finalRows.length - 1) * rowGapY;
+  if (cursorRowTopY + estimatedTotalH + 12 > enclosure.heightMm && minStartY < cursorRowTopY) {
+    cursorRowTopY = minStartY;
+  }
+
+  const newPositions = new Map<string, { x: number; y: number }>();
+  let maxBottomY = 0;
+
+  for (const row of finalRows) {
+    const rowWidth =
+      row.reduce((s, it) => s + it.widthMm, 0) +
+      Math.max(0, row.length - 1) * effectiveGap;
+    let currentX = Math.max(8, Math.round((enclosure.widthMm - rowWidth) / 2));
+
+    // Titik tengah lubang bor dihitung dari rata-rata offset hole di baris ini
+    const rowMaxH = Math.max(...row.map((it) => it.heightMm));
+    const targetHoleY =
+      cursorRowTopY +
+      Math.max(
+        ...row.map((it) =>
+          isDoorButtonCategory(it.category) && it.heightMm > 40
+            ? it.heightMm - 18
+            : it.heightMm / 2
+        )
+      );
+
+    for (const it of row) {
+      const holeOffset =
+        isDoorButtonCategory(it.category) && it.heightMm > 40
+          ? it.heightMm - 18
+          : it.heightMm / 2;
+      const y = Math.max(5, Math.round(targetHoleY - holeOffset));
+      const x = Math.max(
+        5,
+        Math.min(Math.max(5, enclosure.widthMm - it.widthMm - 5), Math.round(currentX))
+      );
+      newPositions.set(it.id, { x, y });
+      maxBottomY = Math.max(maxBottomY, y + it.heightMm);
+      currentX += it.widthMm + effectiveGap;
+    }
+
+    cursorRowTopY += rowMaxH + rowGapY;
+  }
+
+  const neededHeight =
+    maxBottomY + 14 > enclosure.heightMm
+      ? Math.ceil((maxBottomY + 16) / 10) * 10
+      : enclosure.heightMm;
+
+  return {
+    items: items.map((it) => {
+      const pos = newPositions.get(it.id);
+      if (!pos) return it;
+      return {
+        ...it,
+        xMm: pos.x,
+        yMm: pos.y,
+      };
+    }),
+    enclosure:
+      neededHeight !== enclosure.heightMm
+        ? { ...enclosure, heightMm: neededHeight }
+        : enclosure,
+  };
+}

@@ -3458,11 +3458,17 @@ export function buildStandardPanelLayoutFromComponents(
     instanceIdx: number;
   }[] = [];
 
-  const matrixStartY = Math.max(256, hmiBottomY + 18);
+  const matrixStartY =
+    opHeightMm >= 420
+      ? Math.max(256, hmiBottomY + 18)
+      : hmiUnit
+        ? hmiBottomY + 14
+        : 36;
   const colCenters = [75, 145, 215, 285, 355].map((cx) =>
     Math.round((cx / 430) * opWidthMm)
   );
-  const rowTopY = [matrixStartY, matrixStartY + 72];
+  const rowStepY = opHeightMm >= 420 ? 72 : 66;
+  const rowTopY = [matrixStartY, matrixStartY + rowStepY];
 
   const assignToSlot = (
     slotIdx: number,
@@ -3584,8 +3590,8 @@ export function buildStandardPanelLayoutFromComponents(
 
   // Taruh sisa aksesoris OP (Buzzer, Meter Digital 48x48, tombol ekstra) di kanan atas atau baris tambahan bawah
   let extraTopY = 34;
-  let extraRowX = 24;
-  let extraRowY = rowTopY[1] + 74;
+  let extraRowY = rowTopY[1] + 70;
+  const bottomExtras: typeof buzzerOrMeterExtras = [];
 
   for (const extra of buzzerOrMeterExtras) {
     const v = extra.visual;
@@ -3611,30 +3617,70 @@ export function buildStandardPanelLayoutFromComponents(
       });
       extraTopY += v.heightMm + 10;
     } else {
-      if (extraRowX + v.widthMm > opWidthMm - 20) {
-        extraRowX = 24;
-        extraRowY += v.heightMm + 12;
-      }
-      if (!targetDimensions?.hmi?.heightMm && extraRowY + v.heightMm + 16 > opHeightMm) {
-        opHeightMm = extraRowY + v.heightMm + 24;
-      }
-      hmiItems.push({
-        id: `auto-hmi-ext-${extra.comp.id}-${extra.instanceIdx}`,
-        type: "COMPONENT",
-        componentId: extra.comp.id,
-        name: extra.comp.partType || extra.comp.partName,
-        partType: extra.comp.partType,
-        partName: extra.comp.partName,
-        category: v.category,
-        specificModel: v.specificModel,
-        xMm: extraRowX,
-        yMm: Math.min(opHeightMm - v.heightMm - 8, extraRowY),
-        widthMm: v.widthMm,
-        heightMm: v.heightMm,
-        tagLabel: v.defaultTag,
-      });
-      extraRowX += v.widthMm + 14;
+      bottomExtras.push(extra);
     }
+  }
+
+  // Susun baris ekstra bawah secara simetris di tengah lebar pintu tanpa bertumpuk ke atas
+  if (bottomExtras.length > 0) {
+    const extraGap = 20;
+    const maxAvailW = Math.max(80, opWidthMm - 32);
+    const extraRows: Array<typeof buzzerOrMeterExtras> = [];
+    let currentRow: typeof buzzerOrMeterExtras = [];
+    let currentRowW = 0;
+
+    for (const extra of bottomExtras) {
+      const w = extra.visual.widthMm;
+      const neededW = currentRow.length === 0 ? w : currentRowW + extraGap + w;
+      if (currentRow.length > 0 && neededW > maxAvailW) {
+        extraRows.push(currentRow);
+        currentRow = [extra];
+        currentRowW = w;
+      } else {
+        currentRow.push(extra);
+        currentRowW = neededW;
+      }
+    }
+    if (currentRow.length > 0) extraRows.push(currentRow);
+
+    for (const row of extraRows) {
+      const rowTotalW =
+        row.reduce((s, e) => s + e.visual.widthMm, 0) +
+        Math.max(0, row.length - 1) * extraGap;
+      let cursorX = Math.max(12, Math.round((opWidthMm - rowTotalW) / 2));
+      const rowMaxH = Math.max(...row.map((e) => e.visual.heightMm));
+
+      for (const extra of row) {
+        const v = extra.visual;
+        hmiItems.push({
+          id: `auto-hmi-ext-${extra.comp.id}-${extra.instanceIdx}`,
+          type: "COMPONENT",
+          componentId: extra.comp.id,
+          name: extra.comp.partType || extra.comp.partName,
+          partType: extra.comp.partType,
+          partName: extra.comp.partName,
+          category: v.category,
+          specificModel: v.specificModel,
+          xMm: cursorX,
+          yMm: extraRowY,
+          widthMm: v.widthMm,
+          heightMm: v.heightMm,
+          tagLabel: v.defaultTag,
+        });
+        cursorX += v.widthMm + extraGap;
+      }
+      extraRowY += rowMaxH + 12;
+    }
+  }
+
+  // Pastikan tinggi enclosure OP cukup menampung seluruh baris tombol agar tidak terpotong di bawah
+  // (kecuali pengguna secara eksplisit mengunci ukuran targetDimensions.hmi.heightMm)
+  const maxItemBottom = hmiItems.reduce(
+    (maxB, it) => Math.max(maxB, it.yMm + it.heightMm),
+    0
+  );
+  if (!targetDimensions?.hmi?.heightMm && maxItemBottom + 14 > opHeightMm) {
+    opHeightMm = Math.ceil((maxItemBottom + 16) / 10) * 10;
   }
 
   const hmiLayout: PanelLayoutData = {
