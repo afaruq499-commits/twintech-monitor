@@ -529,85 +529,222 @@ export function PanelDrawingSheetModal({
                 <text x="135" y="229" textAnchor="middle" fontSize="6.5">HOLE: +0.5 / 0</text>
               </g>
 
-              {/* ================= KOP GAMBAR (TITLE BLOCK) KANAN BAWAH ================= */}
-              <g transform={`translate(${sheetW - 470}, ${sheetH - 180})`}>
-                <rect x="0" y="0" width="440" height="150" fill="none" stroke="#000" strokeWidth="1.5" />
+              {/* ================= KOP GAMBAR (TITLE BLOCK) KANAN BAWAH - STANDAR TWINTECH ================= */}
+              {(() => {
+                const tbW = 520;
+                const tbH = 156;
+                const tbX = sheetW - 30 - tbW;
+                const tbY = sheetH - 30 - tbH;
 
-                {/* Garis Pembagi Horizontal */}
-                <line x1="0" y1="30" x2="440" y2="30" stroke="#000" strokeWidth="0.8" />
-                <line x1="0" y1="65" x2="440" y2="65" stroke="#000" strokeWidth="0.8" />
-                <line x1="0" y1="95" x2="440" y2="95" stroke="#000" strokeWidth="0.8" />
+                const shortMaterial =
+                  mode === "OUTER" || mode === "HMI" ? "SPCC t=1.5" : "SPCC t=2.0";
+                const hardTreatment =
+                  mode === "OUTER" || mode === "HMI" ? "RAL 7035" : "GALVANIZED";
+                const topPartName =
+                  mode === "OUTER"
+                    ? "MAIN PANEL + BOX LUAR"
+                    : mode === "HMI"
+                      ? "OPERATION PANEL (OP)"
+                      : mode === "OP_MOUNTING"
+                        ? "MOUNTING OP PANEL"
+                        : "MAIN MOUNTING PLATE";
+                const bottomPartNo =
+                  mode === "OUTER"
+                    ? "PANEL LUAR 2D"
+                    : mode === "HMI"
+                      ? "MAIN OP PANEL"
+                      : mode === "OP_MOUNTING"
+                        ? "MOUNTING OP"
+                        : "MOUNTING PLATE";
 
-                {/* Baris 1: Part No & Part Name */}
-                <line x1="220" y1="0" x2="220" y2="30" stroke="#000" strokeWidth="0.8" />
-                <text x="10" y="12" fontSize="6.5" fill="#666">Part No.</text>
-                <text x="10" y="24" fontSize="8" fontWeight="bold">-</text>
+                // Bagi judul proyek menjadi maksimal 2 baris rapi agar tidak pernah memotong border
+                const rawProj = (metadata.nama || "PROJECT AUTOMATION").trim().toUpperCase();
+                let projLine1 = rawProj;
+                let projLine2 = "";
+                if (rawProj.length > 26) {
+                  const words = rawProj.split(/\s+/);
+                  let l1 = "";
+                  let idx = 0;
+                  while (idx < words.length && (l1 + " " + words[idx]).trim().length <= 26) {
+                    l1 = (l1 + " " + words[idx]).trim();
+                    idx += 1;
+                  }
+                  if (!l1) {
+                    l1 = rawProj.slice(0, 26);
+                    projLine2 = rawProj.slice(26, 52);
+                  } else {
+                    projLine2 = words.slice(idx).join(" ");
+                    if (projLine2.length > 28) projLine2 = projLine2.slice(0, 26) + "..";
+                  }
+                  projLine1 = l1;
+                }
 
-                <text x="230" y="12" fontSize="6.5" fill="#666">Part Name</text>
-                <text x="230" y="24" fontSize="9" fontWeight="bold">
-                  {metadata.partName}
-                </text>
+                return (
+                  <g
+                    transform={`translate(${tbX}, ${tbY})`}
+                    style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+                  >
+                    {/* Kotak Luar Title Block */}
+                    <rect x="0" y="0" width={tbW} height={tbH} fill="#ffffff" stroke="#000000" strokeWidth="1.2" />
 
-                {/* Baris 2: Drawn, Checked, Approved, Material, Description */}
-                <line x1="60" y1="30" x2="60" y2="65" stroke="#000" strokeWidth="0.8" />
-                <line x1="120" y1="30" x2="120" y2="65" stroke="#000" strokeWidth="0.8" />
-                <line x1="180" y1="30" x2="180" y2="65" stroke="#000" strokeWidth="0.8" />
-                <line x1="280" y1="30" x2="280" y2="65" stroke="#000" strokeWidth="0.8" />
-                <line x1="380" y1="30" x2="380" y2="65" stroke="#000" strokeWidth="0.8" />
+                    {/* ================= BARIS ATAS: ITEM NO / PART NAME / MATERIAL / DESC / QTY / HARD TREATMENT ================= */}
+                    <line x1="0" y1="16" x2={tbW} y2="16" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="0" y1="32" x2={tbW} y2="32" stroke="#000000" strokeWidth="0.9" />
+                    <line x1="48" y1="0" x2="48" y2="32" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="208" y1="0" x2="208" y2="32" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="288" y1="0" x2="288" y2="32" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="390" y1="0" x2="390" y2="32" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="428" y1="0" x2="428" y2="32" stroke="#000000" strokeWidth="0.7" />
 
-                <text x="30" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Drawn</text>
-                <text x="30" y="58" textAnchor="middle" fontSize="8.5" fontWeight="bold">{metadata.drawnBy}</text>
+                    {/* Nilai Baris 1 (Atas) */}
+                    <text x="24" y="11.5" textAnchor="middle" fontSize="8" fill="#000">M-PN</text>
+                    <text x="128" y="11.5" textAnchor="middle" fontSize="8" fill="#000">{topPartName}</text>
+                    <text x="248" y="11.5" textAnchor="middle" fontSize="8" fill="#000">{shortMaterial}</text>
+                    <text x="339" y="11.5" textAnchor="middle" fontSize="8" fill="#000">-</text>
+                    <text x="409" y="11.5" textAnchor="middle" fontSize="8" fill="#000">01</text>
+                    <text x="474" y="11.5" textAnchor="middle" fontSize="7.5" fill="#000">{hardTreatment}</text>
 
-                <text x="90" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Checked</text>
-                <text x="90" y="58" textAnchor="middle" fontSize="8.5" fontWeight="bold">{metadata.checkedBy}</text>
+                    {/* Label Baris 2 (Bawah Nilai) */}
+                    <text x="24" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Item No.</text>
+                    <text x="128" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Part Name</text>
+                    <text x="248" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Material</text>
+                    <text x="339" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Description</text>
+                    <text x="409" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Qty.</text>
+                    <text x="474" y="27" textAnchor="middle" fontSize="7.5" fill="#111">Hard Treatment</text>
 
-                <text x="150" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Approved</text>
-                <text x="150" y="58" textAnchor="middle" fontSize="8.5" fontWeight="bold">{metadata.approvedBy}</text>
+                    {/* Pemisah Vertikal Utama Kiri (Sign-off & Logo) vs Kanan (Date, Project, Job Order) */}
+                    <line x1="222" y1="32" x2="222" y2={tbH} stroke="#000000" strokeWidth="0.9" />
 
-                <text x="230" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Material</text>
-                <text x="230" y="58" textAnchor="middle" fontSize="7.5" fontWeight="bold">{metadata.material}</text>
+                    {/* ================= BLOK KIRI: DRAWN / CHECKED / APPROVED + LOGO TWINTECH ================= */}
+                    <line x1="0" y1="46" x2="222" y2="46" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="0" y1="80" x2="222" y2="80" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="0" y1="96" x2="222" y2="96" stroke="#000000" strokeWidth="0.9" />
+                    <line x1="74" y1="32" x2="74" y2="96" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="148" y1="32" x2="148" y2="96" stroke="#000000" strokeWidth="0.7" />
 
-                <text x="330" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Date</text>
-                <text x="330" y="58" textAnchor="middle" fontSize="7.5" fontWeight="bold">{metadata.dateStr}</text>
+                    <text x="37" y="42" textAnchor="middle" fontSize="7.5" fill="#111">Drawn</text>
+                    <text x="111" y="42" textAnchor="middle" fontSize="7.5" fill="#111">Checked</text>
+                    <text x="185" y="42" textAnchor="middle" fontSize="7.5" fill="#111">Approved</text>
 
-                <text x="410" y="42" textAnchor="middle" fontSize="6.5" fill="#666">Scale</text>
-                <text x="410" y="58" textAnchor="middle" fontSize="8" fontWeight="bold">NTS (mm)</text>
+                    <text x="37" y="91" textAnchor="middle" fontSize="8" fill="#000">{metadata.drawnBy}</text>
+                    <text x="111" y="91" textAnchor="middle" fontSize="8" fill="#000">{metadata.checkedBy}</text>
+                    <text x="185" y="91" textAnchor="middle" fontSize="8" fill="#000">{metadata.approvedBy}</text>
 
-                {/* Baris 3: Logo & Nama Perusahaan Twintech Precision */}
-                <line x1="220" y1="65" x2="220" y2="150" stroke="#000" strokeWidth="0.8" />
+                    {/* Logo Twintech || Precision (Gaya Outline AutoCAD + Tagline) */}
+                    <g transform="translate(0, 96)">
+                      <text
+                        x="94"
+                        y="31"
+                        textAnchor="end"
+                        fontSize="16.5"
+                        fontWeight="900"
+                        fill="none"
+                        stroke="#000000"
+                        strokeWidth="0.85"
+                        letterSpacing="0.3"
+                      >
+                        Twintech
+                      </text>
+                      {/* Simbol Dua Pilar || */}
+                      <rect x="99" y="16.5" width="4.5" height="17" fill="none" stroke="#000000" strokeWidth="0.85" />
+                      <rect x="106.5" y="12.5" width="4.5" height="18" fill="none" stroke="#000000" strokeWidth="0.85" />
+                      <text
+                        x="116"
+                        y="31"
+                        textAnchor="start"
+                        fontSize="16.5"
+                        fontWeight="900"
+                        fill="none"
+                        stroke="#000000"
+                        strokeWidth="0.85"
+                        letterSpacing="0.3"
+                      >
+                        Precision
+                      </text>
+                      <text x="111" y="47" textAnchor="middle" fontSize="8.2" fill="#111">
+                        pcb dies, precision part, jig and checking fixture
+                      </text>
+                    </g>
 
-                <g transform="translate(10, 75)">
-                  <text x="95" y="16" textAnchor="middle" fontSize="13" fontWeight="900" letterSpacing="0.8">
-                    Twintech II Precision
-                  </text>
-                  <text x="95" y="28" textAnchor="middle" fontSize="6.5" fill="#333">
-                    pcb dies, precision part, jig and checking fixture
-                  </text>
-                  <text x="95" y="55" textAnchor="middle" fontSize="7" fill="#666">
-                    {metadata.client}
-                  </text>
-                </g>
+                    {/* ================= BLOK KANAN ATAS: DATE / ORDER NO / A4 mm / SCALE NtS / PROJECTION ================= */}
+                    <line x1="222" y1="64" x2={tbW} y2="64" stroke="#000000" strokeWidth="0.9" />
+                    <line x1="222" y1="47" x2="382" y2="47" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="324" y1="32" x2="324" y2="64" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="382" y1="32" x2="382" y2="64" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="418" y1="32" x2="418" y2="64" stroke="#000000" strokeWidth="0.7" />
+                    <line x1="456" y1="32" x2="456" y2="64" stroke="#000000" strokeWidth="0.7" />
 
-                {/* Kolom Kanan: Project Name & Job Order */}
-                <g transform="translate(230, 75)">
-                  <text x="0" y="10" fontSize="6.5" fill="#666">Project Name :</text>
-                  <text x="0" y="24" fontSize="8" fontWeight="bold">
-                    {metadata.nama.length > 36 ? metadata.nama.substring(0, 34) + ".." : metadata.nama}
-                  </text>
+                    <text x="273" y="42.5" textAnchor="middle" fontSize="7.5" fill="#111">Date</text>
+                    <text x="273" y="58.5" textAnchor="middle" fontSize="8.2" fill="#000">{metadata.dateStr}</text>
 
-                  <line x1="-10" y1="36" x2="210" y2="36" stroke="#000" strokeWidth="0.6" />
+                    <text x="353" y="42.5" textAnchor="middle" fontSize="7.5" fill="#111">Order No.</text>
+                    <text x="353" y="58.5" textAnchor="middle" fontSize="8" fill="#000">-</text>
 
-                  <text x="0" y="48" fontSize="6.5" fill="#666">Job Order / Code :</text>
-                  <text x="0" y="62" fontSize="9.5" fontWeight="900">
-                    {metadata.kode}
-                  </text>
+                    <text x="400" y="44" textAnchor="middle" fontSize="8" fill="#111">A4</text>
+                    <text x="400" y="58" textAnchor="middle" fontSize="8" fill="#111">mm</text>
 
-                  <text x="130" y="48" fontSize="6.5" fill="#666">Sheet / Qty :</text>
-                  <text x="130" y="62" fontSize="9" fontWeight="bold">
-                    A4 / 1 PCS
-                  </text>
-                </g>
-              </g>
+                    <text x="437" y="44" textAnchor="middle" fontSize="7.5" fill="#111">Scale</text>
+                    <text x="437" y="58" textAnchor="middle" fontSize="8" fill="#111">NtS</text>
+
+                    {/* Simbol Proyeksi Orthogonal (ISO Third-Angle) */}
+                    <g transform="translate(456, 32)">
+                      {/* Lingkaran konsentris + garis sumbu */}
+                      <circle cx="19" cy="16" r="7.5" fill="none" stroke="#000000" strokeWidth="0.9" />
+                      <circle cx="19" cy="16" r="3.8" fill="none" stroke="#000000" strokeWidth="0.9" />
+                      <line x1="9" y1="16" x2="29" y2="16" stroke="#000000" strokeWidth="0.6" />
+                      <line x1="19" y1="6" x2="19" y2="26" stroke="#000000" strokeWidth="0.6" />
+                      {/* Trapesium proyeksi + garis sumbu */}
+                      <polygon
+                        points="36,12 52,8.5 52,23.5 36,20"
+                        fill="none"
+                        stroke="#000000"
+                        strokeWidth="0.9"
+                      />
+                      <line x1="33" y1="16" x2="55" y2="16" stroke="#000000" strokeWidth="0.6" />
+                    </g>
+
+                    {/* ================= BLOK KANAN TENGAH: PROJECT NAME & QTY. PO ================= */}
+                    <line x1="222" y1="125" x2={tbW} y2="125" stroke="#000000" strokeWidth="0.9" />
+                    <line x1="456" y1="64" x2="456" y2="125" stroke="#000000" strokeWidth="0.7" />
+
+                    <text x="227" y="75" fontSize="7.5" fill="#111">Project Name :</text>
+                    {projLine2 ? (
+                      <>
+                        <text x="339" y="95" textAnchor="middle" fontSize="11" fontWeight="600" fill="#000">
+                          {projLine1}
+                        </text>
+                        <text x="339" y="111" textAnchor="middle" fontSize="11" fontWeight="600" fill="#000">
+                          {projLine2}
+                        </text>
+                      </>
+                    ) : (
+                      <text x="339" y="102" textAnchor="middle" fontSize="11.5" fontWeight="600" fill="#000">
+                        {projLine1}
+                      </text>
+                    )}
+
+                    <text x="488" y="75" textAnchor="middle" fontSize="7.5" fill="#111">Qty. PO</text>
+                    <text x="488" y="104" textAnchor="middle" fontSize="9.5" fill="#000">1</text>
+
+                    {/* ================= BLOK KANAN BAWAH: JOB ORDER / MODEL / PART NO ================= */}
+                    <line x1="352" y1="125" x2="352" y2={tbH} stroke="#000000" strokeWidth="0.7" />
+                    <line x1="394" y1="125" x2="394" y2={tbH} stroke="#000000" strokeWidth="0.7" />
+
+                    <text x="227" y="136" fontSize="7.5" fill="#111">Job Order</text>
+                    <text x="287" y="150" textAnchor="middle" fontSize="9" fill="#000">
+                      {metadata.kode}
+                    </text>
+
+                    <text x="357" y="136" fontSize="7.5" fill="#111">Model</text>
+                    <text x="373" y="150" textAnchor="middle" fontSize="9" fill="#000">-</text>
+
+                    <text x="399" y="136" fontSize="7.5" fill="#111">Part No.</text>
+                    <text x="457" y="150" textAnchor="middle" fontSize="8.5" fill="#000">
+                      {bottomPartNo}
+                    </text>
+                  </g>
+                );
+              })()}
 
               {/* Garis Bantu Center Saat Menggeser Gambar Manual (Tidak ikut tercetak) */}
               {isDraggingDrawing && (
