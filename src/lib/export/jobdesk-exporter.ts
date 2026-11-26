@@ -5,7 +5,6 @@ import {
   countWorkingDaysInRange,
   formatDayShortLabel,
   getEntryDateRange,
-  JOBDESK_CATEGORY_LABELS,
   packPicScheduleTracks,
   type JobdeskCategory,
   type JobdeskPlanData,
@@ -17,6 +16,22 @@ export interface JobdeskExportCompanyInfo {
   telpPerusahaan?: string | null;
   faxPerusahaan?: string | null;
   logoBase64?: string | null;
+}
+
+export interface ProjectRoleSummaryCell {
+  pic: string;
+  dateRangeText: string;
+  done: boolean;
+  urgent: boolean;
+}
+
+export interface ProjectRoleSummaryRow {
+  projectLabel: string;
+  program: ProjectRoleSummaryCell[];
+  hmi: ProjectRoleSummaryCell[];
+  wiring: ProjectRoleSummaryCell[];
+  diagram: ProjectRoleSummaryCell[];
+  lainnya: ProjectRoleSummaryCell[];
 }
 
 const THIN_BORDER: Partial<ExcelJS.Borders> = {
@@ -33,20 +48,16 @@ const TABLE_HEADER_BORDER: Partial<ExcelJS.Borders> = {
   right: { style: "thin", color: { argb: "FFCBD5E1" } },
 };
 
-/**
- * Warna kategori di Excel menyamakan visual kartu pada UI Pembagian Jobdesk (Gambar 2):
- * pastel lembut sebagai latar belakang + garis tepi kiri berwarna kategori.
- */
 const CATEGORY_EXCEL_THEME: Record<
   JobdeskCategory,
   { fillArgb: string; accentArgb: string }
 > = {
-  PROGRAM: { fillArgb: "FFEFF6FF", accentArgb: "FF3B82F6" }, // Biru lembut
-  HMI: { fillArgb: "FFFAF5FF", accentArgb: "FFA855F7" }, // Ungu lembut
-  WIRING: { fillArgb: "FFFFFBEB", accentArgb: "FFF59E0B" }, // Kuning / Amber lembut
-  DIAGRAM_WIRING: { fillArgb: "FFECFEFF", accentArgb: "FF06B6D4" }, // Cyan lembut
-  PANEL: { fillArgb: "FFECFDF5", accentArgb: "FF10B981" }, // Hijau Emerald lembut
-  LAINNYA: { fillArgb: "FFF8FAFC", accentArgb: "FF64748B" }, // Abu lembut
+  PROGRAM: { fillArgb: "FFEFF6FF", accentArgb: "FF3B82F6" },
+  HMI: { fillArgb: "FFFAF5FF", accentArgb: "FFA855F7" },
+  WIRING: { fillArgb: "FFFFFBEB", accentArgb: "FFF59E0B" },
+  DIAGRAM_WIRING: { fillArgb: "FFECFEFF", accentArgb: "FF06B6D4" },
+  PANEL: { fillArgb: "FFECFDF5", accentArgb: "FF10B981" },
+  LAINNYA: { fillArgb: "FFF8FAFC", accentArgb: "FF64748B" },
 };
 
 const PIC_ACCENT_TEXT: Record<string, string> = {
@@ -70,7 +81,6 @@ function parseLogoImage(
     return { base64: trimmed, extension: "png" };
   }
 
-  // Fallback otomatis ke logo resmi PT. Twintech Precision di public/logo-twintech.png
   try {
     const fallbackPath = path.join(
       process.cwd(),
@@ -85,16 +95,159 @@ function parseLogoImage(
       };
     }
   } catch {
-    // Abaikan bila file tidak dapat dibaca
+    // Abaikan bila file logo default tidak tersedia
   }
   return null;
 }
 
+function formatShortDateWithoutDay(iso: string): string {
+  return formatDayShortLabel(iso).replace(/^[A-Za-z]+,\s*/, "");
+}
+
+function formatCompactDateRange(startIso: string, endIso: string): string {
+  const s = formatShortDateWithoutDay(startIso);
+  if (endIso <= startIso) return s;
+  const e = formatShortDateWithoutDay(endIso);
+  // Jika bulan sama, tulis ringkas misal "9–10 Des", bila beda "26 Nov–1 Des"
+  const sParts = s.split(" ");
+  const eParts = e.split(" ");
+  if (sParts.length === 2 && eParts.length === 2 && sParts[1] === eParts[1]) {
+    return `${sParts[0]}–${eParts[0]} ${eParts[1]}`;
+  }
+  return `${s}–${e}`;
+}
+
+/**
+ * Mengekstrak kode/nama proyek yang konsisten agar pekerjaan satu proyek
+ * (mis. "Pembuatan Program 26 MTM 1015" & "Perakitan Panel 26-MTM-1015") otomatis
+ * tergabung dalam 1 baris proyek yang sama.
+ */
+function resolveSummaryProjectLabel(
+  title: string,
+  explicitProjectCode?: string | null,
+  explicitProjectName?: string | null
+): string {
+  if (explicitProjectCode?.trim()) {
+    return explicitProjectCode.trim().toUpperCase().replace(/\s+/g, "-");
+  }
+
+  // Deteksi pola kode proyek umum seperti "26-TBI-1023", "26 MTM 1015", "TBU-1105"
+  const codeMatch = title.match(
+    /\b(?:2\d[-\s]*)?(?:TBI|TBU|MTM|BLN|RKI|YTK|TBD|MGS|AHM|WEJ|JIG)[-\s]*\d{3,4}\b/i
+  );
+  if (codeMatch) {
+    return codeMatch[0].trim().toUpperCase().replace(/\s+/g, "-");
+  }
+
+  if (explicitProjectName?.trim()) {
+    return explicitProjectName.trim();
+  }
+
+  // Bersihkan awalan jenis pekerjaan agar tersisa nama proyek/mesinnya
+  const cleaned = title
+    .replace(
+      /^(?:penambahan\s+program|pembuatan\s+program|tracking\s+bug\s+program|perbaikan\s+cbox|perakitan\s+panel|diagram\s+wiring|wiring\s+mesin|layout\s+panel|program|wiring|hmi)\s+/i,
+      ""
+    )
+    .trim();
+
+  if (/\bpanasonic\b/i.test(cleaned)) {
+    return "Panasonic";
+  }
+
+  return cleaned || title;
+}
+
+/**
+ * Mengelompokkan seluruh penugasan di tabel harian menjadi ringkasan per-proyek:
+ * setiap baris proyek memperlihatkan siapa yang pegang Program PLC, HMI, Wiring/Panel, Diagram Wiring, dan Lainnya beserta rentang tanggalnya.
+ */
+export function buildProjectRoleSummaryRows(
+  plan: JobdeskPlanData
+): ProjectRoleSummaryRow[] {
+  const map = new Map<string, ProjectRoleSummaryRow>();
+
+  for (const pic of plan.pics) {
+    const picEntries = plan.cells[pic] ?? {};
+    for (const [dayId, entries] of Object.entries(picEntries)) {
+      const fallbackIso = dayId.startsWith("day-")
+        ? dayId.slice(4, 14)
+        : plan.startDateIso;
+
+      for (const entry of entries) {
+        const range = getEntryDateRange(entry, fallbackIso);
+        const workingDays = countWorkingDaysInRange(
+          range.startIso,
+          range.endIso,
+          Boolean(entry.urgent)
+        );
+        const label = resolveSummaryProjectLabel(
+          entry.title,
+          entry.projectCode,
+          entry.projectName
+        );
+        const key = label.toLowerCase();
+
+        let row = map.get(key);
+        if (!row) {
+          row = {
+            projectLabel: label,
+            program: [],
+            hmi: [],
+            wiring: [],
+            diagram: [],
+            lainnya: [],
+          };
+          map.set(key, row);
+        }
+
+        const dateRangeText = `${formatCompactDateRange(
+          range.startIso,
+          range.endIso
+        )} (${workingDays}h)`;
+
+        const cellItem: ProjectRoleSummaryCell = {
+          pic,
+          dateRangeText,
+          done: Boolean(entry.done),
+          urgent: Boolean(entry.urgent),
+        };
+
+        if (entry.category === "PROGRAM") {
+          row.program.push(cellItem);
+        } else if (entry.category === "HMI") {
+          row.hmi.push(cellItem);
+        } else if (entry.category === "WIRING" || entry.category === "PANEL") {
+          row.wiring.push(cellItem);
+        } else if (entry.category === "DIAGRAM_WIRING") {
+          row.diagram.push(cellItem);
+        } else {
+          row.lainnya.push(cellItem);
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function formatSummaryCellText(items: ProjectRoleSummaryCell[]): string {
+  if (items.length === 0) return "-";
+  return items
+    .map(
+      (it) =>
+        `${it.done ? "✓ " : ""}${it.pic} (${it.dateRangeText})${
+          it.urgent ? " [Urgent]" : ""
+        }`
+    )
+    .join("\n");
+}
+
 /**
  * Mengekspor Pembagian Jobdesk Harian ke format Excel (.xlsx):
- * - Header & Logo resmi PT. Twintech Precision (seperti Gambar 1)
- * - Matriks warna per kategori persis visual kartu di aplikasi (seperti Gambar 2)
- * - Tabel Rekap Detail Penugasan: Pekerjaan apa, Dipegang siapa, Dari tanggal s/d Sampai tanggal
+ * - Header & Logo resmi PT. Twintech Precision
+ * - Matriks warna per kategori mengikuti visual UI
+ * - Ringkasan singkat per proyek (Program, HMI, Wiring/Panel, Diagram Wiring, Lainnya)
  * - Blok `sub jobdesk` bernomor dan catatan footer.
  */
 export async function exportJobdeskPlanToExcelBuffer(
@@ -112,13 +265,13 @@ export async function exportJobdeskPlanToExcelBuffer(
   wb.creator = companyName;
   wb.created = new Date();
 
-  const totalCols = Math.max(plan.days.length + 1, 8);
+  const totalCols = Math.max(plan.days.length + 1, 7);
 
   const ws = wb.addWorksheet("Pembagian Jobdesk", {
     views: [{ showGridLines: true }],
     pageSetup: {
       orientation: "landscape",
-      paperSize: 9, // A4
+      paperSize: 9,
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
@@ -126,13 +279,12 @@ export async function exportJobdeskPlanToExcelBuffer(
     },
   });
 
-  // Atur lebar kolom agar rapi baik untuk Matriks maupun Rekap Penugasan
-  ws.getColumn(1).width = 18;
+  ws.getColumn(1).width = 16;
   for (let c = 2; c <= totalCols; c++) {
-    ws.getColumn(c).width = c <= plan.days.length + 1 ? 26 : 19;
+    ws.getColumn(c).width = 25;
   }
 
-  // ==================== KOP PERUSAHAAN + LOGO TWINTECH (GAMBAR 1) ====================
+  // ==================== KOP PERUSAHAAN + LOGO TWINTECH ====================
   const parsedLogo = parseLogoImage(company.logoBase64);
   if (parsedLogo) {
     const logoId = wb.addImage({
@@ -152,7 +304,6 @@ export async function exportJobdeskPlanToExcelBuffer(
   ws.getRow(5).height = 16;
   ws.getRow(6).height = 10;
 
-  // Judul & Subjudul di tengah atas (kolom C..terakhir)
   ws.mergeCells(1, 3, 1, totalCols);
   const titleCell = ws.getCell(1, 3);
   titleCell.value = plan.title || "Pembagian Jobdesk Harian Tim";
@@ -174,7 +325,6 @@ export async function exportJobdeskPlanToExcelBuffer(
   };
   subTitleCell.alignment = { horizontal: "center", vertical: "middle" };
 
-  // Identitas Perusahaan di kiri bawah logo
   const nameCell = ws.getCell(3, 1);
   nameCell.value = companyName;
   nameCell.font = {
@@ -203,7 +353,7 @@ export async function exportJobdeskPlanToExcelBuffer(
     color: { argb: "FF334155" },
   };
 
-  // ==================== MATRIKS HARIAN (VISUAL WARNA GAMBAR 2) ====================
+  // ==================== MATRIKS HARIAN (VISUAL WARNA UI) ====================
   let currentRowIdx = 7;
   const headerRow = ws.getRow(currentRowIdx);
   headerRow.height = 24;
@@ -246,18 +396,6 @@ export async function exportJobdeskPlanToExcelBuffer(
   });
 
   currentRowIdx += 1;
-
-  // Kumpulkan juga ringkasan penugasan (Pekerjaan, PIC, Dari Tgl, Sampai Tgl, Durasi, Status)
-  const summaryRows: {
-    title: string;
-    category: JobdeskCategory;
-    pic: string;
-    startDateIso: string;
-    endDateIso: string;
-    workingDays: number;
-    urgent: boolean;
-    done: boolean;
-  }[] = [];
 
   for (const pic of plan.pics) {
     const packed = packPicScheduleTracks(plan.cells[pic], plan.days);
@@ -370,46 +508,17 @@ export async function exportJobdeskPlanToExcelBuffer(
     if (picEndRow > picStartRow) {
       ws.mergeCells(picStartRow, 1, picEndRow, 1);
     }
-
-    // Kumpulkan semua entri PIC ini (termasuk di luar rentang tampilan) untuk tabel Rekap Penugasan
-    const picEntriesMap = plan.cells[pic] ?? {};
-    const picList: typeof summaryRows = [];
-    for (const [dayId, entries] of Object.entries(picEntriesMap)) {
-      const fallbackIso = dayId.startsWith("day-")
-        ? dayId.slice(4, 14)
-        : plan.startDateIso;
-      for (const entry of entries) {
-        const range = getEntryDateRange(entry, fallbackIso);
-        const workingDays = countWorkingDaysInRange(
-          range.startIso,
-          range.endIso,
-          Boolean(entry.urgent)
-        );
-        picList.push({
-          title: entry.title,
-          category: entry.category,
-          pic,
-          startDateIso: range.startIso,
-          endDateIso: range.endIso,
-          workingDays,
-          urgent: Boolean(entry.urgent),
-          done: Boolean(entry.done),
-        });
-      }
-    }
-    picList.sort((a, b) => a.startDateIso.localeCompare(b.startDateIso));
-    summaryRows.push(...picList);
   }
 
-  // ==================== REKAP PENUGASAN (PEKERJAAN, PIC, DARI TGL - SAMPAI TGL) ====================
+  // ==================== RINGKASAN PER PROYEK (SINGKAT & MUDAH DIBACA) ====================
   currentRowIdx += 1;
 
-  ws.mergeCells(currentRowIdx, 1, currentRowIdx, 8);
+  ws.mergeCells(currentRowIdx, 1, currentRowIdx, 7);
   const recapTitleRow = ws.getRow(currentRowIdx);
   recapTitleRow.height = 22;
   const recapTitleCell = recapTitleRow.getCell(1);
   recapTitleCell.value =
-    "DETAIL PENUGASAN JOBDESK (PEKERJAAN, PIC & RENTANG TANGGAL)";
+    "RINGKASAN PIC PER PROYEK (PROGRAM / HMI / WIRING / DIAGRAM WIRING)";
   recapTitleCell.font = {
     name: "Calibri",
     size: 11,
@@ -420,20 +529,19 @@ export async function exportJobdeskPlanToExcelBuffer(
   currentRowIdx += 1;
 
   const recapHeaders = [
-    "No",
-    "Nama Pekerjaan / Jobdesk",
-    "Kategori",
-    "Dipegang Oleh (PIC)",
-    "Dari Tanggal",
-    "Sampai Tanggal",
-    "Durasi",
-    "Status",
+    { label: "No", fill: "FF1E293B" },
+    { label: "Proyek / Kode", fill: "FF1E293B" },
+    { label: "Program PLC", fill: "FF2563EB" },
+    { label: "HMI", fill: "FF9333EA" },
+    { label: "Wiring / Panel", fill: "FFD97706" },
+    { label: "Diagram Wiring", fill: "FF0891B2" },
+    { label: "Lainnya", fill: "FF475569" },
   ];
   const recapHeaderRow = ws.getRow(currentRowIdx);
-  recapHeaderRow.height = 22;
+  recapHeaderRow.height = 23;
   recapHeaders.forEach((hdr, i) => {
     const cell = recapHeaderRow.getCell(i + 1);
-    cell.value = hdr;
+    cell.value = hdr.label;
     cell.font = {
       name: "Calibri",
       size: 10,
@@ -442,19 +550,21 @@ export async function exportJobdeskPlanToExcelBuffer(
     };
     cell.alignment = {
       vertical: "middle",
-      horizontal: i === 0 || i >= 4 ? "center" : "left",
+      horizontal: i === 0 ? "center" : "left",
     };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF1E293B" },
+      fgColor: { argb: hdr.fill },
     };
     cell.border = TABLE_HEADER_BORDER;
   });
   currentRowIdx += 1;
 
+  const summaryRows = buildProjectRoleSummaryRows(plan);
+
   if (summaryRows.length === 0) {
-    ws.mergeCells(currentRowIdx, 1, currentRowIdx, 8);
+    ws.mergeCells(currentRowIdx, 1, currentRowIdx, 7);
     const emptyRow = ws.getRow(currentRowIdx);
     emptyRow.height = 20;
     emptyRow.getCell(1).value = "Belum ada pekerjaan terjadwal pada tabel.";
@@ -464,67 +574,90 @@ export async function exportJobdeskPlanToExcelBuffer(
       italic: true,
       color: { argb: "FF64748B" },
     };
-    for (let c = 1; c <= 8; c++) {
+    for (let c = 1; c <= 7; c++) {
       emptyRow.getCell(c).border = THIN_BORDER;
     }
     currentRowIdx += 1;
   } else {
-    summaryRows.forEach((item, idx) => {
+    summaryRows.forEach((projRow, idx) => {
       const row = ws.getRow(currentRowIdx);
-      row.height = 21;
-      const theme =
-        CATEGORY_EXCEL_THEME[item.category] ?? CATEGORY_EXCEL_THEME.LAINNYA;
-      const rowFill = item.done ? "FFD1FAE5" : theme.fillArgb;
+      const maxLines = Math.max(
+        1,
+        projRow.program.length,
+        projRow.hmi.length,
+        projRow.wiring.length,
+        projRow.diagram.length,
+        projRow.lainnya.length
+      );
+      row.height = Math.max(22, maxLines * 17);
 
-      const vals: (string | number)[] = [
-        idx + 1,
-        item.title,
-        JOBDESK_CATEGORY_LABELS[item.category] ?? item.category,
-        item.pic,
-        formatDayShortLabel(item.startDateIso),
-        formatDayShortLabel(item.endDateIso),
-        `${item.workingDays} Hari Kerja`,
-        item.done
-          ? "Selesai"
-          : item.urgent
-          ? "Urgent / Lembur"
-          : "Terjadwal",
+      const cols: {
+        value: string | number;
+        fill: string;
+        bold?: boolean;
+        center?: boolean;
+      }[] = [
+        { value: idx + 1, fill: "FFF8FAFC", center: true },
+        { value: projRow.projectLabel, fill: "FFFFFFFF", bold: true },
+        {
+          value: formatSummaryCellText(projRow.program),
+          fill:
+            projRow.program.length > 0
+              ? CATEGORY_EXCEL_THEME.PROGRAM.fillArgb
+              : "FFFFFFFF",
+        },
+        {
+          value: formatSummaryCellText(projRow.hmi),
+          fill:
+            projRow.hmi.length > 0
+              ? CATEGORY_EXCEL_THEME.HMI.fillArgb
+              : "FFFFFFFF",
+        },
+        {
+          value: formatSummaryCellText(projRow.wiring),
+          fill:
+            projRow.wiring.length > 0
+              ? CATEGORY_EXCEL_THEME.WIRING.fillArgb
+              : "FFFFFFFF",
+        },
+        {
+          value: formatSummaryCellText(projRow.diagram),
+          fill:
+            projRow.diagram.length > 0
+              ? CATEGORY_EXCEL_THEME.DIAGRAM_WIRING.fillArgb
+              : "FFFFFFFF",
+        },
+        {
+          value: formatSummaryCellText(projRow.lainnya),
+          fill:
+            projRow.lainnya.length > 0
+              ? CATEGORY_EXCEL_THEME.LAINNYA.fillArgb
+              : "FFFFFFFF",
+        },
       ];
 
-      vals.forEach((v, cIdx) => {
+      cols.forEach((col, cIdx) => {
         const cell = row.getCell(cIdx + 1);
-        cell.value = v;
+        cell.value = col.value;
         cell.font = {
           name: "Calibri",
           size: 10,
-          bold: cIdx === 1 || cIdx === 3,
+          bold: Boolean(col.bold),
           color: {
-            argb:
-              cIdx === 3
-                ? PIC_ACCENT_TEXT[item.pic.trim().toLowerCase()] || "FF0F172A"
-                : cIdx === 7 && item.urgent && !item.done
-                ? "FFBE123C"
-                : "FF1E293B",
+            argb: col.value === "-" ? "FF94A3B8" : "FF0F172A",
           },
         };
         cell.alignment = {
           vertical: "middle",
-          horizontal: cIdx === 0 || cIdx >= 4 ? "center" : "left",
+          horizontal: col.center ? "center" : col.value === "-" ? "center" : "left",
+          wrapText: true,
         };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: cIdx === 0 ? "FFF8FAFC" : rowFill },
+          fgColor: { argb: col.fill },
         };
-        cell.border = {
-          top: { style: "thin", color: { argb: "FFCBD5E1" } },
-          bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
-          left:
-            cIdx === 1
-              ? { style: "thick", color: { argb: theme.accentArgb } }
-              : { style: "thin", color: { argb: "FFCBD5E1" } },
-          right: { style: "thin", color: { argb: "FFCBD5E1" } },
-        };
+        cell.border = THIN_BORDER;
       });
 
       currentRowIdx += 1;
