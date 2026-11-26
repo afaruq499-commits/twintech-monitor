@@ -1,33 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { jobdeskPlanDataSchema } from "@/lib/jobdesk-plan";
 import {
-  createDefaultJobdeskPlanData,
-  jobdeskPlanDataSchema,
-  parseJobdeskPlanJson,
-} from "@/lib/jobdesk-plan";
+  loadSyncedJobdeskBundle,
+  syncJobdeskPlanBackToSchedule,
+} from "@/lib/jobdesk-server";
 
 export async function GET() {
   try {
-    const existing = await prisma.jobdeskPlan.findUnique({
-      where: { id: "default" },
-    });
-
-    if (!existing) {
-      const fallback = createDefaultJobdeskPlanData();
-      return NextResponse.json({
-        plan: fallback,
-        updatedAt: null,
-        updatedByName: null,
-      });
-    }
-
-    const plan = parseJobdeskPlanJson(existing.dataJson, existing.judul);
-    return NextResponse.json({
-      plan,
-      updatedAt: existing.updatedAt.toISOString(),
-      updatedByName: existing.updatedByName ?? null,
-    });
+    const bundle = await loadSyncedJobdeskBundle();
+    return NextResponse.json(bundle);
   } catch (err) {
     console.error("GET /api/jobdesk-plan error:", err);
     return NextResponse.json(
@@ -72,10 +55,19 @@ export async function PUT(request: Request) {
       },
     });
 
+    // Sinkronkan balik pekerjaan yang terhubung dengan WorkItem ke Schedule Proyek
+    const syncedWorkItemsCount = await syncJobdeskPlanBackToSchedule(d).catch(
+      (syncErr) => {
+        console.error("syncJobdeskPlanBackToSchedule warning:", syncErr);
+        return 0;
+      }
+    );
+
     return NextResponse.json({
       plan: d,
       updatedAt: saved.updatedAt.toISOString(),
       updatedByName: saved.updatedByName ?? null,
+      syncedWorkItemsCount,
     });
   } catch (err) {
     console.error("PUT /api/jobdesk-plan error:", err);

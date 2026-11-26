@@ -1,5 +1,8 @@
 import ExcelJS from "exceljs";
-import type { JobdeskPlanData } from "@/lib/jobdesk-plan";
+import {
+  packPicScheduleTracks,
+  type JobdeskPlanData,
+} from "@/lib/jobdesk-plan";
 
 const THIN_BORDER: Partial<ExcelJS.Borders> = {
   top: { style: "thin", color: { argb: "FFD1D5DB" } },
@@ -11,6 +14,7 @@ const THIN_BORDER: Partial<ExcelJS.Borders> = {
 /**
  * Mengekspor Pembagian Jobdesk Harian ke format Excel (.xlsx)
  * sesuai layout tabel referensi (Kolom A = PIC, Kolom B.. = Day / Tanggal,
+ * mendukung jobdesk multi-hari / range tanggal yang di-merge horizontal,
  * dilanjutkan blok `sub jobdesk` bernomor dan catatan footer).
  */
 export async function exportJobdeskPlanToExcelBuffer(
@@ -32,9 +36,9 @@ export async function exportJobdeskPlanToExcelBuffer(
   });
 
   // Lebar kolom mengikuti layout referensi
-  ws.getColumn(1).width = 18; // Nama PIC / No sub jobdesk label
+  ws.getColumn(1).width = 18;
   for (let i = 0; i < plan.days.length; i++) {
-    ws.getColumn(i + 2).width = 28;
+    ws.getColumn(i + 2).width = 26;
   }
 
   // Baris 1: Header Tanggal (Day) — Kolom A kosong sesuai gambar referensi
@@ -50,12 +54,12 @@ export async function exportJobdeskPlanToExcelBuffer(
 
   plan.days.forEach((day, idx) => {
     const cell = headerRow.getCell(idx + 2);
-    cell.value = day.label;
+    cell.value = day.isWeekend ? `${day.label} (Urgent)` : day.label;
     cell.font = {
       name: "Calibri",
       size: 11,
       bold: true,
-      color: { argb: "FF0F172A" },
+      color: { argb: day.isWeekend ? "FF9F1239" : "FF0F172A" },
     };
     cell.alignment = {
       vertical: "middle",
@@ -64,51 +68,85 @@ export async function exportJobdeskPlanToExcelBuffer(
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FFF1F5F9" },
+      fgColor: { argb: day.isWeekend ? "FFFFF1F2" : "FFF1F5F9" },
     };
     cell.border = THIN_BORDER;
   });
 
-  // Baris 2..N: Baris per PIC
+  // Baris 2..N: Baris per PIC dengan dukungan horizontal merge untuk jobdesk multi-hari
   let currentRowIdx = 2;
   for (const pic of plan.pics) {
-    const row = ws.getRow(currentRowIdx);
-    const picCell = row.getCell(1);
-    picCell.value = pic;
-    picCell.font = {
-      name: "Calibri",
-      size: 11,
-      bold: true,
-      color: { argb: "FF0F172A" },
-    };
-    picCell.alignment = { vertical: "middle", horizontal: "left" };
-    picCell.border = THIN_BORDER;
+    const packed = packPicScheduleTracks(plan.cells[pic], plan.days);
+    const trackCount = Math.max(1, packed.tracks.length);
+    const picStartRow = currentRowIdx;
+    const picEndRow = currentRowIdx + trackCount - 1;
 
-    let maxLines = 1;
-    plan.days.forEach((day, colIdx) => {
-      const entries = plan.cells[pic]?.[day.id] ?? [];
-      const text = entries
-        .map((e) => (e.done ? `✓ ${e.title}` : e.title))
-        .join("\n");
-      if (entries.length > maxLines) maxLines = entries.length;
+    for (let tIdx = 0; tIdx < trackCount; tIdx++) {
+      const row = ws.getRow(currentRowIdx);
+      row.height = 24;
 
-      const cell = row.getCell(colIdx + 2);
-      cell.value = text;
-      cell.font = {
-        name: "Calibri",
-        size: 11,
-        color: { argb: "FF1E293B" },
-      };
-      cell.alignment = {
-        vertical: "middle",
-        horizontal: "left",
-        wrapText: true,
-      };
-      cell.border = THIN_BORDER;
-    });
+      // Terapkan border untuk seluruh sel kolom pada baris track ini
+      for (let colIdx = 1; colIdx <= plan.days.length + 1; colIdx++) {
+        row.getCell(colIdx).border = THIN_BORDER;
+      }
 
-    row.height = Math.max(22, maxLines * 19);
-    currentRowIdx += 1;
+      if (tIdx === 0) {
+        const picCell = row.getCell(1);
+        picCell.value = pic;
+        picCell.font = {
+          name: "Calibri",
+          size: 11,
+          bold: true,
+          color: { argb: "FF0F172A" },
+        };
+        picCell.alignment = { vertical: "middle", horizontal: "left" };
+      }
+
+      const track = packed.tracks[tIdx] ?? [];
+      for (const span of track) {
+        const startExcelCol = span.startColIdx + 2;
+        const endExcelCol = span.endColIdx + 2;
+        const cell = row.getCell(startExcelCol);
+        const prefix = span.entry.done ? "✓ " : "";
+        const urgentSuffix = span.entry.urgent ? " [URGENT]" : "";
+        cell.value = `${prefix}${span.entry.title}${urgentSuffix}`;
+        cell.font = {
+          name: "Calibri",
+          size: 11,
+          color: { argb: span.entry.done ? "FF64748B" : "FF1E293B" },
+        };
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: span.colSpan > 1 ? "center" : "left",
+          wrapText: true,
+        };
+        if (span.colSpan > 1) {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: span.entry.urgent ? "FFFEF3C7" : "FFEFF6FF" },
+          };
+          ws.mergeCells(
+            currentRowIdx,
+            startExcelCol,
+            currentRowIdx,
+            endExcelCol
+          );
+        } else if (span.entry.urgent) {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFFEF3C7" },
+          };
+        }
+      }
+
+      currentRowIdx += 1;
+    }
+
+    if (picEndRow > picStartRow) {
+      ws.mergeCells(picStartRow, 1, picEndRow, 1);
+    }
   }
 
   // Baris kosong pemisah sebelum sub jobdesk
@@ -164,11 +202,12 @@ export async function exportJobdeskPlanToExcelBuffer(
   // Baris kosong sebelum footer catatan
   currentRowIdx += 1;
 
-  // Footer catatan sub jobdesk (default: "sub jobdesk dikerjakan ketika wiring delay komponen")
+  // Footer catatan sub jobdesk
   const noteRow = ws.getRow(currentRowIdx);
   noteRow.height = 22;
   const noteCell = noteRow.getCell(2);
-  noteCell.value = plan.subNote || "sub jobdesk dikerjakan ketika wiring delay komponen";
+  noteCell.value =
+    plan.subNote || "sub jobdesk dikerjakan ketika wiring delay komponen";
   noteCell.font = {
     name: "Calibri",
     size: 11,
