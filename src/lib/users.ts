@@ -43,14 +43,14 @@ export const DEFAULT_USERS: SystemUser[] = [
     allowedPasswords: ["apip123", "twintech2026", "apip", "member123"],
   },
   {
-    id: "user-rajip",
-    username: "rajip",
-    nama: "Rajip",
+    id: "user-ijlal",
+    username: "ijlal",
+    nama: "Ijlal",
     role: "MEMBER",
     jabatan: "Member / Electrical & Wiring Engineer",
-    avatarText: "RJ",
+    avatarText: "IJ",
     warna: "#059669",
-    allowedPasswords: ["rajip123", "twintech2026", "rajip", "member123"],
+    allowedPasswords: ["ijlal123", "twintech2026", "ijlal", "member123"],
   },
 ];
 
@@ -72,8 +72,8 @@ export const SYSTEM_PICS = [
     description: "Automation & PLC Engineer",
   },
   {
-    value: "Rajip",
-    label: "Rajip (Member)",
+    value: "Ijlal",
+    label: "Ijlal (Member)",
     role: "MEMBER" as UserRole,
     color: "#059669",
     description: "Electrical & Wiring Engineer",

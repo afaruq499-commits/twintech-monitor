@@ -678,7 +678,7 @@ export function AppShell({
                     className={`w-8 h-8 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shrink-0 shadow-xs ring-2 ring-white dark:ring-[#12141a] ${
                       currentUser?.role === "ADMIN"
                         ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
-                        : currentUser?.username === "rajip"
+                        : currentUser?.username === "ijlal"
                         ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                         : "bg-gradient-to-br from-sky-500 to-blue-600"
                     }`}
@@ -728,7 +728,7 @@ export function AppShell({
                   className={`w-8 h-8 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shrink-0 shadow-xs ring-2 ring-white dark:ring-[#12141a] ${
                     currentUser?.role === "ADMIN"
                       ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
-                      : currentUser?.username === "rajip"
+                      : currentUser?.username === "ijlal"
                       ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                       : "bg-gradient-to-br from-sky-500 to-blue-600"
                   }`}
@@ -750,7 +750,7 @@ export function AppShell({
                     className={`w-9 h-9 rounded-xl text-white text-xs font-extrabold flex items-center justify-center shrink-0 shadow-xs ${
                       currentUser?.role === "ADMIN"
                         ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
-                        : currentUser?.username === "rajip"
+                        : currentUser?.username === "ijlal"
                         ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                         : "bg-gradient-to-br from-sky-500 to-blue-600"
                     }`}
@@ -960,7 +960,7 @@ export function AppShell({
                 className={`w-7 h-7 rounded-full text-white text-[10px] font-extrabold flex items-center justify-center shrink-0 shadow-xs ring-2 ring-white dark:ring-[#12141a] ${
                   currentUser?.role === "ADMIN"
                     ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
-                    : currentUser?.username === "rajip"
+                    : currentUser?.username === "ijlal"
                     ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                     : "bg-gradient-to-br from-sky-500 to-blue-600"
                 }`}
@@ -1090,7 +1090,7 @@ export function AppShell({
                   className={`w-7 h-7 rounded-full text-white text-[10px] font-extrabold flex items-center justify-center shrink-0 ${
                     currentUser?.role === "ADMIN"
                       ? "bg-gradient-to-br from-[#F45B38] to-[#D9381E]"
-                      : currentUser?.username === "rajip"
+                      : currentUser?.username === "ijlal"
                       ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                       : "bg-gradient-to-br from-sky-500 to-blue-600"
                   }`}

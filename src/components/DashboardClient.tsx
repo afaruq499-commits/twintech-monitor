@@ -233,8 +233,8 @@ export function DashboardClient({
     return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Apip"));
   }, [todayTasks]);
 
-  const rajipTodayTasks = useMemo(() => {
-    return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Rajip"));
+  const ijlalTodayTasks = useMemo(() => {
+    return todayTasks.filter((t) => isTaskAssignedToUser(t.workItemPic, "Ijlal"));
   }, [todayTasks]);
 
   async function handleDismissAlert(alertKey: string) {
@@ -326,8 +326,8 @@ export function DashboardClient({
       byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Faruq"));
     } else if (picFilter === "APIP") {
       byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Apip"));
-    } else if (picFilter === "RAJIP") {
-      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Rajip"));
+    } else if (picFilter === "IJLAL") {
+      byPic = mapped.filter((t) => isTaskAssignedToUser(t.workItemPic, "Ijlal"));
     }
 
     const q = agendaSearch.trim().toLowerCase();
@@ -517,7 +517,7 @@ export function DashboardClient({
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
             {isAdmin
-              ? "Menentukan pekerjaan, tanggal pengerjaan, & delegasi PIC (Faruq, Apip, Rajip) — "
+              ? "Menentukan pekerjaan, tanggal pengerjaan, & delegasi PIC (Faruq, Apip, Ijlal) — "
               : "Pantau notifikasi tugas harian & pekerjaan yang diberikan oleh Admin Faruq — "}
             <span className="font-semibold text-slate-700 dark:text-slate-300">
               {formatTanggalId(todayIso)}
@@ -804,18 +804,18 @@ export function DashboardClient({
 
             <button
               type="button"
-              onClick={() => setPicFilter(picFilter === "RAJIP" ? "ALL" : "RAJIP")}
+              onClick={() => setPicFilter(picFilter === "IJLAL" ? "ALL" : "IJLAL")}
               className={`p-3.5 rounded-2xl v14-subcard flex items-center justify-between transition text-left cursor-pointer ${
-                picFilter === "RAJIP" ? "ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-500/10" : ""
+                picFilter === "IJLAL" ? "ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-500/10" : ""
               }`}
             >
               <div className="flex items-center gap-3">
                 <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0 shadow-xs">
-                  RJ
+                  IJ
                 </span>
                 <div>
                   <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    Rajip
+                    Ijlal
                     <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-600">
                       Member
                     </span>
@@ -824,7 +824,7 @@ export function DashboardClient({
                 </div>
               </div>
               <div className="text-lg font-black text-emerald-600">
-                {rajipTodayTasks.length} <span className="text-xs font-semibold text-slate-400">tugas</span>
+                {ijlalTodayTasks.length} <span className="text-xs font-semibold text-slate-400">tugas</span>
               </div>
             </button>
           </div>
@@ -1297,14 +1297,14 @@ export function DashboardClient({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPicFilter("RAJIP")}
+                      onClick={() => setPicFilter("IJLAL")}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
-                        picFilter === "RAJIP"
+                        picFilter === "IJLAL"
                           ? "bg-emerald-600 text-white shadow-2xs"
                           : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
-                      Rajip
+                      Ijlal
                     </button>
                   </>
                 )}

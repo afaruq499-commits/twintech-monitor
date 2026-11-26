@@ -18,7 +18,7 @@ import {
 } from "../src/lib/auth";
 
 describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
-  it("memiliki akun default Admin (Faruq) dan Member (Apip & Rajip)", () => {
+  it("memiliki akun default Admin (Faruq) dan Member (Apip & Ijlal)", () => {
     const users = getAllUsers();
     expect(users.length).toBeGreaterThanOrEqual(3);
 
@@ -30,9 +30,9 @@ describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
     expect(apip).toBeDefined();
     expect(apip?.role).toBe("MEMBER");
 
-    const rajip = users.find((u) => u.username === "rajip");
-    expect(rajip).toBeDefined();
-    expect(rajip?.role).toBe("MEMBER");
+    const ijlal = users.find((u) => u.username === "ijlal");
+    expect(ijlal).toBeDefined();
+    expect(ijlal?.role).toBe("MEMBER");
   });
 
   it("dapat memverifikasi login Admin dengan password yang sesuai", () => {
@@ -55,13 +55,13 @@ describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
     expect(apip).not.toBeNull();
     expect(apip?.role).toBe("MEMBER");
 
-    const rajip = authenticateUser("rajip", "rajip123", "MEMBER");
-    expect(rajip).not.toBeNull();
-    expect(rajip?.role).toBe("MEMBER");
+    const ijlal = authenticateUser("ijlal", "ijlal123", "MEMBER");
+    expect(ijlal).not.toBeNull();
+    expect(ijlal?.role).toBe("MEMBER");
 
     // Salah password
     expect(authenticateUser("apip", "salah", "MEMBER")).toBeNull();
-    expect(authenticateUser("rajip", "salah", "MEMBER")).toBeNull();
+    expect(authenticateUser("ijlal", "salah", "MEMBER")).toBeNull();
   });
 
   it("dapat mengubah username dan password pengguna (updateSelfCredentials)", () => {
@@ -97,22 +97,22 @@ describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
   });
 
   it("Admin dapat mengatur/mereset password dan username anggota tim (updateTeamUserByAdmin)", () => {
-    const rajip = getUserByUsername("rajip")!;
-    expect(rajip).toBeDefined();
+    const ijlal = getUserByUsername("ijlal")!;
+    expect(ijlal).toBeDefined();
 
     const resetRes = updateTeamUserByAdmin({
-      targetUserId: rajip.id,
-      newPassword: "rajip_reset_admin",
+      targetUserId: ijlal.id,
+      newPassword: "ijlal_reset_admin",
     });
     expect(resetRes.success).toBe(true);
 
-    const loginAfterReset = authenticateUser("rajip", "rajip_reset_admin", "MEMBER");
+    const loginAfterReset = authenticateUser("ijlal", "ijlal_reset_admin", "MEMBER");
     expect(loginAfterReset).not.toBeNull();
 
     // Kembalikan ke password default
     updateTeamUserByAdmin({
-      targetUserId: rajip.id,
-      newPassword: "rajip123",
+      targetUserId: ijlal.id,
+      newPassword: "ijlal123",
     });
   });
 
@@ -121,7 +121,7 @@ describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
     const picValues = SYSTEM_PICS.map((p) => p.value);
     expect(picValues).toContain("Faruq");
     expect(picValues).toContain("Apip");
-    expect(picValues).toContain("Rajip");
+    expect(picValues).toContain("Ijlal");
   });
 
   it("mencocokkan penugasan tugas (isTaskAssignedToUser) dengan tepat", () => {
@@ -129,7 +129,7 @@ describe("Sistem Otentikasi & Role Pengguna (Admin vs Member)", () => {
     expect(isTaskAssignedToUser("Apip Dimas", "Apip")).toBe(true);
     expect(isTaskAssignedToUser("Faruq & Apip", "Apip")).toBe(true);
     expect(isTaskAssignedToUser("Faruq / Tim Elektrik", "Faruq")).toBe(true);
-    expect(isTaskAssignedToUser("Rajip", "Rajip")).toBe(true);
+    expect(isTaskAssignedToUser("Ijlal", "Ijlal")).toBe(true);
     expect(isTaskAssignedToUser("Dedi", "Apip")).toBe(false);
   });
 
