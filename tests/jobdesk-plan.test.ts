@@ -218,7 +218,7 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
     expect(jobdeskPlanDataSchema.safeParse(distributed).success).toBe(true);
   });
 
-  it("exports an Excel (.xlsx) buffer merging multi-day jobdesk ranges horizontally", async () => {
+  it("exports an Excel (.xlsx) buffer with Twintech logo, category colors matching UI, multi-day merged spans, PIC/date summary table, and sub jobdesk", async () => {
     const plan = createDefaultJobdeskPlanData("2026-11-26", 3, true);
     plan.cells["Faruq"] = {
       [plan.days[0].id]: [
@@ -227,7 +227,7 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
           title: "Program TBI-1023 dan TBI-1018",
           category: "PROGRAM",
           startDateIso: "2026-11-26",
-          endDateIso: "2026-11-27", // 2 hari kerja berurutan -> merge B2:C2
+          endDateIso: "2026-11-27", // 2 hari kerja berurutan -> merge B8:C8
         },
       ],
     };
@@ -253,15 +253,44 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
 
     const ws = wb.getWorksheet("Pembagian Jobdesk");
     expect(ws).toBeDefined();
-    expect(ws!.getRow(1).getCell(2).value).toBe(plan.days[0].label);
-    expect(ws!.getRow(2).getCell(1).value).toBe("Faruq");
-    expect(ws!.getRow(2).getCell(2).value).toBe("Program TBI-1023 dan TBI-1018");
-    expect(ws!.getRow(2).getCell(2).isMerged).toBe(true);
-    expect(ws!.getRow(2).getCell(3).isMerged).toBe(true);
-    expect(ws!.getRow(3).getCell(3).value).toBe("HMI TBU-1105");
-    expect(ws!.getRow(6).getCell(2).value).toBe("sub jobdesk");
-    expect(ws!.getRow(7).getCell(2).value).toBe("1. HMI TBU-1105");
-    expect(ws!.getRow(8).getCell(2).value).toBe("2. HMI MTM-1015");
-    expect(ws!.getRow(10).getCell(2).value).toBe(DEFAULT_SUB_JOBDESK_NOTE);
+
+    // Cek logo perusahaan tersemat & kop perusahaan muncul
+    expect(ws!.getImages().length).toBeGreaterThanOrEqual(1);
+    expect(ws!.getCell(3, 1).value).toBe("PT. Twintech Precision");
+
+    // Cek header tanggal di baris 7 & isi matriks di baris 8-9
+    expect(ws!.getRow(7).getCell(2).value).toBe(plan.days[0].label);
+    expect(ws!.getRow(8).getCell(1).value).toBe("Faruq");
+    expect(String(ws!.getRow(8).getCell(2).value)).toContain(
+      "Program TBI-1023 dan TBI-1018"
+    );
+    expect(ws!.getRow(8).getCell(2).isMerged).toBe(true);
+    expect(ws!.getRow(8).getCell(3).isMerged).toBe(true);
+    expect(String(ws!.getRow(9).getCell(3).value)).toContain("HMI TBU-1105");
+
+    // Kumpulkan semua teks baris untuk verifikasi tabel Rekap Penugasan & sub jobdesk
+    const rowValues: string[] = [];
+    ws!.eachRow((row) => {
+      const cells: string[] = [];
+      row.eachCell((cell) => {
+        if (cell.value !== null && cell.value !== undefined) {
+          cells.push(String(cell.value));
+        }
+      });
+      rowValues.push(cells.join(" | "));
+    });
+    const fullSheetText = rowValues.join("\n");
+
+    expect(fullSheetText).toContain(
+      "DETAIL PENUGASAN JOBDESK (PEKERJAAN, PIC & RENTANG TANGGAL)"
+    );
+    expect(fullSheetText).toContain("Dari Tanggal");
+    expect(fullSheetText).toContain("Sampai Tanggal");
+    expect(fullSheetText).toContain("Dipegang Oleh (PIC)");
+    expect(fullSheetText).toContain("2 Hari Kerja");
+    expect(fullSheetText).toContain("sub jobdesk");
+    expect(fullSheetText).toContain("1. HMI TBU-1105");
+    expect(fullSheetText).toContain("2. HMI MTM-1015");
+    expect(fullSheetText).toContain(DEFAULT_SUB_JOBDESK_NOTE);
   });
 });

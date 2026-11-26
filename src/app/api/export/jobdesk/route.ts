@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppSettings } from "@/lib/data-queries";
 import { exportJobdeskPlanToExcelBuffer } from "@/lib/export/jobdesk-exporter";
 import { jobdeskPlanDataSchema } from "@/lib/jobdesk-plan";
 
@@ -18,7 +19,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const buffer = await exportJobdeskPlanToExcelBuffer(parsed.data);
+    const settings = await getAppSettings().catch(() => null);
+    const buffer = await exportJobdeskPlanToExcelBuffer(parsed.data, {
+      namaPerusahaan: settings?.namaPerusahaan,
+      alamatPerusahaan: settings?.alamatPerusahaan,
+      telpPerusahaan: settings?.telpPerusahaan,
+      faxPerusahaan: settings?.faxPerusahaan,
+      logoBase64: settings?.logoBase64,
+    });
     const filename = `Pembagian_Jobdesk_${parsed.data.startDateIso}.xlsx`;
 
     return new NextResponse(Buffer.from(buffer), {
