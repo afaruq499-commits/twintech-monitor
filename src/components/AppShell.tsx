@@ -21,6 +21,7 @@ import {
   KeyRound,
   Layers,
   LayoutDashboard,
+  ListChecks,
   ListOrdered,
   LogOut,
   type LucideIcon,
@@ -87,6 +88,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: "Jadwal & Kalender",
         shortLabel: "Jadwal",
         icon: CalendarDays,
+      },
+      {
+        href: "/jobdesk",
+        label: "Pembagian Jobdesk",
+        shortLabel: "Jobdesk",
+        icon: ListChecks,
       },
       {
         href: "/buat-pr",
@@ -429,6 +436,12 @@ export function AppShell({
       return [
         { label: "Workspace", href: "/" },
         { label: "Prioritas Minggu Ini" },
+      ];
+    }
+    if (pathname === "/jobdesk") {
+      return [
+        { label: "Workspace", href: "/" },
+        { label: "Pembagian Jobdesk Harian" },
       ];
     }
     if (pathname === "/template") {

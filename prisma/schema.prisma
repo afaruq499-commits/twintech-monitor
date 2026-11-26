@@ -289,3 +289,14 @@ model FlowchartDiagram {
   @@index([updatedAt])
   @@map("flowchart_diagrams")
 }
+
+model JobdeskPlan {
+  id            String   @id @default("default") @db.VarChar(60)
+  judul         String   @default("Pembagian Jobdesk Harian") @db.VarChar(300)
+  dataJson      String   @default("{}") @map("data_json") @db.Text
+  updatedByName String?  @map("updated_by_name") @db.VarChar(200)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("jobdesk_plans")
+}
