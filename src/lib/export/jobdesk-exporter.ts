@@ -406,7 +406,7 @@ export async function exportJobdeskPlanToExcelBuffer(
 
     for (let tIdx = 0; tIdx < trackCount; tIdx++) {
       const row = ws.getRow(currentRowIdx);
-      row.height = 30;
+      row.height = 24;
 
       for (let colIdx = 1; colIdx <= plan.days.length + 1; colIdx++) {
         const baseCell = row.getCell(colIdx);
@@ -451,14 +451,8 @@ export async function exportJobdeskPlanToExcelBuffer(
 
         const prefix = span.entry.done ? "✓ " : "";
         const urgentBadge = span.entry.urgent ? " [URGENT]" : "";
-        const rangeText =
-          span.workingDaysCount > 1
-            ? `${formatDayShortLabel(span.startDateIso)} → ${formatDayShortLabel(
-                span.endDateIso
-              )} (${span.workingDaysCount}h)`
-            : `${formatDayShortLabel(span.startDateIso)} (1h)`;
 
-        cell.value = `${prefix}${span.entry.title}${urgentBadge}\n${rangeText}`;
+        cell.value = `${prefix}${span.entry.title}${urgentBadge}`;
         cell.font = {
           name: "Calibri",
           size: 10,

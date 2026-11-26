@@ -360,14 +360,11 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
 
     expect(ws!.getRow(7).getCell(2).value).toBe(plan.days[0].label);
     expect(ws!.getRow(8).getCell(1).value).toBe("Faruq");
-    expect(String(ws!.getRow(8).getCell(2).value)).toContain(
-      "Pembuatan Program 26 MTM 1015"
-    );
+    expect(ws!.getRow(8).getCell(2).value).toBe("Pembuatan Program 26 MTM 1015");
+    expect(String(ws!.getRow(8).getCell(2).value)).not.toContain("→");
     expect(ws!.getRow(8).getCell(2).isMerged).toBe(true);
     expect(ws!.getRow(8).getCell(3).isMerged).toBe(true);
-    expect(String(ws!.getRow(9).getCell(3).value)).toContain(
-      "Perakitan Panel 26-MTM-1015"
-    );
+    expect(ws!.getRow(9).getCell(3).value).toBe("Perakitan Panel 26-MTM-1015");
 
     const rowValues: string[] = [];
     ws!.eachRow((row) => {
