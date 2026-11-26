@@ -1703,8 +1703,8 @@ export function ProjectControlPanelLayoutEditor({
         kode: projectKode || "26-TBD-0513",
         nama: projectNama || "PROJECT AUTOMATION",
         client: projectClient || "PT. TWINTECH PRECISION",
-        pic: projectPic || "DEDI",
-        drawnBy: projectPic || "DEDI",
+        pic: projectPic?.trim() || "-",
+        drawnBy: projectPic?.trim() || "-",
         checkedBy: "IVAN",
         approvedBy: "IVAN",
         partName:

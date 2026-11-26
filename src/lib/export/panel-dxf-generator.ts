@@ -765,7 +765,7 @@ export function generatePanelLayoutDxf(
   addText("7_TITLE_BLOCK", tbX + 4, tbY + 7, 4.0, metadata.kode || "-", 0, 7);
 
   addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 18, 3.0, "Drawn :", 0, 7);
-  addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 7, 4.0, metadata.drawnBy || metadata.pic || "DEDI", 0, 7);
+  addText("7_TITLE_BLOCK", tbX + colW + 4, tbY + 7, 4.0, metadata.drawnBy?.trim() || metadata.pic?.trim() || "-", 0, 7);
 
   addText("7_TITLE_BLOCK", tbX + 2 * colW + 4, tbY + 18, 3.0, "Checked :", 0, 7);
   addText("7_TITLE_BLOCK", tbX + 2 * colW + 4, tbY + 7, 4.0, metadata.checkedBy || "IVAN", 0, 7);
@@ -1101,7 +1101,7 @@ export function generateOuterPanelDxf(
     tbX + colW + 4,
     tbY + 8,
     4.0,
-    metadata.drawnBy || metadata.pic || "DEDI",
+    metadata.drawnBy?.trim() || metadata.pic?.trim() || "-",
     0,
     7
   );

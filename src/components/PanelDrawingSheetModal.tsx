@@ -99,8 +99,8 @@ export function PanelDrawingSheetModal({
       kode: project.kode || "26-TBD-0513",
       nama: project.nama || "MODIFIKASI RATCHET X ROAD TAKING,PIN X BASE STAKING",
       client: project.client || "PT. TWINTECH PRECISION",
-      pic: project.pic || "DEDI",
-      drawnBy: project.pic || "DEDI",
+      pic: project.pic?.trim() || "-",
+      drawnBy: project.pic?.trim() || "-",
       checkedBy: "IVAN",
       approvedBy: "IVAN",
       partName:

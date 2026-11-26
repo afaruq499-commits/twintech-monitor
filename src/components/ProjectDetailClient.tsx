@@ -768,7 +768,14 @@ export function ProjectDetailClient({
             projectKode={project.kode}
             projectNama={project.nama}
             projectClient={project.client}
-            projectPic={project.pic}
+            projectPic={
+              project.pic?.trim() ||
+              project.lanes?.find((l) => l.pic?.trim())?.pic?.trim() ||
+              project.lanes
+                ?.flatMap((l) => l.workItems)
+                .find((w) => w.pic?.trim())?.pic?.trim() ||
+              null
+            }
             components={project.components}
             initialLayoutJson={project.panelLayoutJson}
             onSaveSuccess={() => router.refresh()}

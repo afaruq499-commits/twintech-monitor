@@ -238,5 +238,22 @@ describe("panel-dxf-generator", () => {
     expect(dxf).toContain("TAMPAK DEPAN (FRONT VIEW)");
     expect(dxf).toContain("TAMPAK SAMPING (SIDE VIEW)");
     expect(dxf).toContain("180");
+    expect(dxf).not.toContain("DEDI");
+  });
+
+  it("mengisi kolom Drawn sesuai PIC proyek dan tidak memakai fallback DEDI bila kosong", () => {
+    const features = extractPanelFeatures(400, 500, [], "MAIN", 200);
+
+    const dxfWithPic = generatePanelLayoutDxf(
+      features,
+      {
+        kode: "26-BLN-1026",
+        nama: "MAIN PANEL TEST",
+        pic: "Ijlal",
+      },
+      "MAIN"
+    );
+    expect(dxfWithPic).toContain("Ijlal");
+    expect(dxfWithPic).not.toContain("DEDI");
   });
 });
