@@ -8,6 +8,7 @@ import {
   todayIsoLocal,
 } from "@/lib/date-utils";
 import { createFullScheduleSchema } from "@/lib/validation/schemas";
+import { pushLaneWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 
 export async function POST(request: Request) {
   try {
@@ -202,6 +203,8 @@ export async function POST(request: Request) {
         },
       },
     });
+
+    await pushLaneWorkItemsToJobdeskPlan(createdLane.id).catch(() => {});
 
     return NextResponse.json(
       { ok: true, projectId, laneId: createdLane.id },

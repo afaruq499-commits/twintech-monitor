@@ -122,6 +122,85 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
     expect(faruqPacked.tracks[0][0].workingDaysCount).toBe(3);
   });
 
+  it("preserves manual & unrelated scheduled jobdesks when targeted Schedule Proyek sync runs for only changed workItems", () => {
+    const plan = createDefaultJobdeskPlanData("2026-11-26", 5, true);
+    plan.cells["Faruq"] = {
+      "day-2026-11-26": [
+        {
+          id: "manual-1",
+          title: "Penambahan Program Auto Stop Panasonic",
+          category: "PROGRAM",
+          startDateIso: "2026-11-26",
+          endDateIso: "2026-11-26",
+        },
+      ],
+      "day-2026-12-01": [
+        {
+          id: "custom-wi",
+          title: "Pembuatan Program 26-TBI-1023",
+          category: "PROGRAM",
+          workItemId: "wi-other",
+          sourceKey: "wi:wi-other",
+          startDateIso: "2026-12-01",
+          endDateIso: "2026-12-01",
+        },
+      ],
+    };
+
+    const projects: ProjectJobdeskSourceInput[] = [
+      {
+        id: "proj-1",
+        kode: "26-TBU-1105",
+        nama: "Conveyor Checker",
+        client: "PT TBU",
+        status: "WIRING",
+        prioritas: "SEDANG",
+        deadline: "2026-12-05",
+        urutanManual: 1,
+        components: [],
+        lanes: [
+          {
+            id: "lane-1",
+            nama: "Main",
+            pic: null,
+            workItems: [
+              {
+                id: "wi-other",
+                jenis: "PROGRAMMING",
+                judul: "Pembuatan Program",
+                pic: "Faruq",
+                scheduleCells: [{ tanggal: "2026-11-26", status: "TARGET" }],
+              },
+              {
+                id: "wi-apip-only",
+                jenis: "PROGRAMMING",
+                judul: "HMI",
+                pic: "Apip",
+                scheduleCells: [{ tanggal: "2026-11-27", status: "TARGET" }],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const updated = syncScheduleProyekToJobdeskPlan(plan, projects, {
+      onlyWorkItemIds: ["wi-apip-only"],
+    });
+
+    // Item Faruq di 26 Nov & 1 Des TETAP UTUH dan tidak tertimpa oleh wi-other
+    expect(updated.cells["Faruq"]?.["day-2026-11-26"]?.[0].title).toBe(
+      "Penambahan Program Auto Stop Panasonic"
+    );
+    expect(updated.cells["Faruq"]?.["day-2026-12-01"]?.[0].title).toBe(
+      "Pembuatan Program 26-TBI-1023"
+    );
+    // Hanya wi-apip-only yang masuk ke Apip tgl 27
+    expect(updated.cells["Apip"]?.["day-2026-11-27"]?.[0].title).toBe(
+      "HMI 26-TBU-1105"
+    );
+  });
+
   it("extracts unfinished jobdesks from active queued projects only and marks delayed wiring", () => {
     const projects: ProjectJobdeskSourceInput[] = [
       {

@@ -7,6 +7,7 @@ import type {
 } from "@/lib/constants";
 import { fromIsoDateStr, toIsoDateStr } from "@/lib/date-utils";
 import { getAllScheduledEntries, getAppSettings } from "@/lib/data-queries";
+import { pushScheduleWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 import {
   checkComponentReadinessWarning,
   checkScheduleConflict,
@@ -307,6 +308,8 @@ export async function POST(request: Request) {
       });
     });
 
+    await pushScheduleWorkItemsToJobdeskPlan([d.workItemId]).catch(() => {});
+
     return NextResponse.json({
       ok: true,
       cell: {
@@ -342,7 +345,13 @@ export async function DELETE(request: Request) {
     const cellId = searchParams.get("cellId");
 
     if (cellId) {
-      await prisma.scheduleCell.delete({ where: { id: cellId } });
+      const deletedCell = await prisma.scheduleCell.delete({
+        where: { id: cellId },
+        select: { workItemId: true },
+      });
+      await pushScheduleWorkItemsToJobdeskPlan([deletedCell.workItemId]).catch(
+        () => {}
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -467,6 +476,8 @@ export async function DELETE(request: Request) {
         },
       });
     });
+
+    await pushScheduleWorkItemsToJobdeskPlan([workItemId]).catch(() => {});
 
     return NextResponse.json({ ok: true });
   } catch (err) {

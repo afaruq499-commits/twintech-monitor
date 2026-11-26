@@ -852,15 +852,21 @@ function groupScheduleDatesIntoSegments(
 
 /**
  * Menyinkronkan penugasan PIC & tanggal dari Schedule Proyek (`/jadwal`, `/proyek/[id]`)
- * ke tabel Pembagian Jobdesk secara otomatis.
+ * ke tabel Pembagian Jobdesk.
  *
- * Jika di Schedule Proyek WorkItem sudah diisi PIC (misal "Apip") dan tanggal (misal 27 Nov),
- * fungsi ini menempatkan / memperbarui kartu jobdesk pada baris PIC dan rentang tanggal tsb.
+ * Bila `options.onlyWorkItemIds` diberikan, HANYA WorkItem yang berubah tsb yang diperbarui
+ * tanpa menyentuh/menimpa item lain yang sudah dijadwalkan di Pembagian Jobdesk.
  */
 export function syncScheduleProyekToJobdeskPlan(
   plan: JobdeskPlanData,
-  projects: ProjectJobdeskSourceInput[]
+  projects: ProjectJobdeskSourceInput[],
+  options: { onlyWorkItemIds?: string[] } = {}
 ): JobdeskPlanData {
+  const onlySet =
+    options.onlyWorkItemIds && options.onlyWorkItemIds.length > 0
+      ? new Set(options.onlyWorkItemIds)
+      : null;
+
   const nextPics = [...plan.pics];
   const nextCells: Record<string, Record<string, JobdeskCellEntry[]>> = {};
 
@@ -877,7 +883,7 @@ export function syncScheduleProyekToJobdeskPlan(
 
   const activeProjects = projects.filter((p) => p.status !== "SELESAI");
 
-  // Kumpulkan seluruh workItem dari proyek aktif yang punya PIC & ScheduleCell tanggal
+  // Kumpulkan workItem dari proyek aktif yang punya PIC & ScheduleCell tanggal
   const workItemSyncedItems: {
     workItemId: string;
     pic: string;
@@ -891,6 +897,8 @@ export function syncScheduleProyekToJobdeskPlan(
 
     for (const lane of proj.lanes) {
       for (const wi of lane.workItems) {
+        if (onlySet && !onlySet.has(wi.id)) continue;
+
         const datedCells = wi.scheduleCells.filter((c) => Boolean(c.tanggal));
         if (datedCells.length === 0) continue;
 
@@ -959,13 +967,17 @@ export function syncScheduleProyekToJobdeskPlan(
     }
   }
 
-  // Bersihkan entri lama yang `syncedFromSchedule` ATAU cocok `wi:<workItemId>`
-  // yang masih punya jadwal aktif di Schedule Proyek agar posisi PIC & tanggal selalu akurat
+  // Bersihkan entri lama untuk item yang disinkronkan:
+  // - Bila mode `onlySet`: HANYA hapus entri yang cocok `wiId` di `onlySet`
+  // - Bila full sync: hapus entri `syncedFromSchedule` atau `wiId` aktif yang akan diisi ulang
   for (const pic of Object.keys(nextCells)) {
     for (const [dayId, list] of Object.entries(nextCells[pic])) {
       nextCells[pic][dayId] = list.filter((entry) => {
         const wiId =
           entry.workItemId ?? extractWorkItemIdFromSourceKey(entry.sourceKey);
+        if (onlySet) {
+          return !(wiId && onlySet.has(wiId));
+        }
         if (entry.syncedFromSchedule) return false;
         if (wiId && scheduledWorkItemIds.has(wiId)) return false;
         return true;

@@ -20,51 +20,43 @@ export interface LoadedJobdeskBundle {
   todayIso: string;
 }
 
-/**
- * Memuat rencana pembagian jobdesk terbaru dan menyinkronkan otomatis
- * jadwal WorkItem & ScheduleCell dari Schedule Proyek aktif di database.
- */
-export async function loadSyncedJobdeskBundle(): Promise<LoadedJobdeskBundle> {
-  const todayIso = todayIsoLocal();
+export interface LoadJobdeskOptions {
+  /** Bila true (klik tombol Sinkron Schedule), ambil ulang jadwal WorkItem dari Schedule Proyek */
+  forceSyncFromSchedule?: boolean;
+}
 
-  const [projectsRaw, savedPlanRow] = await Promise.all([
-    prisma.project.findMany({
-      where: { status: { not: "SELESAI" } },
-      include: {
-        components: {
-          select: {
-            statusPembelian: true,
-            statusImport: true,
-          },
+async function queryActiveProjectInputs(): Promise<ProjectJobdeskSourceInput[]> {
+  const projectsRaw = await prisma.project.findMany({
+    where: { status: { not: "SELESAI" } },
+    include: {
+      components: {
+        select: {
+          statusPembelian: true,
+          statusImport: true,
         },
-        lanes: {
-          orderBy: { urutan: "asc" },
-          include: {
-            workItems: {
-              orderBy: { urutan: "asc" },
-              include: {
-                scheduleCells: {
-                  orderBy: { tanggal: "asc" },
-                  select: {
-                    tanggal: true,
-                    status: true,
-                  },
+      },
+      lanes: {
+        orderBy: { urutan: "asc" },
+        include: {
+          workItems: {
+            orderBy: { urutan: "asc" },
+            include: {
+              scheduleCells: {
+                orderBy: { tanggal: "asc" },
+                select: {
+                  tanggal: true,
+                  status: true,
                 },
               },
             },
           },
         },
       },
-      orderBy: [{ urutanManual: "asc" }, { deadline: "asc" }],
-    }),
-    prisma.jobdeskPlan
-      .findUnique({
-        where: { id: "default" },
-      })
-      .catch(() => null),
-  ]);
+    },
+    orderBy: [{ urutanManual: "asc" }, { deadline: "asc" }],
+  });
 
-  const projectInputs: ProjectJobdeskSourceInput[] = projectsRaw.map((p) => ({
+  return projectsRaw.map((p) => ({
     id: p.id,
     kode: p.kode,
     nama: p.nama,
@@ -106,6 +98,26 @@ export async function loadSyncedJobdeskBundle(): Promise<LoadedJobdeskBundle> {
       })),
     })),
   }));
+}
+
+/**
+ * Memuat rencana pembagian jobdesk tersimpan tanpa menimpa pengaturan user saat refresh.
+ * Sinkronisasi penuh dari Schedule Proyek hanya dijalankan saat data awal belum ada
+ * atau ketika user secara eksplisit menekan "Sinkron Schedule" (`forceSyncFromSchedule = true`).
+ */
+export async function loadSyncedJobdeskBundle(
+  options: LoadJobdeskOptions = {}
+): Promise<LoadedJobdeskBundle> {
+  const todayIso = todayIsoLocal();
+
+  const [projectInputs, savedPlanRow] = await Promise.all([
+    queryActiveProjectInputs(),
+    prisma.jobdeskPlan
+      .findUnique({
+        where: { id: "default" },
+      })
+      .catch(() => null),
+  ]);
 
   const availableJobdesks = extractAvailableProjectJobdesks(
     projectInputs,
@@ -116,15 +128,73 @@ export async function loadSyncedJobdeskBundle(): Promise<LoadedJobdeskBundle> {
     ? parseJobdeskPlanJson(savedPlanRow.dataJson, savedPlanRow.judul)
     : createDefaultJobdeskPlanData(todayIso, 5, true);
 
-  const syncedPlan = syncScheduleProyekToJobdeskPlan(basePlan, projectInputs);
+  const shouldSync = !savedPlanRow || Boolean(options.forceSyncFromSchedule);
+  const finalPlan = shouldSync
+    ? syncScheduleProyekToJobdeskPlan(basePlan, projectInputs)
+    : basePlan;
 
   return {
-    plan: syncedPlan,
+    plan: finalPlan,
     availableJobdesks,
     updatedAt: savedPlanRow?.updatedAt.toISOString() ?? null,
     updatedByName: savedPlanRow?.updatedByName ?? null,
     todayIso,
   };
+}
+
+/**
+ * Dipanggil oleh API Schedule Proyek saat WorkItem / ScheduleCell diubah (mis. menunjuk Apip tgl 27).
+ * Memperbarui HANYA workItem yang disentuh di dalam `jobdesk_plans` tanpa mengganggu jobdesk lain.
+ */
+export async function pushScheduleWorkItemsToJobdeskPlan(
+  workItemIds: string[]
+): Promise<void> {
+  const uniqueIds = Array.from(new Set(workItemIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return;
+
+  const todayIso = todayIsoLocal();
+  const [projectInputs, savedPlanRow] = await Promise.all([
+    queryActiveProjectInputs(),
+    prisma.jobdeskPlan
+      .findUnique({
+        where: { id: "default" },
+      })
+      .catch(() => null),
+  ]);
+
+  const basePlan = savedPlanRow
+    ? parseJobdeskPlanJson(savedPlanRow.dataJson, savedPlanRow.judul)
+    : createDefaultJobdeskPlanData(todayIso, 5, true);
+
+  const updatedPlan = syncScheduleProyekToJobdeskPlan(basePlan, projectInputs, {
+    onlyWorkItemIds: uniqueIds,
+  });
+
+  await prisma.jobdeskPlan.upsert({
+    where: { id: "default" },
+    update: {
+      judul: updatedPlan.title,
+      dataJson: JSON.stringify(updatedPlan),
+    },
+    create: {
+      id: "default",
+      judul: updatedPlan.title,
+      dataJson: JSON.stringify(updatedPlan),
+    },
+  });
+}
+
+export async function pushLaneWorkItemsToJobdeskPlan(
+  laneId: string
+): Promise<void> {
+  if (!laneId) return;
+  const items = await prisma.workItem.findMany({
+    where: { laneId },
+    select: { id: true },
+  });
+  if (items.length > 0) {
+    await pushScheduleWorkItemsToJobdeskPlan(items.map((w) => w.id));
+  }
 }
 
 /**
@@ -206,7 +276,6 @@ export async function syncJobdeskPlanBackToSchedule(
       .map((d) => fromIsoDateStr(d))
       .filter((d): d is Date => Boolean(d));
 
-    // Hapus hanya sel level WorkItem yang tidak lagi ada di rentang bar jobdesk
     await prisma.scheduleCell.deleteMany({
       where: {
         workItemId,

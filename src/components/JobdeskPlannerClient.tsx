@@ -379,33 +379,75 @@ export function JobdeskPlannerClient({
     };
   }, [isResizingActive, plan.days]);
 
-  // ==================== API SAVE, SYNC SCHEDULE & EXPORT ====================
+  // ==================== AUTO-SAVE + API SAVE, SYNC SCHEDULE & EXPORT ====================
 
-  async function handleSavePlan() {
+  const latestPlanRef = useRef<JobdeskPlanData>(plan);
+  latestPlanRef.current = plan;
+  const hasUnsavedRef = useRef<boolean>(hasUnsavedChanges);
+  hasUnsavedRef.current = hasUnsavedChanges;
+
+  useEffect(() => {
+    if (!hasUnsavedChanges || saving) return;
+
+    const timer = setTimeout(() => {
+      void handleSavePlan({ silent: true });
+    }, 650);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, hasUnsavedChanges]);
+
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (!hasUnsavedRef.current) return;
+      try {
+        void fetch("/api/jobdesk-plan", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: latestPlanRef.current }),
+          keepalive: true,
+        });
+      } catch {
+        // ignore network errors on unload
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  async function handleSavePlan(options?: { silent?: boolean }) {
     setSaving(true);
     try {
+      const snapshotToSave = latestPlanRef.current;
       const res = await fetch("/api/jobdesk-plan", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan: snapshotToSave }),
+        keepalive: true,
       });
       const json = await res.json();
       if (!res.ok) {
-        showToast("error", json?.error || "Gagal menyimpan jadwal jobdesk.");
+        if (!options?.silent) {
+          showToast("error", json?.error || "Gagal menyimpan jadwal jobdesk.");
+        }
         return;
       }
       setHasUnsavedChanges(false);
       setLastSavedAt(json.updatedAt ?? new Date().toISOString());
       setLastSavedBy(json.updatedByName ?? null);
-      const syncedCount = Number(json.syncedWorkItemsCount ?? 0);
-      showToast(
-        "success",
-        syncedCount > 0
-          ? `Pembagian jobdesk tersimpan & ${syncedCount} pekerjaan disinkronkan ke Schedule Proyek.`
-          : "Pembagian jobdesk berhasil disimpan."
-      );
+      if (!options?.silent) {
+        const syncedCount = Number(json.syncedWorkItemsCount ?? 0);
+        showToast(
+          "success",
+          syncedCount > 0
+            ? `Pembagian jobdesk tersimpan & ${syncedCount} pekerjaan disinkronkan ke Schedule Proyek.`
+            : "Pembagian jobdesk berhasil disimpan."
+        );
+      }
     } catch {
-      showToast("error", "Terjadi kesalahan jaringan saat menyimpan.");
+      if (!options?.silent) {
+        showToast("error", "Terjadi kesalahan jaringan saat menyimpan.");
+      }
     } finally {
       setSaving(false);
     }
@@ -414,22 +456,25 @@ export function JobdeskPlannerClient({
   async function handleRefreshFromSchedule() {
     setSyncing(true);
     try {
-      const res = await fetch("/api/jobdesk-plan", { cache: "no-store" });
+      const res = await fetch("/api/jobdesk-plan?sync=1", {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!res.ok) {
         showToast("error", json?.error || "Gagal sinkronisasi Schedule Proyek.");
         return;
       }
       setPlan(json.plan);
+      latestPlanRef.current = json.plan;
       if (Array.isArray(json.availableJobdesks)) {
         setAvailableJobdesks(json.availableJobdesks);
       }
-      setHasUnsavedChanges(false);
+      setHasUnsavedChanges(true);
       setLastSavedAt(json.updatedAt ?? null);
       setLastSavedBy(json.updatedByName ?? null);
       showToast(
         "success",
-        "Terhubung & diperbarui otomatis dari data Schedule Proyek terbaru."
+        "Data Schedule Proyek terbaru berhasil ditarik dan otomatis tersimpan."
       );
     } catch {
       showToast("error", "Gagal menghubungi server untuk sinkronisasi.");
@@ -1198,7 +1243,7 @@ export function JobdeskPlannerClient({
 
             <button
               type="button"
-              onClick={handleSavePlan}
+              onClick={() => void handleSavePlan({ silent: false })}
               disabled={saving}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[#F05232] hover:bg-[#d94426] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-[#F05232]/25 transition-colors cursor-pointer"
             >

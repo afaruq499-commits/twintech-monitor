@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import type { ScheduleCellStatus } from "@/lib/constants";
 import { fromIsoDateStr } from "@/lib/date-utils";
+import { pushScheduleWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 
 export async function POST(request: Request) {
   try {
@@ -49,6 +50,9 @@ export async function POST(request: Request) {
         },
       });
 
+      await pushScheduleWorkItemsToJobdeskPlan([updated.workItemId]).catch(
+        () => {}
+      );
       return NextResponse.json({ ok: true, cell: updated });
     }
 
@@ -105,6 +109,8 @@ export async function POST(request: Request) {
         delayDikonfirmasi: status === "DONE" || status === "DELAY",
       },
     });
+
+    await pushScheduleWorkItemsToJobdeskPlan([workItemId]).catch(() => {});
 
     return NextResponse.json({ ok: true, updatedCount: matchingCells.length });
   } catch (err) {

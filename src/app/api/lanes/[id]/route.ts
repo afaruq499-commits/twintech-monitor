@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fromIsoDateStr } from "@/lib/date-utils";
 import { laneSchema } from "@/lib/validation/schemas";
+import { pushLaneWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 
 export async function PATCH(
   request: Request,
@@ -55,6 +56,8 @@ export async function PATCH(
           : {}),
       },
     });
+    await pushLaneWorkItemsToJobdeskPlan(id).catch(() => {});
+
     return NextResponse.json({ lane: updated });
   } catch (err) {
     console.error("PATCH /api/lanes/[id] error:", err);

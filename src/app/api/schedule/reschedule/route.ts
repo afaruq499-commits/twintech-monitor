@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fromIsoDateStr, addDaysIso, todayIsoLocal } from "@/lib/date-utils";
 import { getAllScheduledEntries, getAppSettings } from "@/lib/data-queries";
 import { checkScheduleConflict } from "@/lib/schedule";
+import { pushScheduleWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 import type { ScheduleCellStatus, WorkType } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -215,6 +216,8 @@ export async function POST(request: Request) {
         });
       }
     });
+
+    await pushScheduleWorkItemsToJobdeskPlan([workItemId]).catch(() => {});
 
     return NextResponse.json({
       ok: true,

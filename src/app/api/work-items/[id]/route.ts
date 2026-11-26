@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fromIsoDateStr } from "@/lib/date-utils";
 import { workItemSchema } from "@/lib/validation/schemas";
+import { pushScheduleWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 
 export async function PATCH(
   request: Request,
@@ -158,6 +159,8 @@ export async function PATCH(
       });
     });
 
+    await pushScheduleWorkItemsToJobdeskPlan([id]).catch(() => {});
+
     return NextResponse.json({ workItem: updated });
   } catch (err) {
     console.error("PATCH /api/work-items/[id] error:", err);
@@ -181,6 +184,8 @@ export async function DELETE(
       await tx.subScope.deleteMany({ where: { workItemId: id } });
       await tx.workItem.delete({ where: { id } });
     });
+    await pushScheduleWorkItemsToJobdeskPlan([id]).catch(() => {});
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/work-items/[id] error:", err);

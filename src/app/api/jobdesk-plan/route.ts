@@ -7,9 +7,12 @@ import {
   syncJobdeskPlanBackToSchedule,
 } from "@/lib/jobdesk-server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const bundle = await loadSyncedJobdeskBundle();
+    const syncParam = new URL(request.url).searchParams.get("sync");
+    const bundle = await loadSyncedJobdeskBundle({
+      forceSyncFromSchedule: syncParam === "1",
+    });
     return NextResponse.json(bundle);
   } catch (err) {
     console.error("GET /api/jobdesk-plan error:", err);

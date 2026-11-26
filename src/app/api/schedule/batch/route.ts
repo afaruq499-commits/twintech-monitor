@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fromIsoDateStr } from "@/lib/date-utils";
+import { pushScheduleWorkItemsToJobdeskPlan } from "@/lib/jobdesk-server";
 import {
   resolveScheduleBatchChanges,
   type ScheduleBatchChangeItem,
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
         timeout: 60000, // 60 detik batas timeout transaksi interaktif
       }
     );
+
+    await pushScheduleWorkItemsToJobdeskPlan(workItemIds).catch(() => {});
 
     return NextResponse.json({
       ok: true,
