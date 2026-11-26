@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+} from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -166,7 +172,42 @@ export function JobdeskPlannerClient({
 
   // Drag & Drop kartu antar panel/sel
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
+  const dragPayloadRef = useRef<DragPayload | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+  function beginDrag(e: ReactDragEvent<HTMLElement>, payload: DragPayload) {
+    dragPayloadRef.current = payload;
+    setDragPayload(payload);
+    try {
+      const id =
+        payload.availableItem?.sourceKey ||
+        payload.cellEntry?.id ||
+        payload.subItem?.id ||
+        "jobdesk";
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "copyMove";
+    } catch {
+      // Abaikan jika browser membatasi akses dataTransfer
+    }
+  }
+
+  function endDrag() {
+    dragPayloadRef.current = null;
+    setDragPayload(null);
+    setDragOverTarget(null);
+  }
+
+  function resolveDayByClientX(clientX: number) {
+    for (let i = 0; i < plan.days.length; i++) {
+      const el = dayHeaderRefs.current[i];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right) {
+        return plan.days[i];
+      }
+    }
+    return null;
+  }
 
   const assignmentMap = useMemo(() => buildAssignmentMap(plan), [plan]);
 
@@ -923,31 +964,32 @@ export function JobdeskPlannerClient({
 
   function handleDropOnCell(pic: string, dayId: string, targetDateIso: string) {
     setDragOverTarget(null);
-    if (!dragPayload) return;
+    const activePayload = dragPayloadRef.current ?? dragPayload;
+    if (!activePayload) return;
 
-    if (dragPayload.kind === "AVAILABLE" && dragPayload.availableItem) {
+    if (activePayload.kind === "AVAILABLE" && activePayload.availableItem) {
       if (isWeekendIso(targetDateIso)) {
         showToast(
           "info",
           "Hari Sabtu/Minggu libur. Untuk tugas Urgent di akhir pekan, klik '+ Tambah Job' lalu centang Urgent."
         );
-        setDragPayload(null);
+        endDrag();
         return;
       }
-      assignAvailableToCell(dragPayload.availableItem, pic, dayId, targetDateIso);
+      assignAvailableToCell(activePayload.availableItem, pic, dayId, targetDateIso);
     } else if (
-      dragPayload.kind === "CELL_ENTRY" &&
-      dragPayload.cellEntry &&
-      dragPayload.fromPic &&
-      dragPayload.fromDayId
+      activePayload.kind === "CELL_ENTRY" &&
+      activePayload.cellEntry &&
+      activePayload.fromPic &&
+      activePayload.fromDayId
     ) {
-      const { fromPic, fromDayId, cellEntry } = dragPayload;
+      const { fromPic, fromDayId, cellEntry } = activePayload;
       if (isWeekendIso(targetDateIso) && !cellEntry.urgent) {
         showToast(
           "info",
           "Hari Sabtu/Minggu libur. Centang 'Urgent' di modal edit jika ingin menjadwalkan di akhir pekan."
         );
-        setDragPayload(null);
+        endDrag();
         return;
       }
 
@@ -1003,26 +1045,27 @@ export function JobdeskPlannerClient({
           },
         };
       });
-    } else if (dragPayload.kind === "SUB_ITEM" && dragPayload.subItem) {
-      handlePromoteSubToCell(dragPayload.subItem, pic, dayId, targetDateIso);
+    } else if (activePayload.kind === "SUB_ITEM" && activePayload.subItem) {
+      handlePromoteSubToCell(activePayload.subItem, pic, dayId, targetDateIso);
     }
 
-    setDragPayload(null);
+    endDrag();
   }
 
   function handleDropOnSub() {
     setDragOverTarget(null);
-    if (!dragPayload) return;
+    const activePayload = dragPayloadRef.current ?? dragPayload;
+    if (!activePayload) return;
 
-    if (dragPayload.kind === "AVAILABLE" && dragPayload.availableItem) {
-      addAvailableToSubJobdesk(dragPayload.availableItem);
+    if (activePayload.kind === "AVAILABLE" && activePayload.availableItem) {
+      addAvailableToSubJobdesk(activePayload.availableItem);
     } else if (
-      dragPayload.kind === "CELL_ENTRY" &&
-      dragPayload.cellEntry &&
-      dragPayload.fromPic &&
-      dragPayload.fromDayId
+      activePayload.kind === "CELL_ENTRY" &&
+      activePayload.cellEntry &&
+      activePayload.fromPic &&
+      activePayload.fromDayId
     ) {
-      const { fromPic, fromDayId, cellEntry } = dragPayload;
+      const { fromPic, fromDayId, cellEntry } = activePayload;
       updatePlan((prev) => ({
         ...prev,
         cells: {
@@ -1049,7 +1092,7 @@ export function JobdeskPlannerClient({
         ],
       }));
     }
-    setDragPayload(null);
+    endDrag();
   }
 
   const modalFilteredQueue = useMemo(() => {
@@ -1463,13 +1506,10 @@ export function JobdeskPlannerClient({
                     <div
                       key={item.sourceKey}
                       draggable
-                      onDragStart={() =>
-                        setDragPayload({ kind: "AVAILABLE", availableItem: item })
+                      onDragStart={(e) =>
+                        beginDrag(e, { kind: "AVAILABLE", availableItem: item })
                       }
-                      onDragEnd={() => {
-                        setDragPayload(null);
-                        setDragOverTarget(null);
-                      }}
+                      onDragEnd={endDrag}
                       className={`rounded-xl border border-slate-200/90 dark:border-white/10 border-l-4 ${catStyle.border} bg-white dark:bg-[#1a1d24] p-2.5 shadow-xs hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1819,7 +1859,42 @@ export function JobdeskPlannerClient({
                         </div>
 
                         {/* Area Grid Multi-Kolom Tanggal */}
-                        <div className="relative">
+                        <div
+                          className="relative"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (e.dataTransfer) {
+                              e.dataTransfer.dropEffect = "move";
+                            }
+                            const matchedDay = resolveDayByClientX(e.clientX);
+                            if (matchedDay) {
+                              const targetKey = `cell:${pic}:${matchedDay.id}`;
+                              if (dragOverTarget !== targetKey) {
+                                setDragOverTarget(targetKey);
+                              }
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            if (
+                              !e.currentTarget.contains(
+                                e.relatedTarget as Node | null
+                              )
+                            ) {
+                              setDragOverTarget(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const matchedDay = resolveDayByClientX(e.clientX);
+                            if (matchedDay) {
+                              handleDropOnCell(
+                                pic,
+                                matchedDay.id,
+                                matchedDay.dateIso
+                              );
+                            }
+                          }}
+                        >
                           {/* Layer 1: Background Kolom Dropzone */}
                           <div
                             className="grid absolute inset-0"
@@ -1839,20 +1914,22 @@ export function JobdeskPlannerClient({
                                   key={`bg-${pic}-${day.id}`}
                                   onDragOver={(e) => {
                                     e.preventDefault();
-                                    setDragOverTarget(dropKey);
-                                  }}
-                                  onDragLeave={() => {
-                                    if (dragOverTarget === dropKey) {
-                                      setDragOverTarget(null);
+                                    e.stopPropagation();
+                                    if (e.dataTransfer) {
+                                      e.dataTransfer.dropEffect = "move";
+                                    }
+                                    if (dragOverTarget !== dropKey) {
+                                      setDragOverTarget(dropKey);
                                     }
                                   }}
                                   onDrop={(e) => {
                                     e.preventDefault();
+                                    e.stopPropagation();
                                     handleDropOnCell(pic, day.id, day.dateIso);
                                   }}
                                   className={`border-r border-slate-200 dark:border-white/10 transition-colors ${
                                     isOver
-                                      ? "bg-[#F05232]/10 ring-2 ring-inset ring-[#F05232]"
+                                      ? "bg-[#F05232]/15 ring-2 ring-inset ring-[#F05232]"
                                       : isWeekend
                                       ? "bg-rose-50/40 dark:bg-rose-950/10"
                                       : ""
@@ -1862,9 +1939,9 @@ export function JobdeskPlannerClient({
                             })}
                           </div>
 
-                          {/* Layer 2: Kartu Spanning Multi-Hari + Tombol Tambah di Bawah */}
+                          {/* Layer 2: Kartu Spanning Multi-Hari + Tombol Tambah di Bawah (pointer-events-none agar background tetap terima drag/drop) */}
                           <div
-                            className="grid relative z-10 gap-y-1.5 p-1.5 items-start"
+                            className="grid relative z-10 gap-y-1.5 p-1.5 items-start pointer-events-none"
                             style={{
                               gridTemplateColumns: `repeat(${plan.days.length}, minmax(130px, 1fr))`,
                               gridTemplateRows: `repeat(${totalTrackRows}, auto)`,
@@ -1900,24 +1977,21 @@ export function JobdeskPlannerClient({
                                   <div
                                     key={span.entry.id}
                                     draggable={!resizeState}
-                                    onDragStart={() => {
+                                    onDragStart={(e) => {
                                       if (resizeState) return;
-                                      setDragPayload({
+                                      beginDrag(e, {
                                         kind: "CELL_ENTRY",
                                         fromPic: pic,
                                         fromDayId: span.storageDayId,
                                         cellEntry: span.entry,
                                       });
                                     }}
-                                    onDragEnd={() => {
-                                      setDragPayload(null);
-                                      setDragOverTarget(null);
-                                    }}
+                                    onDragEnd={endDrag}
                                     style={{
                                       gridColumn: `${span.startColIdx + 1} / span ${effectiveColSpan}`,
                                       gridRow: trackIdx + 1,
                                     }}
-                                    className={`group/entry relative self-start mx-0.5 rounded-lg border border-slate-200 dark:border-white/10 border-l-4 ${
+                                    className={`group/entry pointer-events-auto relative self-start mx-0.5 rounded-lg border border-slate-200 dark:border-white/10 border-l-4 ${
                                       catStyle.border
                                     } pl-2 pr-3 py-1.5 text-[11px] shadow-2xs transition-shadow flex flex-col gap-1 ${
                                       span.entry.done
@@ -2116,7 +2190,7 @@ export function JobdeskPlannerClient({
                                     gridColumn: colIdx + 1,
                                     gridRow: packed.tracks.length + 1,
                                   }}
-                                  className="px-0.5 pt-0.5"
+                                  className="px-0.5 pt-0.5 pointer-events-auto"
                                 >
                                   <button
                                     type="button"
@@ -2154,6 +2228,7 @@ export function JobdeskPlannerClient({
           <div
             onDragOver={(e) => {
               e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
               setDragOverTarget("sub-zone");
             }}
             onDragLeave={() => {
@@ -2203,13 +2278,10 @@ export function JobdeskPlannerClient({
                     <div
                       key={sub.id}
                       draggable
-                      onDragStart={() =>
-                        setDragPayload({ kind: "SUB_ITEM", subItem: sub })
+                      onDragStart={(e) =>
+                        beginDrag(e, { kind: "SUB_ITEM", subItem: sub })
                       }
-                      onDragEnd={() => {
-                        setDragPayload(null);
-                        setDragOverTarget(null);
-                      }}
+                      onDragEnd={endDrag}
                       className="rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-[#1a1d24] px-3 py-2 space-y-2"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
