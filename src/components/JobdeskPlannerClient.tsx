@@ -483,33 +483,32 @@ export function JobdeskPlannerClient({
     }
   }
 
-  async function handleExportExcel() {
+  function handleExportExcel() {
     setExporting(true);
     try {
-      const res = await fetch("/api/export/jobdesk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        showToast("error", json?.error || "Gagal mengekspor file Excel.");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Pembagian_Jobdesk_${plan.startDateIso}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showToast("success", "File Excel Pembagian Jobdesk berhasil diunduh.");
+      // Gunakan submit <form method="POST"> secara sinkron di dalam klik user
+      // agar browser mengunduh langsung lewat header Content-Disposition: attachment
+      // tanpa dianggap sebagai async blob automatic download.
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/api/export/jobdesk";
+      form.style.display = "none";
+
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "planJson";
+      input.value = JSON.stringify(plan);
+      form.appendChild(input);
+
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
+
+      showToast("success", "Mengunduh file Excel Pembagian Jobdesk...");
     } catch {
       showToast("error", "Gagal mengunduh file Excel.");
     } finally {
-      setExporting(false);
+      setTimeout(() => setExporting(false), 800);
     }
   }
 
