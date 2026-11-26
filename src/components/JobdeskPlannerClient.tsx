@@ -1351,8 +1351,8 @@ export function JobdeskPlannerClient({
 
       {/* ==================== MAIN WORKSPACE ==================== */}
       <div
-        className={`grid gap-4 items-start ${
-          showQueuePanel ? "grid-cols-1 xl:grid-cols-[350px_1fr]" : "grid-cols-1"
+        className={`grid gap-3 items-start ${
+          showQueuePanel ? "grid-cols-1 xl:grid-cols-[270px_minmax(0,1fr)]" : "grid-cols-1"
         }`}
       >
         {/* PANEL KIRI: ANTRIAN JOBDESK PROYEK */}
@@ -1651,22 +1651,22 @@ export function JobdeskPlannerClient({
               </div>
             </div>
 
-            {/* MATRIKS GANTT-GRID HORIZONTAL SCROLLABLE */}
+            {/* MATRIKS GANTT-GRID COMPACT */}
             <div className="overflow-x-auto select-none">
               <div
                 style={{
-                  minWidth: `${145 + plan.days.length * 185}px`,
+                  minWidth: `${104 + plan.days.length * 130}px`,
                 }}
               >
                 {/* HEADER KOLOM TANGGAL */}
                 <div
                   className="grid bg-slate-100/90 dark:bg-white/[0.04] border-b border-slate-200 dark:border-white/10"
                   style={{
-                    gridTemplateColumns: `145px repeat(${plan.days.length}, minmax(185px, 1fr))`,
+                    gridTemplateColumns: `104px repeat(${plan.days.length}, minmax(130px, 1fr))`,
                   }}
                 >
-                  <div className="px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-slate-100 dark:bg-[#161920] flex items-center">
-                    PIC / Tanggal
+                  <div className="px-2.5 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-slate-100 dark:bg-[#161920] flex items-center">
+                    PIC / Tgl
                   </div>
 
                   {plan.days.map((day, idx) => {
@@ -1770,18 +1770,18 @@ export function JobdeskPlannerClient({
                         key={pic}
                         className="grid group/row bg-white dark:bg-[#12141a]"
                         style={{
-                          gridTemplateColumns: `145px minmax(0, 1fr)`,
+                          gridTemplateColumns: `104px minmax(0, 1fr)`,
                         }}
                       >
                         {/* Kolom Nama PIC (Sticky Kiri) */}
-                        <div className="px-3 py-3 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-white dark:bg-[#12141a] flex flex-col justify-between gap-2">
-                          <div className="flex items-center justify-between gap-1.5">
-                            <div className="flex items-center gap-2 min-w-0">
+                        <div className="px-2.5 py-2.5 border-r border-slate-200 dark:border-white/10 sticky left-0 z-20 bg-white dark:bg-[#12141a] flex flex-col justify-start gap-1.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                className="w-2 h-2 rounded-full shrink-0"
                                 style={{ backgroundColor: dotColor }}
                               />
-                              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                              <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                 {pic}
                               </span>
                             </div>
@@ -1789,7 +1789,7 @@ export function JobdeskPlannerClient({
                               <button
                                 type="button"
                                 onClick={() => handleRemovePic(pic)}
-                                className="opacity-0 group-hover/row:opacity-100 p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-opacity cursor-pointer"
+                                className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-opacity cursor-pointer"
                                 title={`Hapus baris ${pic}`}
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -1798,22 +1798,23 @@ export function JobdeskPlannerClient({
                           </div>
 
                           {packed.outOfRangeEntries.length > 0 && (
-                            <div className="space-y-1">
-                              {packed.outOfRangeEntries.slice(0, 2).map((oor) => (
-                                <button
-                                  key={oor.entry.id}
-                                  type="button"
-                                  onClick={() =>
-                                    ensureColumnVisibleForDate(oor.startDateIso)
-                                  }
-                                  className="w-full text-left rounded-md bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 px-1.5 py-0.5 text-[10px] font-medium text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 cursor-pointer truncate"
-                                  title={`Klik untuk tampilkan tanggal ${oor.startDateIso}: ${oor.entry.title}`}
-                                >
-                                  ↗ {formatDayShortLabel(oor.startDateIso)}:{" "}
-                                  {oor.entry.title}
-                                </button>
-                              ))}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                ensureColumnVisibleForDate(
+                                  packed.outOfRangeEntries[0].startDateIso
+                                )
+                              }
+                              className="w-full text-left rounded bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 px-1.5 py-0.5 text-[9.5px] font-semibold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 cursor-pointer truncate"
+                              title={packed.outOfRangeEntries
+                                .map(
+                                  (o) =>
+                                    `${formatDayShortLabel(o.startDateIso)}: ${o.entry.title}`
+                                )
+                                .join("\n")}
+                            >
+                              ↗ +{packed.outOfRangeEntries.length} tgl lain
+                            </button>
                           )}
                         </div>
 
@@ -1823,7 +1824,7 @@ export function JobdeskPlannerClient({
                           <div
                             className="grid absolute inset-0"
                             style={{
-                              gridTemplateColumns: `repeat(${plan.days.length}, minmax(185px, 1fr))`,
+                              gridTemplateColumns: `repeat(${plan.days.length}, minmax(130px, 1fr))`,
                             }}
                           >
                             {plan.days.map((day) => {
@@ -1863,9 +1864,9 @@ export function JobdeskPlannerClient({
 
                           {/* Layer 2: Kartu Spanning Multi-Hari + Tombol Tambah di Bawah */}
                           <div
-                            className="grid relative z-10 gap-y-1.5 p-2"
+                            className="grid relative z-10 gap-y-1.5 p-1.5 items-start"
                             style={{
-                              gridTemplateColumns: `repeat(${plan.days.length}, minmax(185px, 1fr))`,
+                              gridTemplateColumns: `repeat(${plan.days.length}, minmax(130px, 1fr))`,
                               gridTemplateRows: `repeat(${totalTrackRows}, auto)`,
                             }}
                           >
@@ -1916,9 +1917,9 @@ export function JobdeskPlannerClient({
                                       gridColumn: `${span.startColIdx + 1} / span ${effectiveColSpan}`,
                                       gridRow: trackIdx + 1,
                                     }}
-                                    className={`group/entry relative mx-0.5 rounded-xl border border-slate-200 dark:border-white/10 border-l-4 ${
+                                    className={`group/entry relative self-start mx-0.5 rounded-lg border border-slate-200 dark:border-white/10 border-l-4 ${
                                       catStyle.border
-                                    } px-2.5 py-2 text-xs shadow-2xs transition-shadow flex items-center justify-between gap-2 ${
+                                    } pl-2 pr-3 py-1.5 text-[11px] shadow-2xs transition-shadow flex flex-col gap-1 ${
                                       span.entry.done
                                         ? "bg-emerald-50/75 dark:bg-emerald-950/25 opacity-80"
                                         : `${catStyle.barBg} hover:shadow-sm`
@@ -1928,7 +1929,8 @@ export function JobdeskPlannerClient({
                                         : "cursor-grab active:cursor-grabbing"
                                     }`}
                                   >
-                                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                                    {/* Baris Atas: Checkbox + Judul Ringkas + Tombol Hapus */}
+                                    <div className="flex items-start gap-1.5 min-w-0">
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -1938,7 +1940,7 @@ export function JobdeskPlannerClient({
                                             span.entry.id
                                           )
                                         }
-                                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer ${
+                                        className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer ${
                                           span.entry.done
                                             ? "bg-emerald-500 border-emerald-500 text-white"
                                             : "border-slate-300 dark:border-white/25 bg-white dark:bg-[#12141a] hover:border-emerald-500"
@@ -1950,73 +1952,91 @@ export function JobdeskPlannerClient({
                                         )}
                                       </button>
 
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              openEditCellModal(
-                                                pic,
-                                                span.storageDayId,
-                                                span.startDateIso,
-                                                formatDayShortLabel(
-                                                  span.startDateIso
-                                                ),
-                                                span.entry
-                                              )
-                                            }
-                                            className={`text-left font-bold leading-snug hover:text-[#F05232] cursor-pointer ${
-                                              span.entry.done
-                                                ? "line-through text-slate-400"
-                                                : "text-slate-900 dark:text-slate-100"
-                                            }`}
-                                          >
-                                            {span.entry.title}
-                                          </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openEditCellModal(
+                                            pic,
+                                            span.storageDayId,
+                                            span.startDateIso,
+                                            formatDayShortLabel(
+                                              span.startDateIso
+                                            ),
+                                            span.entry
+                                          )
+                                        }
+                                        title={`${span.entry.title} (${formatDayShortLabel(
+                                          span.startDateIso
+                                        )}${
+                                          effectiveDaysCount > 1
+                                            ? ` → ${formatDayShortLabel(effectiveEndIso)}`
+                                            : ""
+                                        })`}
+                                        className={`flex-1 min-w-0 text-left font-bold leading-tight line-clamp-2 hover:text-[#F05232] cursor-pointer ${
+                                          span.entry.done
+                                            ? "line-through text-slate-400"
+                                            : "text-slate-900 dark:text-slate-100"
+                                        }`}
+                                      >
+                                        {span.entry.title}
+                                      </button>
 
-                                          {span.entry.urgent && (
-                                            <span className="inline-flex items-center gap-0.5 rounded bg-rose-100 dark:bg-rose-950/70 px-1.5 py-0.5 text-[9px] font-bold text-rose-700 dark:text-rose-300">
-                                              <Flame className="w-2.5 h-2.5" />
-                                              URGENT
-                                            </span>
-                                          )}
-
-                                          {(span.entry.syncedFromSchedule ||
-                                            span.entry.workItemId) && (
-                                            <span
-                                              className="inline-flex items-center gap-0.5 rounded bg-cyan-100 dark:bg-cyan-950/60 px-1.5 py-0.5 text-[9px] font-semibold text-cyan-800 dark:text-cyan-300"
-                                              title="Terhubung dengan Schedule Proyek"
-                                            >
-                                              <Link2 className="w-2.5 h-2.5" />
-                                              Schedule
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                                          <span>
-                                            {effectiveDaysCount > 1
-                                              ? `${formatDayShortLabel(
-                                                  span.startDateIso
-                                                )} → ${formatDayShortLabel(
-                                                  effectiveEndIso
-                                                )} (${effectiveDaysCount} hari kerja)`
-                                              : `${formatDayShortLabel(
-                                                  span.startDateIso
-                                                )} (1 hari)`}
-                                          </span>
-                                          {span.entry.note && (
-                                            <span className="italic truncate max-w-[180px]">
-                                              • {span.entry.note}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteCellEntry(
+                                            pic,
+                                            span.storageDayId,
+                                            span.entry.id
+                                          )
+                                        }
+                                        className="opacity-0 group-hover/entry:opacity-100 shrink-0 text-slate-400 hover:text-rose-500 p-0.5 rounded transition-opacity cursor-pointer"
+                                        title="Hapus dari jadwal"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
                                     </div>
 
-                                    {/* Quick -/+ Range & Resize Handle di Sisi Kanan */}
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <div className="flex items-center rounded-lg border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#12141a]/90 opacity-85 group-hover/entry:opacity-100">
+                                    {/* Baris Bawah: Badge Status & Stepper Range Ringkas */}
+                                    <div className="flex items-center justify-between gap-1 pl-5">
+                                      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                                        {span.entry.urgent && (
+                                          <span
+                                            className="inline-flex items-center gap-0.5 rounded bg-rose-100 dark:bg-rose-950/70 px-1 py-0.2 text-[9px] font-bold text-rose-700 dark:text-rose-300 shrink-0"
+                                            title="Pekerjaan Urgent"
+                                          >
+                                            <Flame className="w-2.5 h-2.5" />
+                                            Urg
+                                          </span>
+                                        )}
+
+                                        {(span.entry.syncedFromSchedule ||
+                                          span.entry.workItemId) && (
+                                          <span
+                                            className="inline-flex items-center gap-0.5 rounded bg-cyan-100 dark:bg-cyan-950/60 px-1 py-0.2 text-[9px] font-semibold text-cyan-800 dark:text-cyan-300 shrink-0"
+                                            title="Terhubung dengan Schedule Proyek"
+                                          >
+                                            <Link2 className="w-2.5 h-2.5" />
+                                            Sync
+                                          </span>
+                                        )}
+
+                                        {effectiveDaysCount > 1 && (
+                                          <span className="text-[9.5px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                                            {formatDayShortLabel(span.startDateIso).replace(
+                                              /^[A-Za-z]+,\s*/,
+                                              ""
+                                            )}
+                                            →
+                                            {formatDayShortLabel(effectiveEndIso).replace(
+                                              /^[A-Za-z]+,\s*/,
+                                              ""
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center rounded border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#12141a]/90 shrink-0">
                                         <button
                                           type="button"
                                           onClick={(ev) => {
@@ -2030,12 +2050,12 @@ export function JobdeskPlannerClient({
                                             );
                                           }}
                                           disabled={effectiveDaysCount <= 1}
-                                          className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 cursor-pointer"
+                                          className="p-0.5 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 cursor-pointer"
                                           title="Kurangi 1 hari kerja"
                                         >
-                                          <Minus className="w-3 h-3" />
+                                          <Minus className="w-2.5 h-2.5" />
                                         </button>
-                                        <span className="px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                        <span className="px-1 text-[9.5px] font-bold text-slate-600 dark:text-slate-300">
                                           {effectiveDaysCount}h
                                         </span>
                                         <button
@@ -2050,49 +2070,34 @@ export function JobdeskPlannerClient({
                                               1
                                             );
                                           }}
-                                          className="p-1 text-slate-500 hover:text-[#F05232] cursor-pointer"
+                                          className="p-0.5 text-slate-500 hover:text-[#F05232] cursor-pointer"
                                           title="Perpanjang +1 hari kerja"
                                         >
-                                          <Plus className="w-3 h-3" />
+                                          <Plus className="w-2.5 h-2.5" />
                                         </button>
                                       </div>
+                                    </div>
 
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleDeleteCellEntry(
-                                            pic,
-                                            span.storageDayId,
-                                            span.entry.id
-                                          )
-                                        }
-                                        className="opacity-0 group-hover/entry:opacity-100 text-slate-400 hover:text-rose-500 p-1 rounded transition-opacity cursor-pointer"
-                                        title="Hapus dari jadwal"
-                                      >
-                                        <X className="w-3.5 h-3.5" />
-                                      </button>
-
-                                      {/* Handle Tarik Range Horizontal */}
-                                      <div
-                                        onPointerDown={(ev) => {
-                                          ev.preventDefault();
-                                          ev.stopPropagation();
-                                          setResizeState({
-                                            pic,
-                                            storageDayId: span.storageDayId,
-                                            entryId: span.entry.id,
-                                            startDateIso: span.startDateIso,
-                                            startColIdx: span.startColIdx,
-                                            urgent: Boolean(span.entry.urgent),
-                                            previewEndIso: span.endDateIso,
-                                            previewEndColIdx: span.endColIdx,
-                                          });
-                                        }}
-                                        title="Tarik ke kanan untuk memperpanjang range hari"
-                                        className="h-7 w-2.5 rounded-r-md bg-slate-300/70 dark:bg-white/15 hover:bg-[#F05232] hover:text-white flex items-center justify-center cursor-ew-resize transition-colors"
-                                      >
-                                        <span className="w-0.5 h-3.5 bg-current rounded-full opacity-60" />
-                                      </div>
+                                    {/* Handle Tarik Range Horizontal di Sisi Kanan */}
+                                    <div
+                                      onPointerDown={(ev) => {
+                                        ev.preventDefault();
+                                        ev.stopPropagation();
+                                        setResizeState({
+                                          pic,
+                                          storageDayId: span.storageDayId,
+                                          entryId: span.entry.id,
+                                          startDateIso: span.startDateIso,
+                                          startColIdx: span.startColIdx,
+                                          urgent: Boolean(span.entry.urgent),
+                                          previewEndIso: span.endDateIso,
+                                          previewEndColIdx: span.endColIdx,
+                                        });
+                                      }}
+                                      title="Tarik ke kanan untuk memperpanjang range hari"
+                                      className="absolute right-0 top-1 bottom-1 w-2 rounded-r bg-slate-300/60 dark:bg-white/15 hover:bg-[#F05232] flex items-center justify-center cursor-ew-resize transition-colors"
+                                    >
+                                      <span className="w-0.5 h-3 bg-current rounded-full opacity-60" />
                                     </div>
                                   </div>
                                 );
