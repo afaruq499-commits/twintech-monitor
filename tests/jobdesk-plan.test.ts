@@ -10,6 +10,7 @@ import {
   DEFAULT_SUB_JOBDESK_NOTE,
   expandWorkingDateRange,
   extractAvailableProjectJobdesks,
+  extractJobdeskTasksForDate,
   formatDayShortLabel,
   generateConsecutiveDayColumns,
   isWeekendIso,
@@ -392,5 +393,70 @@ describe("jobdesk-plan helpers, range-days, weekend skip, Schedule Proyek sync &
     expect(fullSheetText).toContain("1. HMI TBU-1105");
     expect(fullSheetText).toContain("2. HMI MTM-1015");
     expect(fullSheetText).toContain(DEFAULT_SUB_JOBDESK_NOTE);
+  });
+
+  it("extracts active Pembagian Jobdesk tasks on today's date for Dashboard team delegation without duplicating schedule cells", () => {
+    const plan = createDefaultJobdeskPlanData("2026-11-26", 5, true);
+    plan.cells["Faruq"] = {
+      "day-2026-11-26": [
+        {
+          id: "j-faruq-1",
+          title: "Penambahan Program Auto Stop Panasonic",
+          category: "PROGRAM",
+          startDateIso: "2026-11-26",
+          endDateIso: "2026-11-26",
+        },
+        {
+          id: "j-faruq-dup",
+          title: "Program PLC Existing",
+          category: "PROGRAM",
+          workItemId: "wi-already",
+          startDateIso: "2026-11-26",
+          endDateIso: "2026-11-27",
+        },
+      ],
+    };
+    plan.cells["Ijlal"] = {
+      "day-2026-11-26": [
+        {
+          id: "j-ijlal-1",
+          title: "HMI 26 MTM 1015",
+          category: "HMI",
+          startDateIso: "2026-11-26",
+          endDateIso: "2026-11-27", // Menjangkau 26 dan 27 Nov
+        },
+      ],
+    };
+
+    const tasksToday = extractJobdeskTasksForDate(
+      plan,
+      "2026-11-26",
+      new Map(),
+      [
+        {
+          workItemId: "wi-already",
+          workItemJudul: "Program PLC Existing",
+          workItemPic: "Faruq",
+        },
+      ]
+    );
+
+    // j-faruq-dup dideduplikasi karena wi-already sudah ada di Schedule Faruq hari ini
+    expect(tasksToday).toHaveLength(2);
+    expect(tasksToday.map((t) => `${t.workItemPic}:${t.workItemJudul}`)).toEqual([
+      "Faruq:Penambahan Program Auto Stop Panasonic",
+      "Ijlal:HMI 26 MTM 1015",
+    ]);
+    expect(tasksToday[1].source).toBe("JOBDESK");
+    expect(tasksToday[1].jobdeskEntryId).toBe("j-ijlal-1");
+
+    // Di tanggal 27 Nov, Ijlal masih punya tugas multi-hari HMI 26 MTM 1015
+    const tasksTomorrow = extractJobdeskTasksForDate(
+      plan,
+      "2026-11-27",
+      new Map(),
+      []
+    );
+    expect(tasksTomorrow.some((t) => t.workItemPic === "Ijlal")).toBe(true);
   });
 });

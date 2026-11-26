@@ -70,6 +70,10 @@ interface TaskItem {
   status: ScheduleCellStatus;
   warnaCustom?: string | null;
   catatan: string | null;
+  pointsCount?: number;
+  source?: "SCHEDULE" | "JOBDESK";
+  jobdeskPic?: string;
+  jobdeskEntryId?: string;
 }
 
 interface TopPriorityItem {
@@ -282,17 +286,28 @@ export function DashboardClient({
     setOptimisticStatusMap((prev) => ({ ...prev, [task.id]: nextStatus }));
 
     try {
-      const res = await fetch("/api/schedule/task-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cellId: task.id,
-          workItemId: task.workItemId,
-          tanggal: task.tanggal,
-          subScopeId: task.subScopeId,
-          status: nextStatus,
-        }),
-      });
+      const res =
+        task.source === "JOBDESK" && task.jobdeskEntryId
+          ? await fetch("/api/jobdesk-plan", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pic: task.jobdeskPic,
+                entryId: task.jobdeskEntryId,
+                done: nextStatus === "DONE",
+              }),
+            })
+          : await fetch("/api/schedule/task-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                cellId: task.id,
+                workItemId: task.workItemId,
+                tanggal: task.tanggal,
+                subScopeId: task.subScopeId,
+                status: nextStatus,
+              }),
+            });
       if (!res.ok) {
         setOptimisticStatusMap((prev) => {
           const next = { ...prev };
@@ -404,7 +419,10 @@ export function DashboardClient({
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0 flex-1">
-            <Link href={`/jadwal/lane/${task.laneId}`} className="block">
+            <Link
+              href={task.laneId ? `/jadwal/lane/${task.laneId}` : "/jobdesk"}
+              className="block"
+            >
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white dark:ring-[#16181f]"
@@ -413,6 +431,11 @@ export function DashboardClient({
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
                   {task.projectClient} • {task.laneNama}
                 </span>
+                {task.source === "JOBDESK" && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#F05232] text-[9px] font-extrabold shrink-0">
+                    Jobdesk
+                  </span>
+                )}
               </div>
               <div className="font-bold text-sm text-slate-900 dark:text-white leading-snug whitespace-pre-line group-hover:text-[#F05232] transition-colors">
                 {displayJudul}
@@ -737,7 +760,14 @@ export function DashboardClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link
+                href="/jobdesk"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#F05232]/30 bg-white dark:bg-[#1a1d24] hover:bg-[#F05232]/10 text-[#F05232] text-xs font-bold shadow-2xs transition"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                Pembagian Jobdesk
+              </Link>
               <Link
                 href="/jadwal/buat"
                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#141518] hover:bg-neutral-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-[#111216] text-xs font-bold shadow-xs transition"

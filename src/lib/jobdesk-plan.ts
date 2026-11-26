@@ -5,6 +5,8 @@ import {
   type ProjectPriority,
   type ProjectStatus,
   type PurchaseStatus,
+  type ScheduleCellStatus,
+  type WorkType,
 } from "@/lib/constants";
 import {
   addDaysIso,
@@ -1335,4 +1337,151 @@ export function autoDistributeUnassignedJobdesks(
     cells: nextCells,
     subJobdesks: nextSubs,
   };
+}
+
+export interface JobdeskDashboardTask {
+  id: string;
+  workItemId: string;
+  workItemJudul: string;
+  workItemPic: string | null;
+  workItemUrutan: number | null;
+  subScopeId: string | null;
+  subScopeJudul: string | null;
+  subScopeUrutan: number | null;
+  jenis: WorkType;
+  bolehParalel: boolean;
+  laneId: string;
+  laneNama: string;
+  projectId: string;
+  projectNama: string;
+  projectClient: string;
+  projectWarna: string;
+  tanggal: string;
+  status: ScheduleCellStatus;
+  warnaCustom: string | null;
+  catatan: string | null;
+  pointsCount: number;
+  source: "JOBDESK";
+  jobdeskPic: string;
+  jobdeskEntryId: string;
+}
+
+function mapJobdeskCategoryToWorkType(category: JobdeskCategory): WorkType {
+  if (category === "PROGRAM" || category === "HMI") return "PROGRAMMING";
+  if (category === "WIRING") return "WIRING";
+  return "LAINNYA";
+}
+
+function defaultPicColor(picName: string): string {
+  const found = SYSTEM_PICS.find(
+    (p) => p.value.toLowerCase() === picName.trim().toLowerCase()
+  );
+  return found?.color ?? "#64748b";
+}
+
+function doesPicMatchString(rawPic: string | null | undefined, targetPic: string): boolean {
+  if (!rawPic) return false;
+  const target = targetPic.trim().toLowerCase();
+  const tokens = rawPic
+    .toLowerCase()
+    .split(/[,/&+]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return tokens.includes(target);
+}
+
+/**
+ * Mengambil seluruh tugas pada `Pembagian Jobdesk` yang aktif pada `targetDateIso`
+ * untuk digabungkan ke Dashboard (`Delegasi Pekerjaan Tim & Penjadwalan` dan `Agenda Hari Ini/Besok`)
+ * tanpa menduplikasi item yang sudah ada di Schedule Proyek pada tanggal dan PIC yang sama.
+ */
+export function extractJobdeskTasksForDate(
+  plan: JobdeskPlanData,
+  targetDateIso: string,
+  projectsById: Map<
+    string,
+    { nama: string; client: string; warna: string; kode?: string | null }
+  >,
+  existingScheduleTasks: {
+    workItemId?: string | null;
+    workItemJudul: string;
+    workItemPic?: string | null;
+  }[] = []
+): JobdeskDashboardTask[] {
+  const dayDateById = new Map(plan.days.map((d) => [d.id, d.dateIso]));
+  const result: JobdeskDashboardTask[] = [];
+
+  for (const pic of plan.pics) {
+    const picRow = plan.cells[pic];
+    if (!picRow) continue;
+
+    for (const [dayId, list] of Object.entries(picRow)) {
+      const fallbackIso =
+        dayDateById.get(dayId) ??
+        (dayId.startsWith("day-") ? dayId.slice(4, 14) : plan.startDateIso);
+
+      for (const entry of list) {
+        const range = getEntryDateRange(entry, fallbackIso);
+        const activeDates = expandWorkingDateRange(
+          range.startIso,
+          range.endIso,
+          Boolean(entry.urgent)
+        );
+        if (!activeDates.includes(targetDateIso)) continue;
+
+        const linkedWiId =
+          entry.workItemId ||
+          (entry.sourceKey?.startsWith("wi:") ? entry.sourceKey.slice(3) : null);
+
+        // Cegah duplikasi jika tugas Schedule Proyek yang sama sudah muncul untuk PIC & tanggal ini
+        const alreadyInSchedule = existingScheduleTasks.some((t) => {
+          if (!doesPicMatchString(t.workItemPic, pic)) return false;
+          if (linkedWiId && t.workItemId === linkedWiId) return true;
+          return (
+            t.workItemJudul.trim().toLowerCase() ===
+            entry.title.trim().toLowerCase()
+          );
+        });
+        if (alreadyInSchedule) continue;
+
+        const proj = entry.projectId ? projectsById.get(entry.projectId) : undefined;
+        const picColor = defaultPicColor(pic);
+
+        result.push({
+          id: `jobdesk:${pic}:${entry.id}`,
+          workItemId: linkedWiId ?? "",
+          workItemJudul: entry.title,
+          workItemPic: pic,
+          workItemUrutan: 999,
+          subScopeId: null,
+          subScopeJudul: null,
+          subScopeUrutan: null,
+          jenis: mapJobdeskCategoryToWorkType(entry.category),
+          bolehParalel: true,
+          laneId: "",
+          laneNama: "Pembagian Jobdesk",
+          projectId: entry.projectId ?? "",
+          projectNama:
+            proj?.nama || entry.projectName || "Pembagian Jobdesk Harian",
+          projectClient:
+            proj?.client || entry.projectCode || "Tim Engineering",
+          projectWarna: proj?.warna || picColor,
+          tanggal: targetDateIso,
+          status: entry.done ? "DONE" : "ON_PROGRESS",
+          warnaCustom: null,
+          catatan: entry.urgent
+            ? entry.note
+              ? `URGENT • ${entry.note}`
+              : "URGENT"
+            : entry.note ?? null,
+          pointsCount: 1,
+          source: "JOBDESK",
+          jobdeskPic: pic,
+          jobdeskEntryId: entry.id,
+        });
+      }
+    }
+  }
+
+  return result;
 }

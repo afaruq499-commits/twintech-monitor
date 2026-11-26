@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { jobdeskPlanDataSchema } from "@/lib/jobdesk-plan";
+import {
+  jobdeskPlanDataSchema,
+  parseJobdeskPlanJson,
+} from "@/lib/jobdesk-plan";
 import {
   loadSyncedJobdeskBundle,
   syncJobdeskPlanBackToSchedule,
@@ -76,6 +79,76 @@ export async function PUT(request: Request) {
     console.error("PUT /api/jobdesk-plan error:", err);
     return NextResponse.json(
       { error: "Gagal menyimpan pembagian jobdesk." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const entryId = typeof body?.entryId === "string" ? body.entryId : "";
+    const pic = typeof body?.pic === "string" ? body.pic : "";
+    const done = Boolean(body?.done);
+
+    if (!entryId) {
+      return NextResponse.json(
+        { error: "Parameter entryId wajib diisi." },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.jobdeskPlan.findUnique({
+      where: { id: "default" },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Data pembagian jobdesk belum ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    const plan = parseJobdeskPlanJson(existing.dataJson, existing.judul);
+    let found = false;
+
+    const picKeys = pic && plan.cells[pic] ? [pic] : Object.keys(plan.cells);
+    for (const pKey of picKeys) {
+      const row = plan.cells[pKey];
+      if (!row) continue;
+      for (const [dayId, list] of Object.entries(row)) {
+        row[dayId] = list.map((e) => {
+          if (e.id === entryId) {
+            found = true;
+            return { ...e, done };
+          }
+          return e;
+        });
+      }
+    }
+
+    if (!found) {
+      return NextResponse.json(
+        { error: "Item tugas pembagian jobdesk tidak ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    const sessionUser = await getSessionUser();
+    await prisma.jobdeskPlan.update({
+      where: { id: "default" },
+      data: {
+        dataJson: JSON.stringify(plan),
+        updatedByName: sessionUser?.nama ?? existing.updatedByName,
+      },
+    });
+
+    await syncJobdeskPlanBackToSchedule(plan).catch(() => {});
+
+    return NextResponse.json({ ok: true, entryId, done });
+  } catch (err) {
+    console.error("PATCH /api/jobdesk-plan error:", err);
+    return NextResponse.json(
+      { error: "Gagal memperbarui status tugas pembagian jobdesk." },
       { status: 500 }
     );
   }

@@ -24,6 +24,10 @@ import {
   PROJECT_CHECKLIST_KEYS,
   type ProjectChecklistKey,
 } from "@/lib/project-checklist";
+import {
+  extractJobdeskTasksForDate,
+  parseJobdeskPlanJson,
+} from "@/lib/jobdesk-plan";
 
 export interface AppSettingsDTO extends ConflictSettings {
   namaPerusahaan: string;
@@ -379,7 +383,7 @@ export async function getDashboardSummary() {
   const tomorrowIso = addDaysIso(todayIso, 1);
   const next7Iso = addDaysIso(todayIso, 6);
 
-  const [projects, allCells, dismissals] = await Promise.all([
+  const [projects, allCells, dismissals, jobdeskRow] = await Promise.all([
     prisma.project.findMany({
       include: {
         components: true,
@@ -411,6 +415,9 @@ export async function getDashboardSummary() {
       orderBy: { tanggal: "asc" },
     }),
     prisma.alertDismissal.findMany(),
+    prisma.jobdeskPlan
+      .findUnique({ where: { id: "default" } })
+      .catch(() => null),
   ]);
 
   const dismissedKeys = new Set(dismissals.map((d) => d.alertKey));
@@ -616,12 +623,52 @@ export async function getDashboardSummary() {
       });
   }
 
-  const todayTasks = groupCellsBySubScope(
+  const scheduleTodayTasks = groupCellsBySubScope(
     normalizedCells.filter((c) => c.tanggal === todayIso)
   );
-  const tomorrowTasks = groupCellsBySubScope(
+  const scheduleTomorrowTasks = groupCellsBySubScope(
     normalizedCells.filter((c) => c.tanggal === tomorrowIso)
   );
+
+  const parsedJobdeskPlan = jobdeskRow
+    ? parseJobdeskPlanJson(jobdeskRow.dataJson, jobdeskRow.judul)
+    : null;
+  const projectMetaById = new Map(
+    projects.map((p) => [
+      p.id,
+      { nama: p.nama, client: p.client, warna: p.warna, kode: p.kode },
+    ])
+  );
+
+  const jobdeskTodayTasks = parsedJobdeskPlan
+    ? extractJobdeskTasksForDate(
+        parsedJobdeskPlan,
+        todayIso,
+        projectMetaById,
+        scheduleTodayTasks
+      )
+    : [];
+  const jobdeskTomorrowTasks = parsedJobdeskPlan
+    ? extractJobdeskTasksForDate(
+        parsedJobdeskPlan,
+        tomorrowIso,
+        projectMetaById,
+        scheduleTomorrowTasks
+      )
+    : [];
+
+  type DashboardTaskItem =
+    | (typeof scheduleTodayTasks)[number]
+    | (typeof jobdeskTodayTasks)[number];
+
+  const todayTasks: DashboardTaskItem[] = [
+    ...scheduleTodayTasks,
+    ...jobdeskTodayTasks,
+  ];
+  const tomorrowTasks: DashboardTaskItem[] = [
+    ...scheduleTomorrowTasks,
+    ...jobdeskTomorrowTasks,
+  ];
   const next7DaysTasks = normalizedCells.filter(
     (c) => c.tanggal >= todayIso && c.tanggal <= next7Iso
   );
@@ -710,9 +757,18 @@ export async function getDashboardSummary() {
     const dateIso = addDaysIso(todayIso, offset);
     const [y, m, d] = dateIso.split("-").map(Number);
     const utcDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    const dayTasks = groupCellsBySubScope(
+    const schedDayTasks = groupCellsBySubScope(
       normalizedCells.filter((c) => c.tanggal === dateIso)
     );
+    const jobdeskDayTasks = parsedJobdeskPlan
+      ? extractJobdeskTasksForDate(
+          parsedJobdeskPlan,
+          dateIso,
+          projectMetaById,
+          schedDayTasks
+        )
+      : [];
+    const dayTasks = [...schedDayTasks, ...jobdeskDayTasks];
     let doneCount = 0;
     let delayCount = 0;
     let activeCount = 0;
