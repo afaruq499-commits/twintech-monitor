@@ -5007,30 +5007,81 @@ export function ProjectControlPanelLayoutEditor({
                         </>
                       )}
 
-                      {/* Detail Visual: COOLING / EXHAUST FAN + FILTER GRILLE */}
-                      {it.category === "FAN" && (
-                        <>
-                          <rect x="2" y="2" width={it.widthMm - 4} height={it.heightMm - 4} fill="#cbd5e1" stroke="#64748b" strokeWidth="1" rx="2" />
-                          <circle cx={it.widthMm / 2} cy={it.heightMm / 2} r={Math.min(it.widthMm, it.heightMm) * 0.36} fill="#334155" stroke="#475569" strokeWidth="1.5" />
-                          {[0, 45, 90, 135].map((deg) => (
+                      {/* Detail Visual: LUBANG CUTOUT FAN (Ø115 + 4× Ø5 pitch 105×105) */}
+                      {it.category === "FAN" && (() => {
+                        const base = Math.min(it.widthMm, it.heightMm);
+                        const cx = it.widthMm / 2;
+                        const cy = it.heightMm / 2;
+                        const rCutout = base >= 115 && base <= 125 ? 57.5 : base * 0.45;
+                        const hp = base >= 115 && base <= 125 ? 52.5 : base * 0.43;
+                        const rScrew = 2.5;
+                        return (
+                          <>
                             <rect
-                              key={deg}
-                              x={it.widthMm / 2 - 2.5}
-                              y={it.heightMm / 2 - Math.min(it.widthMm, it.heightMm) * 0.3}
-                              width="5"
-                              height={Math.min(it.widthMm, it.heightMm) * 0.6}
-                              fill="#94a3b8"
-                              opacity="0.7"
-                              rx="2"
-                              transform={`rotate(${deg}, ${it.widthMm / 2}, ${it.heightMm / 2})`}
+                              x="0.5"
+                              y="0.5"
+                              width={it.widthMm - 1}
+                              height={it.heightMm - 1}
+                              fill="transparent"
+                              stroke="#94a3b8"
+                              strokeWidth="0.6"
+                              strokeDasharray="3 3"
                             />
-                          ))}
-                          <circle cx={it.widthMm / 2} cy={it.heightMm / 2} r="7" fill="#0f172a" />
-                          <text x={it.widthMm / 2} y={it.heightMm - 6} textAnchor="middle" fontSize="6.5" fill="#0f172a" fontWeight="extrabold">
-                            {it.tagLabel || "FAN"}
-                          </text>
-                        </>
-                      )}
+                            <line
+                              x1={cx - rCutout - 6}
+                              y1={cy}
+                              x2={cx + rCutout + 6}
+                              y2={cy}
+                              stroke="#64748b"
+                              strokeWidth="0.6"
+                              strokeDasharray="4 2 1 2"
+                            />
+                            <line
+                              x1={cx}
+                              y1={cy - rCutout - 6}
+                              x2={cx}
+                              y2={cy + rCutout + 6}
+                              stroke="#64748b"
+                              strokeWidth="0.6"
+                              strokeDasharray="4 2 1 2"
+                            />
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={rCutout}
+                              fill="#1e293b"
+                              stroke="#38bdf8"
+                              strokeWidth="1.5"
+                            />
+                            {[
+                              [-hp, -hp],
+                              [hp, -hp],
+                              [-hp, hp],
+                              [hp, hp],
+                            ].map(([dx, dy], idx) => (
+                              <circle
+                                key={idx}
+                                cx={cx + dx}
+                                cy={cy + dy}
+                                r={rScrew}
+                                fill="#0f172a"
+                                stroke="#38bdf8"
+                                strokeWidth="1"
+                              />
+                            ))}
+                            <text
+                              x={cx}
+                              y={cy + 2.5}
+                              textAnchor="middle"
+                              fontSize="7"
+                              fill="#e2e8f0"
+                              fontWeight="extrabold"
+                            >
+                              Ø{Math.round(rCutout * 2)}
+                            </text>
+                          </>
+                        );
+                      })()}
 
                       {/* Detail Visual: AKSESORIS (DIN Stopper End Clamp / Ground Busbar) */}
                       {it.category === "ACCESSORY" && (

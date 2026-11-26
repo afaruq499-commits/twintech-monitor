@@ -19,9 +19,10 @@ import {
   downloadDxfFile,
   type DxfProjectMetadata,
 } from "@/lib/export/panel-dxf-generator";
-import type {
-  PanelLayoutItem,
-  OuterPanelLayoutData,
+import {
+  resolveFanCutoutPosition,
+  type PanelLayoutItem,
+  type OuterPanelLayoutData,
 } from "@/lib/panel-layout-template";
 
 interface PanelDrawingSheetModalProps {
@@ -835,9 +836,17 @@ export function PanelDrawingSheetModal({
                     const lotoy = fy - sh + (feat.lotoY ?? 110) * s;
 
                     const fanSizeMm = feat.fanSizeMm || 120;
-                    const fanX = sx + Math.max(8, (outerD - fanSizeMm) / 2) * s;
-                    const fanY = sy - sh + (feat.fanY ?? 90) * s;
-                    const fanW = fanSizeMm * s;
+                    const fanPos = resolveFanCutoutPosition(
+                      outerD,
+                      outerH,
+                      fanSizeMm,
+                      feat.fanY
+                    );
+                    const fanCx = sx + fanPos.cxFromEdgeMm * s;
+                    const fanCy = sy - sh + fanPos.cyFromTopMm * s;
+                    const fanRMain = (fanPos.spec.cutoutDiaMm / 2) * s;
+                    const fanRScrew = (fanPos.spec.screwHoleDiaMm / 2) * s;
+                    const fanHalfPitch = fanPos.spec.halfPitchMm * s;
 
                     return (
                       <g id="outer-panel-sheet-drawing">
@@ -1118,69 +1127,216 @@ export function PanelDrawingSheetModal({
                           />
                         )}
 
-                        {/* 5. Cooling Fan Louver */}
+                        {/* 5. Lubang Fan Bulat (Ø115 + 4× Ø5 pitch 105×105 mm) */}
                         {feat.hasFan && (
                           <g id="sheet-fan-louver">
-                            <rect
-                              x={fanX}
-                              y={fanY}
-                              width={fanW}
-                              height={fanW}
+                            {/* Garis sumbu tengah */}
+                            <line
+                              x1={fanCx - fanRMain - 14}
+                              y1={fanCy}
+                              x2={fanCx + fanRMain + 14}
+                              y2={fanCy}
+                              stroke="#64748b"
+                              strokeWidth="0.6"
+                              strokeDasharray="4 2 1 2"
+                            />
+                            <line
+                              x1={fanCx}
+                              y1={fanCy - fanRMain - 14}
+                              x2={fanCx}
+                              y2={fanCy + fanRMain + 14}
+                              stroke="#64748b"
+                              strokeWidth="0.6"
+                              strokeDasharray="4 2 1 2"
+                            />
+
+                            {/* Lubang Potong Utama Ø115 */}
+                            <circle
+                              cx={fanCx}
+                              cy={fanCy}
+                              r={fanRMain}
                               fill="#ffffff"
                               stroke="#000000"
-                              strokeWidth="1.5"
+                              strokeWidth="1.3"
                             />
-                            <rect
-                              x={fanX + 4 * s}
-                              y={fanY + 4 * s}
-                              width={fanW - 8 * s}
-                              height={fanW - 8 * s}
-                              fill="#f1f5f9"
+
+                            {/* 4 Lubang Baut Ø5 pada jarak 105×105 mm */}
+                            {[
+                              [-fanHalfPitch, -fanHalfPitch],
+                              [fanHalfPitch, -fanHalfPitch],
+                              [-fanHalfPitch, fanHalfPitch],
+                              [fanHalfPitch, fanHalfPitch],
+                            ].map(([dx, dy], idx) => (
+                              <circle
+                                key={`sheet-fan-bolt-${idx}`}
+                                cx={fanCx + dx}
+                                cy={fanCy + dy}
+                                r={fanRScrew}
+                                fill="#ffffff"
+                                stroke="#000000"
+                                strokeWidth="1.0"
+                              />
+                            ))}
+
+                            {/* Dimensi Pitch Vertikal 105 (kiri) */}
+                            <line
+                              x1={fanCx - fanHalfPitch - 14}
+                              y1={fanCy - fanHalfPitch}
+                              x2={fanCx - fanHalfPitch - 14}
+                              y2={fanCy + fanHalfPitch}
+                              stroke="#000000"
+                              strokeWidth="0.7"
+                            />
+                            <line
+                              x1={fanCx - fanHalfPitch - 17}
+                              y1={fanCy - fanHalfPitch}
+                              x2={fanCx - fanHalfPitch}
+                              y2={fanCy - fanHalfPitch}
+                              stroke="#000000"
+                              strokeWidth="0.5"
+                            />
+                            <line
+                              x1={fanCx - fanHalfPitch - 17}
+                              y1={fanCy + fanHalfPitch}
+                              x2={fanCx - fanHalfPitch}
+                              y2={fanCy + fanHalfPitch}
+                              stroke="#000000"
+                              strokeWidth="0.5"
+                            />
+                            <text
+                              x={fanCx - fanHalfPitch - 17}
+                              y={fanCy}
+                              textAnchor="middle"
+                              fontSize="8"
+                              fill="#000000"
+                              transform={`rotate(-90 ${fanCx - fanHalfPitch - 17} ${fanCy})`}
+                            >
+                              {fanPos.spec.holePitchMm}
+                            </text>
+
+                            {/* Dimensi Pitch Horizontal 105 (bawah) */}
+                            <line
+                              x1={fanCx - fanHalfPitch}
+                              y1={fanCy + fanHalfPitch + 14}
+                              x2={fanCx + fanHalfPitch}
+                              y2={fanCy + fanHalfPitch + 14}
+                              stroke="#000000"
+                              strokeWidth="0.7"
+                            />
+                            <line
+                              x1={fanCx - fanHalfPitch}
+                              y1={fanCy + fanHalfPitch}
+                              x2={fanCx - fanHalfPitch}
+                              y2={fanCy + fanHalfPitch + 17}
+                              stroke="#000000"
+                              strokeWidth="0.5"
+                            />
+                            <line
+                              x1={fanCx + fanHalfPitch}
+                              y1={fanCy + fanHalfPitch}
+                              x2={fanCx + fanHalfPitch}
+                              y2={fanCy + fanHalfPitch + 17}
+                              stroke="#000000"
+                              strokeWidth="0.5"
+                            />
+                            <text
+                              x={fanCx}
+                              y={fanCy + fanHalfPitch + 25}
+                              textAnchor="middle"
+                              fontSize="8"
+                              fill="#000000"
+                            >
+                              {fanPos.spec.holePitchMm}
+                            </text>
+
+                            {/* Dimensi Dari Tepi Atas ke Lubang Baut & Center (kanan) */}
+                            <line
+                              x1={sx + sd + 12}
+                              y1={sy - sh}
+                              x2={sx + sd + 12}
+                              y2={fanCy - fanHalfPitch}
+                              stroke="#000000"
+                              strokeWidth="0.6"
+                            />
+                            <text
+                              x={sx + sd + 16}
+                              y={(sy - sh + (fanCy - fanHalfPitch)) / 2}
+                              fontSize="7.5"
+                              fill="#000000"
+                              transform={`rotate(-90 ${sx + sd + 16} ${(sy - sh + (fanCy - fanHalfPitch)) / 2})`}
+                            >
+                              {String(fanPos.topToUpperHoleMm).replace(".", ",")}
+                            </text>
+                            <line
+                              x1={sx + sd + 26}
+                              y1={sy - sh}
+                              x2={sx + sd + 26}
+                              y2={fanCy}
+                              stroke="#000000"
+                              strokeWidth="0.6"
+                            />
+                            <text
+                              x={sx + sd + 30}
+                              y={(sy - sh + fanCy) / 2}
+                              fontSize="7.5"
+                              fill="#000000"
+                              transform={`rotate(-90 ${sx + sd + 30} ${(sy - sh + fanCy) / 2})`}
+                            >
+                              {String(fanPos.cyFromTopMm).replace(".", ",")}
+                            </text>
+
+                            {/* Leader Ø115 */}
+                            <line
+                              x1={fanCx - fanRMain * 0.45}
+                              y1={fanCy - fanRMain * 0.9}
+                              x2={fanCx - fanRMain - 14}
+                              y2={fanCy - fanRMain - 24}
                               stroke="#000000"
                               strokeWidth="0.8"
                             />
-                            {[1, 2, 3, 4, 5, 6].map((idx) => {
-                              const slatY = fanY + 4 * s + idx * ((fanW - 8 * s) / 7);
-                              return (
-                                <line
-                                  key={`slat-${idx}`}
-                                  x1={fanX + 6 * s}
-                                  y1={slatY}
-                                  x2={fanX + fanW - 6 * s}
-                                  y2={slatY}
-                                  stroke="#000000"
-                                  strokeWidth="0.8"
-                                />
-                              );
-                            })}
                             <line
-                              x1={fanX + fanW}
-                              y1={fanY + fanW / 2}
-                              x2={fanX + fanW + 35}
-                              y2={fanY - 25}
+                              x1={fanCx - fanRMain - 14}
+                              y1={fanCy - fanRMain - 24}
+                              x2={fanCx - fanRMain - 54}
+                              y2={fanCy - fanRMain - 24}
                               stroke="#000000"
-                              strokeWidth="1.0"
-                            />
-                            <line
-                              x1={fanX + fanW + 35}
-                              y1={fanY - 25}
-                              x2={fanX + fanW + 140}
-                              y2={fanY - 25}
-                              stroke="#000000"
-                              strokeWidth="1.0"
-                            />
-                            <polygon
-                              points={`${fanX + fanW},${fanY + fanW / 2} ${fanX + fanW + 6},${fanY + fanW / 2 - 3} ${fanX + fanW + 6},${fanY + fanW / 2 + 3}`}
-                              fill="#000000"
+                              strokeWidth="0.8"
                             />
                             <text
-                              x={fanX + fanW + 38}
-                              y={fanY - 28}
-                              fontSize="9.5"
+                              x={fanCx - fanRMain - 52}
+                              y={fanCy - fanRMain - 27}
+                              fontSize="8.5"
                               fontWeight="bold"
                               fill="#000000"
                             >
-                              FAN FILTER {fanSizeMm}×{fanSizeMm} MM
+                              Ø{fanPos.spec.cutoutDiaMm}
+                            </text>
+
+                            {/* Leader Ø5 */}
+                            <line
+                              x1={fanCx + fanHalfPitch + fanRScrew * 0.7}
+                              y1={fanCy + fanHalfPitch + fanRScrew * 0.7}
+                              x2={fanCx + fanHalfPitch + 12}
+                              y2={fanCy + fanHalfPitch + 14}
+                              stroke="#000000"
+                              strokeWidth="0.8"
+                            />
+                            <line
+                              x1={fanCx + fanHalfPitch + 12}
+                              y1={fanCy + fanHalfPitch + 14}
+                              x2={fanCx + fanHalfPitch + 38}
+                              y2={fanCy + fanHalfPitch + 14}
+                              stroke="#000000"
+                              strokeWidth="0.8"
+                            />
+                            <text
+                              x={fanCx + fanHalfPitch + 15}
+                              y={fanCy + fanHalfPitch + 11}
+                              fontSize="8"
+                              fontWeight="bold"
+                              fill="#000000"
+                            >
+                              Ø{fanPos.spec.screwHoleDiaMm}
                             </text>
                           </g>
                         )}

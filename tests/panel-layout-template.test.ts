@@ -637,6 +637,7 @@ describe("FR-EG-EP-006 Panel Layout Auto-Template", () => {
       expect(dxf).toContain("2_LOCK_DOOR");
       expect(dxf).toContain("3_LOTO");
       expect(dxf).toContain("4_FAN_GRILL");
+      expect(dxf).toContain("Ø115 + 4x Ø5 (105x105)");
       expect(dxf).toContain("5_DIMENSIONS");
       expect(dxf).toContain("6_LEADERS");
       expect(dxf).toContain("7_TITLE_BLOCK");

@@ -88,6 +88,80 @@ export interface OuterPanelLayoutData {
   lastSaved?: string;
 }
 
+export interface FanCutoutSpec {
+  nominalSizeMm: number;
+  cutoutDiaMm: number;
+  holePitchMm: number;
+  halfPitchMm: number;
+  screwHoleDiaMm: number;
+}
+
+/**
+ * Menghasilkan spesifikasi standar lubang fan panel:
+ * untuk ukuran standar 120mm -> lubang potong tengah Ø115 mm + 4 lubang baut Ø5 mm (pitch 105×105 mm).
+ */
+export function getFanCutoutSpec(fanSizeMm: number = 120): FanCutoutSpec {
+  const nominal = Math.round(fanSizeMm || 120);
+  if (nominal <= 95) {
+    return {
+      nominalSizeMm: 92,
+      cutoutDiaMm: 86,
+      holePitchMm: 82.5,
+      halfPitchMm: 41.25,
+      screwHoleDiaMm: 4.5,
+    };
+  }
+  if (nominal >= 195) {
+    return {
+      nominalSizeMm: nominal,
+      cutoutDiaMm: nominal - 10,
+      holePitchMm: nominal - 25,
+      halfPitchMm: (nominal - 25) / 2,
+      screwHoleDiaMm: 6,
+    };
+  }
+  if (nominal >= 145) {
+    return {
+      nominalSizeMm: nominal,
+      cutoutDiaMm: nominal - 8,
+      holePitchMm: nominal - 18,
+      halfPitchMm: (nominal - 18) / 2,
+      screwHoleDiaMm: 5,
+    };
+  }
+  return {
+    nominalSizeMm: 120,
+    cutoutDiaMm: 115,
+    holePitchMm: 105,
+    halfPitchMm: 52.5,
+    screwHoleDiaMm: 5,
+  };
+}
+
+export function resolveFanCutoutPosition(
+  depthMm: number,
+  heightMm: number,
+  fanSizeMm: number = 120,
+  fanY?: number | null
+) {
+  const spec = getFanCutoutSpec(fanSizeMm);
+  const cxFromEdgeMm = Math.round((depthMm / 2) * 10) / 10;
+  const minCenterY = spec.cutoutDiaMm / 2 + 25;
+  const maxCenterY = Math.max(minCenterY, heightMm - spec.cutoutDiaMm / 2 - 25);
+  const rawCenterY =
+    fanY !== undefined && fanY !== null ? fanY + spec.cutoutDiaMm / 2 : 175;
+  const cyFromTopMm =
+    Math.round(Math.min(maxCenterY, Math.max(minCenterY, rawCenterY)) * 10) / 10;
+
+  return {
+    spec,
+    cxFromEdgeMm,
+    cyFromTopMm,
+    topToUpperHoleMm: Math.round((cyFromTopMm - spec.halfPitchMm) * 10) / 10,
+    edgeToInnerHoleMm: Math.round((cxFromEdgeMm - spec.halfPitchMm) * 10) / 10,
+  };
+}
+
 export interface PanelLayoutData {
   enclosure: PanelEnclosure;
   items: PanelLayoutItem[];
@@ -3841,7 +3915,7 @@ export function createDefaultOuterPanelLayout(
       hasFan: detected.hasFan,
       fanSizeMm: detected.fanSizeMm,
       fanSide: "RIGHT",
-      fanY: 100,
+      fanY: 117.5,
       fanLabel: detected.fanLabel,
     },
   };
@@ -4013,12 +4087,14 @@ export function parseDualPanelLayoutJson(
     }
 
     const filterMainItems = (items: PanelLayoutItem[]): PanelLayoutItem[] => {
-      return items.filter((it: any) => {
-        if (it?.category === "FAN") return false;
-        const tag = `${it?.tagLabel || ""} ${it?.partType || ""} ${it?.partName || ""}`.toUpperCase();
-        if (tag.includes("FAN") || tag.includes("XF1232") || tag.includes("COOLING")) return false;
-        return true;
-      });
+      return items.filter(
+        (it: PanelLayoutItem & { partType?: string; partName?: string }) => {
+          if (it?.category === "FAN") return false;
+          const tag = `${it?.tagLabel || ""} ${it?.partType || ""} ${it?.partName || ""}`.toUpperCase();
+          if (tag.includes("FAN") || tag.includes("XF1232") || tag.includes("COOLING")) return false;
+          return true;
+        }
+      );
     };
 
     let main: PanelLayoutData;

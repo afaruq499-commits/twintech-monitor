@@ -9,7 +9,12 @@
  * - Dimensi koordinat baseline (X dan Y)
  */
 
-import type { PanelLayoutItem, OuterPanelLayoutData } from "@/lib/panel-layout-template";
+import {
+  getFanCutoutSpec,
+  resolveFanCutoutPosition,
+  type PanelLayoutItem,
+  type OuterPanelLayoutData,
+} from "@/lib/panel-layout-template";
 
 export interface DxfProjectMetadata {
   kode: string; // e.g. "26-TBI-1023" atau "26-TBD-0513"
@@ -148,6 +153,38 @@ export function extractPanelFeatures(
         heightMm: cutoutH,
         label: it.tagLabel || it.name || "HMI CUTOUT",
       });
+    } else if (
+      (it.name || "").toLowerCase().includes("fan") ||
+      (it.tagLabel || "").toLowerCase().includes("fan")
+    ) {
+      // Lubang Fan bulat (Ø115 + 4× Ø5 pitch 105×105 mm untuk ukuran 120mm)
+      const spec = getFanCutoutSpec(Math.max(it.widthMm, it.heightMm));
+      const cxSvg = it.xMm + it.widthMm / 2;
+      const cySvg = it.yMm + it.heightMm / 2;
+      const cadX = Math.round(cxSvg * 10) / 10;
+      const cadY = Math.round((plateHeight - cySvg) * 10) / 10;
+
+      holes.push({
+        cx: cadX,
+        cy: cadY,
+        diameter: spec.cutoutDiaMm,
+        label: `FAN Ø${spec.cutoutDiaMm}`,
+      });
+
+      const hp = spec.halfPitchMm;
+      for (const [dx, dy] of [
+        [-hp, -hp],
+        [hp, -hp],
+        [-hp, hp],
+        [hp, hp],
+      ]) {
+        holes.push({
+          cx: Math.round((cadX + dx) * 10) / 10,
+          cy: Math.round((cadY + dy) * 10) / 10,
+          diameter: spec.screwHoleDiaMm,
+          label: `Ø${spec.screwHoleDiaMm}`,
+        });
+      }
     } else if (roundCategories.includes(it.category)) {
       // Komponen berlubang bulat pintu panel (tombol, selector, emergency stop, lampu)
       let diameter = 22; // Standar industri 22mm
@@ -1003,25 +1040,55 @@ export function generateOuterPanelDxf(
     addRect("3_LOTO", sideX - 24, lotoy - 20, sideX - 8, lotoy + 20, 1);
   }
 
-  // 5. Cooling Fan Louvre pada tampak samping
+  // 5. Lubang Cutout Fan Bulat (Ø115 + 4× Ø5 pitch 105×105) pada tampak samping
   if (hasFan) {
-    const fSize = fanSizeMm;
-    const fy = H - fanY - fSize;
-    const fx = sideX + Math.max(10, (D - fSize) / 2);
-    // Outer grill
-    addRect("4_FAN_GRILL", fx, fy, fx + fSize, fy + fSize, 6);
-    // Inner frame
-    addRect("4_FAN_GRILL", fx + 8, fy + 8, fx + fSize - 8, fy + fSize - 8, 6);
-    // Louvre slats
-    const slatStep = (fSize - 16) / 7;
-    for (let i = 1; i < 7; i++) {
-      const sy = fy + 8 + i * slatStep;
-      addLine("4_FAN_GRILL", fx + 10, sy, fx + fSize - 10, sy, 6);
+    const fanPos = resolveFanCutoutPosition(D, H, fanSizeMm, fanY);
+    const { spec } = fanPos;
+    const fanCx = sideX + fanPos.cxFromEdgeMm;
+    const fanCy = H - fanPos.cyFromTopMm;
+    const hp = spec.halfPitchMm;
+
+    // Lubang tengah utama Ø115
+    addCircle("4_FAN_GRILL", fanCx, fanCy, spec.cutoutDiaMm / 2, 6);
+
+    // 4 lubang baut sudut Ø5 (jarak 105×105)
+    for (const [dx, dy] of [
+      [-hp, -hp],
+      [hp, -hp],
+      [-hp, hp],
+      [hp, hp],
+    ]) {
+      addCircle(
+        "4_FAN_GRILL",
+        fanCx + dx,
+        fanCy + dy,
+        spec.screwHoleDiaMm / 2,
+        6
+      );
     }
-    // Leader line
-    addLine("6_LEADERS", fx + fSize / 2, fy + fSize, fx + fSize / 2 + 30, fy + fSize + 40, 4);
-    addLine("6_LEADERS", fx + fSize / 2 + 30, fy + fSize + 40, fx + fSize / 2 + 120, fy + fSize + 40, 4);
-    addText("6_LEADERS", fx + fSize / 2 + 35, fy + fSize + 43, 4.0, fanLabel, 0, 4);
+
+    // Garis sumbu tengah
+    const ext = spec.cutoutDiaMm / 2 + 15;
+    addLine("4_FAN_GRILL", fanCx - ext, fanCy, fanCx + ext, fanCy, 6);
+    addLine("4_FAN_GRILL", fanCx, fanCy - ext, fanCx, fanCy + ext, 6);
+
+    // Dimensi pitch 105×105 & leader Ø115 / Ø5
+    addLine("5_DIMENSIONS", fanCx - hp, fanCy - hp - 18, fanCx + hp, fanCy - hp - 18, 2);
+    addText("5_DIMENSIONS", fanCx - 6, fanCy - hp - 25, 4.0, `${spec.holePitchMm}`, 0, 2);
+    addLine("5_DIMENSIONS", fanCx - hp - 18, fanCy - hp, fanCx - hp - 18, fanCy + hp, 2);
+    addText("5_DIMENSIONS", fanCx - hp - 26, fanCy - 4, 4.0, `${spec.holePitchMm}`, 90, 2);
+
+    addLine("6_LEADERS", fanCx, fanCy + spec.cutoutDiaMm / 2, fanCx + 30, fanCy + spec.cutoutDiaMm / 2 + 35, 4);
+    addLine("6_LEADERS", fanCx + 30, fanCy + spec.cutoutDiaMm / 2 + 35, fanCx + 115, fanCy + spec.cutoutDiaMm / 2 + 35, 4);
+    addText(
+      "6_LEADERS",
+      fanCx + 34,
+      fanCy + spec.cutoutDiaMm / 2 + 39,
+      4.0,
+      `Ø${spec.cutoutDiaMm} + 4x Ø${spec.screwHoleDiaMm} (${spec.holePitchMm}x${spec.holePitchMm}) [${fanLabel}]`,
+      0,
+      4
+    );
   }
 
   // 6. Dimensi Tebal/Kedalaman (Side Bottom)

@@ -18,9 +18,10 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
-import type {
-  OuterPanelLayoutData,
-  PanelComponentInput,
+import {
+  resolveFanCutoutPosition,
+  type OuterPanelLayoutData,
+  type PanelComponentInput,
 } from "@/lib/panel-layout-template";
 import {
   generateOuterPanelDxf,
@@ -136,10 +137,16 @@ export function ProjectOuterPanel2DViewer({
   const lotoX = frontX + (features.lotoX ?? 110);
   const lotoY = frontY + (features.lotoY ?? 110);
 
-  // Posisi Fan Samping
+  // Posisi Lubang Fan Samping (Ø115 + 4× Ø5 pitch 105×105 mm)
   const fanSizeMm = features.fanSizeMm || prFeatures.fanSizeMm || 120;
-  const fanX = sideX + Math.max(10, Math.round((depthMm - fanSizeMm) / 2));
-  const fanY = sideY + (features.fanY ?? 90);
+  const fanPos = resolveFanCutoutPosition(
+    depthMm,
+    heightMm,
+    fanSizeMm,
+    features.fanY
+  );
+  const fanCx = sideX + fanPos.cxFromEdgeMm;
+  const fanCy = sideY + fanPos.cyFromTopMm;
 
   // Penyesuaian Dimensi
   const updateEnclosure = (patch: Partial<typeof enclosure>) => {
@@ -1099,115 +1106,168 @@ export function ProjectOuterPanel2DViewer({
                 />
               )}
 
-              {/* --- ELEMEN: COOLING FAN LOUVRE / FILTER KISI-KISI --- */}
+              {/* --- ELEMEN: LUBANG CUTOUT FAN BULAT (Ø115 + 4× Ø5 PITCH 105×105) --- */}
               {/* Tampil HANYA jika hasFan === true */}
-              {features.hasFan && (
-                <g id="cooling-fan-louvre" transform={`translate(${fanX}, ${fanY})`}>
-                  {/* Outer Housing Filter Persegi */}
-                  <rect
-                    x={0}
-                    y={0}
-                    width={fanSizeMm}
-                    height={fanSizeMm}
-                    rx={6}
-                    fill="#0f172a"
-                    stroke="#38bdf8"
-                    strokeWidth={2.5}
-                  />
+              {features.hasFan && (() => {
+                const { spec } = fanPos;
+                const rMain = spec.cutoutDiaMm / 2;
+                const rScrew = spec.screwHoleDiaMm / 2;
+                const hp = spec.halfPitchMm;
+                const armExt = rMain + 16;
 
-                  {/* Inner Mesh Filter Frame */}
-                  <rect
-                    x={8}
-                    y={8}
-                    width={fanSizeMm - 16}
-                    height={fanSizeMm - 16}
-                    rx={3}
-                    fill="#1e293b"
-                    stroke="#475569"
-                    strokeWidth={1}
-                  />
+                return (
+                  <g id="cooling-fan-louvre">
+                    {/* Garis Sumbu Tengah (Centerlines) */}
+                    <line
+                      x1={fanCx - armExt}
+                      y1={fanCy}
+                      x2={fanCx + armExt}
+                      y2={fanCy}
+                      stroke="#64748b"
+                      strokeWidth={1}
+                      strokeDasharray="6 3 2 3"
+                    />
+                    <line
+                      x1={fanCx}
+                      y1={fanCy - armExt}
+                      x2={fanCx}
+                      y2={fanCy + armExt}
+                      stroke="#64748b"
+                      strokeWidth={1}
+                      strokeDasharray="6 3 2 3"
+                    />
 
-                  {/* Kisi-kisi Horizontal Louvre Fan */}
-                  {Array.from({ length: 7 }).map((_, idx) => {
-                    const step = (fanSizeMm - 24) / 8;
-                    const yPos = 12 + (idx + 1) * step;
-                    return (
-                      <g key={idx}>
-                        <line
-                          x1={12}
-                          y1={yPos}
-                          x2={fanSizeMm - 12}
-                          y2={yPos}
-                          stroke="#94a3b8"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                        />
-                        <line
-                          x1={12}
-                          y1={yPos + 1.5}
-                          x2={fanSizeMm - 12}
-                          y2={yPos + 1.5}
-                          stroke="#0f172a"
-                          strokeWidth={1}
-                        />
-                      </g>
-                    );
-                  })}
+                    {/* Lubang Potong Utama Bulat Ø115 */}
+                    <circle
+                      cx={fanCx}
+                      cy={fanCy}
+                      r={rMain}
+                      fill="#0f172a"
+                      stroke="#38bdf8"
+                      strokeWidth={2}
+                    />
 
-                  {/* Badge Ukuran Fan di Tengah Bawah */}
-                  <rect
-                    x={fanSizeMm / 2 - 28}
-                    y={fanSizeMm - 14}
-                    width={56}
-                    height={12}
-                    rx={2}
-                    fill="#0284c7"
-                  />
-                  <text
-                    x={fanSizeMm / 2}
-                    y={fanSizeMm - 5}
-                    textAnchor="middle"
-                    fill="#ffffff"
-                    fontSize={7.5}
-                    fontWeight="extrabold"
-                    fontFamily="monospace"
-                  >
-                    {fanSizeMm}×{fanSizeMm} mm
-                  </text>
-                </g>
-              )}
+                    {/* 4 Lubang Baut Ø5 pada jarak 105×105 mm */}
+                    {[
+                      [-hp, -hp],
+                      [hp, -hp],
+                      [-hp, hp],
+                      [hp, hp],
+                    ].map(([dx, dy], i) => (
+                      <circle
+                        key={`fan-bolt-${i}`}
+                        cx={fanCx + dx}
+                        cy={fanCy + dy}
+                        r={rScrew}
+                        fill="#0f172a"
+                        stroke="#38bdf8"
+                        strokeWidth={1.6}
+                      />
+                    ))}
 
-              {/* Leader Line Pointer ke Fan */}
-              {features.hasFan && (
-                <>
-                  <path
-                    d={`M ${fanX + fanSizeMm / 2} ${fanY} L ${fanX + fanSizeMm / 2 + 35} ${fanY - 45} L ${fanX + fanSizeMm / 2 + 150} ${fanY - 45}`}
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth={1.8}
-                    markerStart="url(#arrowPointer)"
-                  />
-                  <text
-                    x={fanX + fanSizeMm / 2 + 40}
-                    y={fanY - 51}
-                    fill="#38bdf8"
-                    fontSize={12}
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                  >
-                    FAN FILTER {fanSizeMm}×{fanSizeMm}
-                  </text>
-                  <text
-                    x={fanX + fanSizeMm / 2 + 40}
-                    y={fanY - 33}
-                    fill="#94a3b8"
-                    fontSize={9.5}
-                    fontFamily="sans-serif"
-                  >
-                    {features.fanLabel || prFeatures.fanCompName || "Exhaust Cooling Fan"}
-                  </text>
-                </>
-              )}
+                    {/* Dimensi Pitch Vertikal 105 (kiri) */}
+                    <line
+                      x1={fanCx - hp - 18}
+                      y1={fanCy - hp}
+                      x2={fanCx - hp - 18}
+                      y2={fanCy + hp}
+                      stroke="#94a3b8"
+                      strokeWidth={0.9}
+                    />
+                    <line
+                      x1={fanCx - hp - 22}
+                      y1={fanCy - hp}
+                      x2={fanCx - hp}
+                      y2={fanCy - hp}
+                      stroke="#94a3b8"
+                      strokeWidth={0.7}
+                    />
+                    <line
+                      x1={fanCx - hp - 22}
+                      y1={fanCy + hp}
+                      x2={fanCx - hp}
+                      y2={fanCy + hp}
+                      stroke="#94a3b8"
+                      strokeWidth={0.7}
+                    />
+                    <text
+                      x={fanCx - hp - 22}
+                      y={fanCy}
+                      textAnchor="middle"
+                      fill="#cbd5e1"
+                      fontSize={9}
+                      fontFamily="monospace"
+                      transform={`rotate(-90 ${fanCx - hp - 22} ${fanCy})`}
+                    >
+                      {spec.holePitchMm}
+                    </text>
+
+                    {/* Dimensi Pitch Horizontal 105 (bawah) */}
+                    <line
+                      x1={fanCx - hp}
+                      y1={fanCy + hp + 18}
+                      x2={fanCx + hp}
+                      y2={fanCy + hp + 18}
+                      stroke="#94a3b8"
+                      strokeWidth={0.9}
+                    />
+                    <line
+                      x1={fanCx - hp}
+                      y1={fanCy + hp}
+                      x2={fanCx - hp}
+                      y2={fanCy + hp + 22}
+                      stroke="#94a3b8"
+                      strokeWidth={0.7}
+                    />
+                    <line
+                      x1={fanCx + hp}
+                      y1={fanCy + hp}
+                      x2={fanCx + hp}
+                      y2={fanCy + hp + 22}
+                      stroke="#94a3b8"
+                      strokeWidth={0.7}
+                    />
+                    <text
+                      x={fanCx}
+                      y={fanCy + hp + 30}
+                      textAnchor="middle"
+                      fill="#cbd5e1"
+                      fontSize={9}
+                      fontFamily="monospace"
+                    >
+                      {spec.holePitchMm}
+                    </text>
+
+                    {/* Leader Pointer Ø115 */}
+                    <path
+                      d={`M ${fanCx + rMain * 0.7} ${fanCy - rMain * 0.7} L ${fanCx + rMain + 28} ${fanCy - rMain - 24} L ${fanCx + rMain + 120} ${fanCy - rMain - 24}`}
+                      fill="none"
+                      stroke="#38bdf8"
+                      strokeWidth={1.6}
+                      markerStart="url(#arrowPointer)"
+                    />
+                    <text
+                      x={fanCx + rMain + 32}
+                      y={fanCy - rMain - 30}
+                      fill="#38bdf8"
+                      fontSize={11}
+                      fontWeight="bold"
+                      fontFamily="monospace"
+                    >
+                      Ø{spec.cutoutDiaMm} (4× Ø{spec.screwHoleDiaMm})
+                    </text>
+                    <text
+                      x={fanCx + rMain + 32}
+                      y={fanCy - rMain - 12}
+                      fill="#94a3b8"
+                      fontSize={9}
+                      fontFamily="sans-serif"
+                    >
+                      {features.fanLabel || prFeatures.fanCompName || `Fan Cutout ${spec.holePitchMm}×${spec.holePitchMm}`}
+                    </text>
+                  </g>
+                );
+              })()}
 
               {/* --- GARIS UKUR DIMENSI TAMPAK SAMPING --- */}
               {/* Garis Ukur Tebal/Kedalaman (Bottom Dimension: D mm) */}
